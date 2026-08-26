@@ -1,0 +1,10 @@
+node_modules
+.nuxt
+.output
+.data
+.env
+public/uploads
+.DS_Store
+*.log
+.workbuddy
+_tmp_*
