@@ -1,0 +1,688 @@
+@import 'tailwindcss';
+@import '@nuxt/ui';
+
+/* ==========================================================================
+   设计令牌 / Design Tokens
+   全站唯一的颜色、字体、圆角、阴影来源。组件与页面一律引用，禁止裸值。
+   ========================================================================== */
+@theme {
+  /* ---- 识别色：电影工业朱红，仅用于焦点与少量强调 ---- */
+  --color-signal-50: #fff3f0;
+  --color-signal-100: #ffe1db;
+  --color-signal-200: #ffc2b6;
+  --color-signal-300: #ff9988;
+  --color-signal-400: #ff6d55;
+  --color-signal-500: #ff4d35;
+  --color-signal-600: #ed321b;
+  --color-signal-700: #c72614;
+  --color-signal-800: #a42316;
+  --color-signal-900: #872218;
+  --color-signal-950: #490d07;
+
+  /* ---- 字体 ---- */
+  --font-sans: 'Noto Sans', 'Noto Sans SC', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'Noto Sans', 'Noto Sans SC', ui-sans-serif, system-ui, sans-serif;
+
+  /* ---- 补充字重（Tailwind 默认只有 100 的倍数） ---- */
+  --font-weight-450: 450;
+  --font-weight-550: 550;
+  --font-weight-650: 650;
+
+  /* ---- 圆角 ---- */
+  --radius-xs: 0.375rem;
+  --radius-sm: 0.5rem;
+  --radius-md: 0.625rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 0.875rem;
+  --radius-2xl: 1rem;
+  --radius-3xl: 1.25rem;
+
+  /* ---- 阴影（分层，营造电影质感的空间深度） ---- */
+  --shadow-soft: 0 1px 2px rgb(10 11 13 / 4%), 0 4px 12px -2px rgb(10 11 13 / 6%);
+  --shadow-card: 0 1px 2px rgb(10 11 13 / 5%), 0 8px 24px -6px rgb(10 11 13 / 9%);
+  --shadow-lift: 0 2px 4px rgb(10 11 13 / 6%), 0 18px 40px -12px rgb(10 11 13 / 17%);
+  --shadow-cinema: 0 1px 2px rgb(10 11 13 / 10%), 0 30px 70px -34px rgb(10 11 13 / 48%);
+  --shadow-glow: 0 0 0 1px rgb(255 77 53 / 10%), 0 14px 34px -16px rgb(255 77 53 / 24%);
+
+  /* ---- 动效时长 ---- */
+  --ease-cinematic: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Nuxt UI 语义变量微调：更干净的白、更细腻的描边 */
+:root {
+  --ui-radius: 0.5rem;
+  --ui-container: 80rem;
+  --ui-bg: #f7f8fa;
+  --ui-bg-muted: #f0f1f3;
+  --ui-bg-elevated: #ffffff;
+  --ui-bg-accented: #e8eaed;
+  --ui-border: #dedfe3;
+  --ui-border-muted: #e8e9ec;
+  --ui-border-accented: #cfd1d6;
+  --ui-text: #202124;
+  --ui-text-muted: #5e6269;
+  --ui-text-toned: #35383d;
+  --ui-text-highlighted: #0c0d0f;
+  --ui-text-dimmed: #8b9098;
+  color-scheme: light;
+}
+
+.dark {
+  --ui-bg: #08090b;
+  --ui-bg-muted: #101216;
+  --ui-bg-elevated: #15171b;
+  --ui-bg-accented: #1d2025;
+  --ui-border: #292d33;
+  --ui-border-muted: #202329;
+  --ui-border-accented: #383d45;
+  --ui-text: #d6d8dc;
+  --ui-text-muted: #9ba0a8;
+  --ui-text-toned: #bdc1c7;
+  --ui-text-highlighted: #f4f5f6;
+  --ui-text-dimmed: #737982;
+  color-scheme: dark;
+}
+
+/* ==========================================================================
+   基础层 / Base
+   ========================================================================== */
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    /* 页面保持可滚动，但不显示根滚动条；弹层滚动锁因此也无需做宽度补偿。 */
+    overflow-y: auto;
+    scrollbar-gutter: stable;
+    scrollbar-width: none;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  html::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+
+  body {
+    margin: 0;
+    overflow-x: hidden;
+    font-family: var(--font-sans);
+    font-size: 1.0625rem;
+    line-height: 1.75;
+    font-weight: 400;
+    letter-spacing: 0;
+    background: var(--ui-bg);
+    color: var(--ui-text);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  ::selection {
+    background: rgb(255 77 53 / 20%);
+    color: var(--ui-text-highlighted);
+  }
+
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  /* Noto Sans 的中文字面更饱满，标题仅做轻微收紧。 */
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    margin: 0;
+    font-weight: 600;
+    letter-spacing: -0.012em;
+  }
+
+  /* 滚动条 */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: var(--ui-bg-muted);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    border: 3px solid var(--ui-bg-muted);
+    border-radius: 99px;
+    background: var(--ui-border-accented);
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--ui-text-dimmed);
+  }
+}
+
+/* ==========================================================================
+   排版阶梯 / Typography Scale
+   字号、行高、字重、字距成对定义，全站复用，禁止临时手写尺寸。
+   ========================================================================== */
+@utility type-display {
+  font-size: clamp(2.8rem, 5vw, 4.6rem);
+  font-weight: 650;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+}
+
+@utility type-page-title {
+  font-size: clamp(2.15rem, 3.4vw, 3rem);
+  font-weight: 650;
+  line-height: 1.16;
+  letter-spacing: -0.025em;
+}
+
+@utility type-section-title {
+  font-size: clamp(1.8rem, 2.5vw, 2.4rem);
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.02em;
+}
+
+@utility type-card-title {
+  font-size: 1.1875rem;
+  font-weight: 600;
+  line-height: 1.55;
+  letter-spacing: -0.008em;
+}
+
+@utility type-lead {
+  font-size: 1.1875rem;
+  font-weight: 400;
+  line-height: 1.85;
+  letter-spacing: 0;
+  color: var(--ui-text-muted);
+}
+
+@utility type-body {
+  font-size: 1.0625rem;
+  font-weight: 400;
+  line-height: 1.8;
+  letter-spacing: 0;
+  color: var(--ui-text-muted);
+}
+
+@utility type-caption {
+  font-size: 1rem;
+  font-weight: 400;
+  line-height: 1.7;
+  letter-spacing: 0;
+  color: var(--ui-text-dimmed);
+}
+
+@utility type-kicker {
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.5;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ui-text-dimmed);
+}
+
+@utility type-mono {
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  font-weight: 500;
+  line-height: 1.6;
+  letter-spacing: 0.04em;
+}
+
+@utility type-label {
+  font-size: 1rem;
+  font-weight: 550;
+  line-height: 1.55;
+  letter-spacing: 0;
+  color: var(--ui-text-toned);
+}
+
+/* ==========================================================================
+   布局原语 / Layout Primitives
+   ========================================================================== */
+@utility shell {
+  width: 100%;
+  max-width: 80rem;
+  margin-inline: auto;
+  padding-inline: 1.25rem;
+}
+
+@utility shell-wide {
+  width: 100%;
+  max-width: 92rem;
+  margin-inline: auto;
+  padding-inline: 1.25rem;
+}
+
+@utility section-y {
+  padding-block: 4.5rem;
+}
+
+@utility panel-scroll {
+  scrollbar-gutter: stable;
+  overscroll-behavior: contain;
+}
+
+/* 创作台参数区保留滚轮 / 触控滚动，不展示常驻滚动条。 */
+.studio-scroll {
+  scrollbar-width: none;
+}
+
+.studio-scroll::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+@utility surface-rule {
+  background-image: linear-gradient(to bottom, rgb(12 13 15 / 3%) 1px, transparent 1px);
+  background-size: 100% 4px;
+}
+
+@utility focus-ring {
+  outline: none;
+
+  &:focus-visible {
+    outline: 2px solid var(--color-signal-500);
+    outline-offset: 2px;
+  }
+}
+
+/* ==========================================================================
+   液态玻璃导航 / Liquid Glass Navigation
+   多层半透明材质：环境采样、内高光、动态折射与浮动阴影。
+   ========================================================================== */
+.liquid-nav {
+  --liquid-shift: 0;
+  position: fixed;
+  z-index: 50;
+  top: 12px;
+  right: 14px;
+  left: 14px;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+  transition: top 500ms var(--ease-cinematic);
+}
+
+.liquid-nav__glass {
+  position: relative;
+  isolation: isolate;
+  width: 100%;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  gap: 1.35rem;
+  overflow: hidden;
+  padding: 0.55rem 0.65rem 0.55rem 1rem;
+  border: 1px solid rgb(255 255 255 / 56%);
+  border-radius: 1.25rem;
+  background: linear-gradient(180deg, rgb(255 255 255 / 20%), rgb(255 255 255 / 7%));
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 72%),
+    inset 0 -1px 0 rgb(255 255 255 / 20%),
+    0 1px 2px rgb(15 18 24 / 5%),
+    0 14px 42px -22px rgb(15 18 24 / 30%);
+  pointer-events: auto;
+  transition:
+    height 500ms var(--ease-cinematic),
+    border-radius 500ms var(--ease-cinematic),
+    background 500ms var(--ease-cinematic),
+    border-color 500ms var(--ease-cinematic),
+    box-shadow 500ms var(--ease-cinematic);
+}
+
+.liquid-nav__motion {
+  width: min(100%, 76rem);
+}
+
+.liquid-nav__glass::after {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(100deg, transparent 8%, rgb(255 255 255 / 34%) 36%, transparent 58%);
+  content: '';
+  opacity: 0.66;
+  pointer-events: none;
+  transform: translateX(calc(var(--liquid-shift) * 1%));
+  transition: opacity 500ms var(--ease-cinematic);
+}
+
+.liquid-nav__brand {
+  flex: none;
+  border-radius: 0.65rem;
+}
+
+.liquid-nav__links {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.liquid-nav__link {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-height: 38px;
+  padding: 0 0.85rem;
+  border-radius: 0.75rem;
+  color: color-mix(in srgb, var(--ui-text-muted) 88%, transparent);
+  font-size: 1rem;
+  font-weight: 550;
+  line-height: 1;
+  letter-spacing: -0.012em;
+  transition:
+    color 180ms ease,
+    background-color 180ms ease,
+    transform 180ms var(--ease-cinematic);
+}
+
+.liquid-nav__link::after {
+  position: absolute;
+  right: 0.8rem;
+  bottom: 5px;
+  left: 0.8rem;
+  height: 1.5px;
+  border-radius: 99px;
+  background: var(--color-signal-500);
+  content: '';
+  opacity: 0;
+  transform: scaleX(0.35);
+  transition:
+    opacity 220ms ease,
+    transform 350ms var(--ease-cinematic);
+}
+
+.liquid-nav__link:hover {
+  background: rgb(255 255 255 / 42%);
+  color: var(--ui-text-highlighted);
+}
+
+.liquid-nav__link:active {
+  transform: scale(0.97);
+}
+
+.liquid-nav__link.is-active {
+  background: rgb(255 255 255 / 56%);
+  color: var(--ui-text-highlighted);
+}
+
+.liquid-nav__link.is-active::after {
+  opacity: 1;
+  transform: scaleX(1);
+}
+
+.liquid-nav__actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.liquid-nav__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0 0.5rem;
+  color: var(--ui-text-muted);
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+.liquid-nav__status-dot {
+  width: 0.375rem;
+  height: 0.375rem;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow:
+    0 0 0 3px rgb(34 197 94 / 12%),
+    0 0 12px rgb(34 197 94 / 32%);
+}
+
+.liquid-nav__icon-button {
+  border-radius: 0.75rem !important;
+}
+
+.liquid-nav__cta {
+  border-radius: 0.75rem !important;
+  box-shadow: 0 8px 18px -10px rgb(255 77 53 / 68%);
+}
+
+.liquid-nav.is-scrolled {
+  top: 8px;
+}
+
+.liquid-nav.is-scrolled .liquid-nav__glass {
+  height: 56px;
+  border-color: rgb(255 255 255 / 64%);
+  border-radius: 1rem;
+  background: linear-gradient(180deg, rgb(255 255 255 / 30%), rgb(255 255 255 / 12%));
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 82%),
+    inset 0 -1px 0 rgb(255 255 255 / 24%),
+    0 1px 2px rgb(15 18 24 / 7%),
+    0 18px 48px -22px rgb(15 18 24 / 40%);
+}
+
+.dark .liquid-nav__glass {
+  border-color: rgb(255 255 255 / 14%);
+  background: linear-gradient(180deg, rgb(255 255 255 / 10%), rgb(255 255 255 / 4%));
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 13%),
+    inset 0 -1px 0 rgb(255 255 255 / 4%),
+    0 1px 2px rgb(0 0 0 / 30%),
+    0 18px 48px -22px rgb(0 0 0 / 80%);
+}
+
+.dark .liquid-nav__link:hover,
+.dark .liquid-nav__link.is-active {
+  background: rgb(255 255 255 / 8%);
+}
+
+.dark .liquid-nav.is-scrolled .liquid-nav__glass {
+  border-color: rgb(255 255 255 / 18%);
+  background: linear-gradient(180deg, rgb(255 255 255 / 13%), rgb(255 255 255 / 6%));
+}
+
+/* 创作台使用低干扰的工作区工具栏，不沿用营销页导航结构。 */
+.liquid-nav--workspace {
+  top: 10px;
+  right: 16px;
+  left: 16px;
+}
+
+.liquid-nav--workspace .liquid-nav__motion {
+  width: min(100%, 105rem);
+}
+
+.liquid-nav--workspace .liquid-nav__glass {
+  height: 50px;
+  gap: 0.65rem;
+  padding: 0.35rem 0.45rem;
+  border-color: color-mix(in srgb, var(--ui-border) 80%, transparent);
+  border-radius: 0.875rem;
+  background: color-mix(in srgb, var(--ui-bg-elevated) 72%, transparent);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 40%),
+    0 8px 24px -18px rgb(15 18 24 / 32%);
+}
+
+.liquid-nav--workspace.is-scrolled {
+  top: 10px;
+}
+
+.liquid-nav--workspace.is-scrolled .liquid-nav__glass {
+  height: 50px;
+  border-color: color-mix(in srgb, var(--ui-border) 80%, transparent);
+  border-radius: 0.875rem;
+  background: color-mix(in srgb, var(--ui-bg-elevated) 78%, transparent);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 40%),
+    0 8px 24px -18px rgb(15 18 24 / 32%);
+}
+
+.liquid-nav__workspace-brand {
+  display: inline-flex;
+  border-radius: 0.65rem;
+}
+
+.liquid-nav__divider {
+  width: 1px;
+  height: 20px;
+  background: var(--ui-border);
+}
+
+.liquid-nav__workspace-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--ui-text-toned);
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.liquid-nav__workspace-title > span {
+  color: var(--ui-text-dimmed);
+}
+
+.liquid-nav__workspace-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.liquid-nav__workspace-button {
+  border-radius: 0.65rem !important;
+  color: var(--ui-text-muted) !important;
+  font-size: 1rem !important;
+}
+
+.dark .liquid-nav--workspace .liquid-nav__glass,
+.dark .liquid-nav--workspace.is-scrolled .liquid-nav__glass {
+  border-color: var(--ui-border);
+  background: color-mix(in srgb, var(--ui-bg-elevated) 76%, transparent);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 8%),
+    0 8px 24px -18px rgb(0 0 0 / 72%);
+}
+
+@media (max-width: 767px) {
+  .liquid-nav {
+    top: 8px;
+    right: 8px;
+    left: 8px;
+  }
+
+  .liquid-nav__glass {
+    height: 60px;
+    gap: 0.5rem;
+    padding: 0.45rem 0.45rem 0.45rem 0.8rem;
+    border-radius: 1rem;
+  }
+
+  .liquid-nav__motion {
+    width: 100%;
+  }
+
+  .liquid-nav--workspace {
+    top: 8px;
+    right: 8px;
+    left: 8px;
+  }
+
+  .liquid-nav--workspace .liquid-nav__glass {
+    height: 52px;
+  }
+
+  .liquid-nav__workspace-button {
+    padding-inline: 0.5rem !important;
+  }
+
+  .liquid-nav__workspace-button:first-child {
+    display: none;
+  }
+
+  .liquid-nav__links,
+  .liquid-nav__status,
+  .liquid-nav__cta {
+    display: none !important;
+  }
+
+  .liquid-nav__actions {
+    gap: 0.2rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .liquid-nav,
+  .liquid-nav__glass,
+  .liquid-nav__glass::after,
+  .liquid-nav__link,
+  .liquid-nav__link::after {
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* 胶片颗粒：电影质感的关键，压在纯白上避免"塑料感" */
+@utility film-grain {
+  position: relative;
+
+  &::after {
+    position: absolute;
+    z-index: 2;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.05;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.9'/%3E%3C/svg%3E");
+    content: '';
+  }
+}
+
+/* 细腻分隔线：左浅右深渐变，比实线更耐看 */
+@utility hairline {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--ui-border) 12%, var(--ui-border) 88%, transparent);
+}
+
+/* ==========================================================================
+   页面过渡 / Page Transition
+   ========================================================================== */
+.page-enter-active,
+.page-leave-active {
+  transition:
+    opacity 0.28s var(--ease-cinematic),
+    transform 0.28s var(--ease-cinematic);
+}
+
+.page-enter-from,
+.page-leave-to {
+  opacity: 0;
+  transform: translateY(8px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
