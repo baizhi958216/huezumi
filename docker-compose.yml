@@ -1,0 +1,13 @@
+services:
+  forkvdo:
+    build: .
+    ports:
+      - '3000:3000'
+    env_file:
+      - .env
+    volumes:
+      - forkvdo-data:/app/.data
+    restart: unless-stopped
+
+volumes:
+  forkvdo-data:
