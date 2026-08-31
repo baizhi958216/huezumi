@@ -8,7 +8,7 @@ export default defineAppConfig({
     // 统一的视觉基线：所有组件共用同一套圆角、字重与内边距节奏
     button: {
       slots: {
-        base: 'rounded-md font-550 tracking-normal transition duration-150 active:translate-y-px disabled:opacity-40 disabled:saturate-0 aria-disabled:opacity-40 aria-disabled:saturate-0',
+        base: 'rounded-md !text-base font-550 tracking-normal transition duration-150 active:translate-y-px disabled:opacity-40 disabled:saturate-0 aria-disabled:opacity-40 aria-disabled:saturate-0',
       },
       defaultVariants: {
         size: 'md',
@@ -26,25 +26,25 @@ export default defineAppConfig({
 
     input: {
       slots: {
-        base: 'rounded-md',
+        base: 'rounded-md !text-base',
       },
     },
 
     textarea: {
       slots: {
-        base: 'rounded-md leading-6',
+        base: 'rounded-md !text-base leading-7',
       },
     },
 
     select: {
       slots: {
-        base: 'rounded-md',
+        base: 'rounded-md !text-base',
       },
     },
 
     badge: {
       slots: {
-        base: 'rounded-md font-550',
+        base: 'rounded-md !text-base font-550',
       },
     },
 
@@ -66,7 +66,7 @@ export default defineAppConfig({
 
     tooltip: {
       slots: {
-        content: 'rounded-md px-3 py-2 text-sm shadow-card',
+        content: 'rounded-md px-3 py-2 !text-base shadow-card',
       },
     },
   },
