@@ -5,12 +5,15 @@
   "packageManager": "pnpm@10.15.1",
   "scripts": {
     "build": "nuxt build",
+    "check": "node harness/run.mjs",
+    "check:full": "node harness/run.mjs --full",
     "dev": "nuxt dev",
     "generate": "nuxt generate",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "preview": "nuxt preview",
-    "postinstall": "nuxt prepare"
+    "postinstall": "nuxt prepare",
+    "typecheck": "nuxt typecheck"
   },
   "dependencies": {
     "@nuxt/ui": "^4.11.0",
@@ -21,7 +24,7 @@
     "nuxt": "^4.1.0",
     "ogl": "^1.0.11",
     "vue": "^3.5.20",
-    "vue-router": "^4.5.1",
+    "vue-router": "^5.3.0",
     "zod": "^4.1.5"
   },
   "devDependencies": {
