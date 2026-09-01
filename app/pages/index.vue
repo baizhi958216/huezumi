@@ -3,13 +3,9 @@ import type { ModelSpec, ProviderCapability } from '#shared/types/generation'
 import { MODE_META, resolveModelCapability } from '#shared/types/generation'
 import AnimatedContent from '~/components/vuebits/AnimatedContent.vue'
 import CountUp from '~/components/vuebits/CountUp.vue'
-import DotGrid from '~/components/vuebits/DotGrid.vue'
-import ScrollVelocity from '~/components/vuebits/ScrollVelocity.vue'
-import SplitText from '~/components/vuebits/SplitText.vue'
+import TextType from '~/components/vuebits/TextType.vue'
 
 const { data: providerCatalog } = await useFetch<ProviderCapability[]>('/api/providers')
-const colorMode = useColorMode()
-const isDark = computed(() => colorMode.value === 'dark')
 
 const modes = Object.entries(MODE_META).map(([key, value]) => ({
   ...value,
@@ -27,21 +23,6 @@ const workflow = [
   { n: '01', title: '选择生成方式', desc: '根据现有素材选择文生、首尾帧或多模态参考，平台会按所选供应商的能力自动收敛可选项。' },
   { n: '02', title: '设置输出参数', desc: '指定模型、清晰度、画幅、时长、声音与水印，参数范围完全由供应商能力声明驱动。' },
   { n: '03', title: '提交并追踪任务', desc: '任务异步执行，状态实时轮询；生成结果自动转存作品库，不依赖供应商的临时链接。' },
-]
-
-const marqueeItems = [
-  'WAN 3.0 PRIME',
-  'HAPPYHORSE 1.1',
-  'MINIMAX H3',
-  'HAILUO 2.3',
-  'KLING V2.6',
-  'SEEDANCE 2.5',
-  '480P – 4K',
-  '最长 30 秒',
-  '同步音频',
-  '首尾帧控制',
-  '多模态参考',
-  '21:9 – 9:16',
 ]
 
 const faqItems = [
@@ -184,81 +165,107 @@ const selectedModelFacts = computed(() => {
 </script>
 
 <template>
-  <div class="bg-default">
+  <div class="home-page bg-default">
     <!-- ============================ HERO ============================ -->
-    <section class="film-grain relative overflow-hidden border-b border-default bg-elevated">
-      <DotGrid :gap="32" :color="isDark ? '#2d3036' : '#d9dce1'" active-color="#ff4d35" class="opacity-55" />
-      <div class="absolute inset-x-0 bottom-0 h-40 bg-elevated/80 backdrop-blur-[2px]" aria-hidden="true" />
+    <section class="home-hero">
+      <div class="home-hero__glow" aria-hidden="true" />
+      <div class="relative mx-auto max-w-[1440px] px-5 pt-36 md:px-8 md:pt-44">
+        <AnimatedContent :distance="26" :duration="0.75" class-name="mx-auto max-w-4xl text-center">
+          <NuxtLink to="#capabilities" class="home-announcement focus-ring">
+            <span class="home-announcement__dot" />
+            {{ supportedModelCount }} 个视频模型已接入
+            <span class="i-lucide-arrow-up-right" aria-hidden="true" />
+          </NuxtLink>
 
-      <div class="relative mx-auto grid max-w-[1440px] items-center gap-14 px-5 pt-36 pb-18 md:px-8 lg:grid-cols-[.92fr_1.08fr] lg:pt-40 lg:pb-24">
-        <AnimatedContent :distance="32" :duration="0.8" class-name="max-w-2xl">
-          <UBadge color="neutral" variant="outline" size="lg" class="mb-8 gap-2 bg-elevated/90 px-3 py-1 backdrop-blur">
-            <span class="h-1.5 w-1.5 rounded-full bg-emerald-600" />
-            {{ supportedModelCount }} 个 API 模型已适配 · 最高 4K
-          </UBadge>
-
-          <h1 class="type-display">
-            <SplitText text="什么内容都能拍，" /><br>
-            <span class="text-dimmed"><SplitText text="不必真的去拍。" :delay="0.25" /></span>
+          <h1 class="home-hero__title mt-7">
+            <span class="home-hero__title-line">
+              <TextType text="把想象，" :show-cursor="false" :initial-delay="120" />
+            </span>
+            <span class="home-hero__title-line home-hero__title-accent">
+              <TextType text="直接变成镜头。" :initial-delay="480" />
+            </span>
           </h1>
 
-          <p class="type-lead mt-7 max-w-xl">
-            文字、首尾帧、参考图、参考视频、参考音频，自由组合输入。一个创作流程覆盖项目已适配的全部模型，最高 4K、最长 30 秒、支持同步生成声音。
+          <p class="home-hero__lead mx-auto mt-6 max-w-2xl">
+            从一句描述到完整画面，也可以带上图片、视频和声音。forkvdo 将不同模型放进同一个清晰、可靠的创作流程。
           </p>
 
-          <div class="mt-9 flex flex-wrap gap-3">
-            <UButton to="/studio" size="xl" color="primary" trailing-icon="i-lucide-arrow-up-right" class="px-7">
-              新建生成任务
+          <div class="mt-8 flex flex-wrap justify-center gap-3">
+            <UButton to="/studio" size="xl" color="primary" trailing-icon="i-lucide-arrow-up-right" class="home-primary-action px-7">
+              开始创作
             </UButton>
-            <UButton to="/projects" size="xl" color="neutral" variant="outline" class="bg-elevated px-7">
-              查看作品库
+            <UButton to="/projects" size="xl" color="neutral" variant="outline" class="home-secondary-action px-7">
+              查看作品
             </UButton>
-          </div>
-
-          <div class="mt-11 flex flex-wrap items-center gap-x-8 gap-y-3">
-            <div
-              v-for="item in [
-                { value: 4, suffix: 'K', label: '最高清晰度' },
-                { value: 30, suffix: ' 秒', label: '单次最长时长' },
-                { value: 6, suffix: ' 种', label: '输入组合方式' },
-              ]" :key="item.label" class="flex items-baseline gap-2"
-            >
-              <span class="text-lg font-650 tracking-tight">
-                <CountUp :to="item.value" :duration="1.6" />{{ item.suffix }}
-              </span>
-              <span class="type-caption">{{ item.label }}</span>
-            </div>
           </div>
         </AnimatedContent>
 
-        <AnimatedContent :distance="36" direction="horizontal" :reverse="true" :duration="0.9" :delay="0.08">
-          <UCard class="mx-auto w-full max-w-[680px] overflow-hidden bg-zinc-950 shadow-cinema" :ui="{ body: 'p-0 sm:p-0' }">
-            <div class="relative aspect-[16/10] overflow-hidden">
-              <img src="/images/hero-cinematic.png" alt="AI 生成的电影感荒原光门画面" class="h-full w-full object-cover opacity-95">
-              <div class="surface-rule absolute inset-0 opacity-25" aria-hidden="true" />
-              <div class="absolute inset-x-0 top-0 flex items-center justify-between border-b border-white/15 bg-black/25 px-4 py-3 text-white backdrop-blur-md">
-                <span class="type-mono flex items-center gap-2 text-white/70"><span class="h-1.5 w-1.5 rounded-full bg-signal-500" /> LIVE FRAME</span>
-                <span class="type-mono text-white/55">00:00:08:14</span>
+        <AnimatedContent :distance="34" :duration="0.9" :delay="0.1" class-name="home-product-stage mt-14 md:mt-18">
+          <div class="home-product-stage__chrome">
+            <div class="home-product-stage__dots" aria-hidden="true">
+              <span /><span /><span />
+            </div>
+            <div class="home-product-stage__brand">
+              <span class="i-lucide-sparkles" /> FORKVDO STUDIO
+            </div>
+            <div class="home-product-stage__status">
+              <span /> 生成中
+            </div>
+          </div>
+          <div class="home-product-stage__body">
+            <aside class="home-prompt-panel">
+              <div>
+                <span class="home-panel-label">创作提示</span>
+                <h2 class="mt-3 text-xl font-650 tracking-tight text-highlighted">
+                  描述你想看见的镜头
+                </h2>
+                <p class="mt-2 text-sm leading-6 text-muted">
+                  镜头语言、主体动作、光线和声音，都可以交给一句话。
+                </p>
               </div>
-              <div class="absolute inset-x-0 bottom-0 grid grid-cols-4 divide-x divide-white/15 border-t border-white/15 bg-black/55 text-white backdrop-blur-md">
-                <div v-for="cell in [{ label: '模型', value: 'WAN 3.0' }, { label: '画幅', value: '16:9' }, { label: '输出', value: '1080P' }, { label: '音轨', value: 'SYNC' }]" :key="cell.label" class="px-3 py-3">
-                  <span class="type-kicker block text-white/40">{{ cell.label }}</span>
-                  <span class="type-mono mt-1 block truncate text-white/85">{{ cell.value }}</span>
+              <div class="home-prompt-box">
+                <p>暴雨后的荒原，一扇发光的门缓缓开启。镜头低机位向前推进，远处雷声与风声交织。</p>
+                <div class="home-prompt-box__meta">
+                  <span><span class="i-lucide-image" /> 首帧</span>
+                  <span>16:9 · 1080P</span>
                 </div>
               </div>
-            </div>
-          </UCard>
-        </AnimatedContent>
-      </div>
-    </section>
+              <div class="home-prompt-actions">
+                <span>WAN 3.0</span>
+                <span>8 秒</span>
+                <span>同步音频</span>
+                <span class="i-lucide-arrow-up-right home-prompt-actions__send" aria-hidden="true" />
+              </div>
+            </aside>
 
-    <!-- ============================ 模型跑马灯 ============================ -->
-    <section class="border-b border-default bg-elevated py-5">
-      <ScrollVelocity
-        :items="marqueeItems"
-        :base-velocity="38"
-        class="type-mono text-zinc-400"
-      />
+            <div class="home-preview">
+              <img src="/images/hero-cinematic.png" alt="AI 生成的电影感荒原光门画面">
+              <div class="home-preview__shade" aria-hidden="true" />
+              <div class="home-preview__caption">
+                <div><span class="home-preview__live" /> PREVIEW</div>
+                <span>00:08 / 00:08</span>
+              </div>
+              <div class="home-preview__progress">
+                <span />
+              </div>
+            </div>
+          </div>
+        </AnimatedContent>
+
+        <div class="home-proof" aria-label="平台能力概览">
+          <div
+            v-for="item in [
+              { value: supportedModelCount, suffix: '', label: '个已接入模型' },
+              { value: 4, suffix: 'K', label: '最高输出' },
+              { value: 30, suffix: ' 秒', label: '最长时长' },
+              { value: 7, suffix: ' 类', label: '输入素材' },
+            ]" :key="item.label" class="home-proof__item"
+          >
+            <strong><CountUp :to="item.value" :duration="1.4" />{{ item.suffix }}</strong>
+            <span>{{ item.label }}</span>
+          </div>
+        </div>
+      </div>
     </section>
 
     <!-- ============================ 模型目录 ============================ -->
@@ -269,9 +276,6 @@ const selectedModelFacts = computed(() => {
             <p class="type-kicker">
               MODEL CATALOG
             </p>
-            <h2 class="type-section-title mt-3 max-w-2xl">
-              项目已支持的模型
-            </h2>
           </div>
         </div>
       </AnimatedContent>
@@ -342,11 +346,6 @@ const selectedModelFacts = computed(() => {
                     {{ fact.value }}
                   </p>
                 </article>
-
-                <div v-if="selectedModel.capabilities?.notes" class="model-catalog__note">
-                  <span class="i-lucide-info mt-0.5 shrink-0 text-signal-500" aria-hidden="true" />
-                  <p>{{ selectedModel.capabilities.notes }}</p>
-                </div>
               </div>
             </div>
           </Transition>
@@ -467,44 +466,6 @@ const selectedModelFacts = computed(() => {
       </div>
     </section>
 
-    <!-- ============================ 数据带 ============================ -->
-    <section class="border-b border-default bg-default">
-      <div class="mx-auto grid max-w-[1440px] px-5 md:grid-cols-4 md:px-8 divide-y divide-default md:divide-x md:divide-y-0">
-        <div class="py-10 md:px-8 md:first:pl-0">
-          <div class="text-4xl font-300 tracking-tight text-highlighted">
-            <CountUp :to="4" :duration="1.6" />K
-          </div>
-          <p class="type-caption mt-2">
-            最高输出清晰度
-          </p>
-        </div>
-        <div class="py-10 md:px-8">
-          <div class="text-4xl font-300 tracking-tight text-highlighted">
-            <CountUp :to="30" :duration="1.4" /> 秒
-          </div>
-          <p class="type-caption mt-2">
-            单次生成最长时长
-          </p>
-        </div>
-        <div class="py-10 md:px-8">
-          <div class="text-4xl font-300 tracking-tight text-highlighted">
-            <CountUp :to="7" :duration="1.4" /> 类
-          </div>
-          <p class="type-caption mt-2">
-            平台支持的输入素材类型
-          </p>
-        </div>
-        <div class="py-10 md:px-8">
-          <div class="text-4xl font-300 tracking-tight text-highlighted">
-            <CountUp :to="supportedModelCount" :duration="1.2" /> 个
-          </div>
-          <p class="type-caption mt-2">
-            可选生成模型
-          </p>
-        </div>
-      </div>
-    </section>
-
     <!-- ============================ FAQ ============================ -->
     <section class="mx-auto max-w-[1440px] px-5 py-20 md:px-8 md:py-24">
       <AnimatedContent :distance="26" :duration="0.65">
@@ -580,6 +541,361 @@ const selectedModelFacts = computed(() => {
 </template>
 
 <style scoped>
+.home-page {
+  overflow: hidden;
+}
+
+.home-hero {
+  position: relative;
+  min-height: 100vh;
+  overflow: hidden;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--ui-bg-elevated) 96%, transparent) 0%, var(--ui-bg) 72%);
+}
+
+.home-hero__glow {
+  position: absolute;
+  top: -14rem;
+  left: 50%;
+  width: min(82rem, 100vw);
+  height: 42rem;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 42% 50%, rgb(255 209 167 / 24%), transparent 38%),
+    radial-gradient(circle at 64% 42%, rgb(189 205 255 / 26%), transparent 42%);
+  filter: blur(26px);
+  pointer-events: none;
+  transform: translateX(-50%);
+}
+
+.home-announcement {
+  display: inline-flex;
+  min-height: 2rem;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.7rem;
+  border: 1px solid color-mix(in srgb, var(--ui-border) 78%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ui-bg-elevated) 88%, transparent);
+  box-shadow: 0 8px 30px -22px rgb(15 18 24 / 38%);
+  color: var(--ui-text-muted);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  backdrop-filter: blur(16px);
+  transition:
+    border-color 180ms ease,
+    color 180ms ease,
+    transform 180ms ease;
+}
+
+.home-announcement:hover {
+  border-color: color-mix(in srgb, var(--color-signal-500) 34%, var(--ui-border));
+  color: var(--ui-text-highlighted);
+  transform: translateY(-1px);
+}
+
+.home-announcement__dot {
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 0 3px rgb(34 197 94 / 10%);
+}
+
+.home-hero__title {
+  color: var(--ui-text-highlighted);
+  font-size: clamp(3rem, 7vw, 6.25rem);
+  font-weight: 650;
+  line-height: 1.08;
+  letter-spacing: -0.045em;
+}
+
+.home-hero__title-line {
+  display: block;
+  min-height: 1.08em;
+  white-space: nowrap;
+}
+
+.home-hero__title-accent {
+  color: color-mix(in srgb, var(--ui-text-highlighted) 76%, #6675f5);
+}
+
+.home-hero__lead {
+  color: var(--ui-text-muted);
+  font-size: clamp(1.05rem, 1.6vw, 1.25rem);
+  line-height: 1.8;
+}
+
+.home-primary-action,
+.home-secondary-action {
+  min-height: 3rem;
+  border-radius: 0.9rem !important;
+}
+
+.home-primary-action {
+  background: var(--ui-text-highlighted) !important;
+  color: var(--ui-bg-elevated) !important;
+  box-shadow: 0 12px 28px -18px color-mix(in srgb, var(--ui-text-highlighted) 58%, transparent);
+}
+
+.home-secondary-action {
+  background: color-mix(in srgb, var(--ui-bg-elevated) 82%, transparent);
+  backdrop-filter: blur(12px);
+}
+
+.home-product-stage {
+  position: relative;
+  overflow: hidden;
+  width: min(100%, 75rem);
+  margin-inline: auto;
+  border: 1px solid color-mix(in srgb, var(--ui-border) 80%, transparent);
+  border-radius: 1.6rem;
+  background: var(--ui-bg-elevated);
+  box-shadow:
+    0 2px 8px rgb(15 18 24 / 5%),
+    0 38px 90px -42px rgb(15 18 24 / 34%);
+}
+
+.home-product-stage::before {
+  position: absolute;
+  z-index: -1;
+  right: 8%;
+  bottom: -3rem;
+  left: 8%;
+  height: 10rem;
+  border-radius: 50%;
+  background: rgb(93 116 255 / 18%);
+  filter: blur(56px);
+  content: '';
+}
+
+.home-product-stage__chrome {
+  display: grid;
+  height: 3.25rem;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  padding-inline: 1rem;
+  border-bottom: 1px solid var(--ui-border-muted);
+  background: color-mix(in srgb, var(--ui-bg-elevated) 92%, var(--ui-bg-muted));
+  color: var(--ui-text-dimmed);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}
+
+.home-product-stage__dots {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.home-product-stage__dots span {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: var(--ui-border-accented);
+}
+
+.home-product-stage__brand,
+.home-product-stage__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.home-product-stage__status {
+  justify-self: end;
+  color: var(--ui-text-muted);
+  letter-spacing: 0.02em;
+}
+
+.home-product-stage__status span {
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 50%;
+  background: var(--color-signal-500);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-signal-500) 10%, transparent);
+}
+
+.home-product-stage__body {
+  display: grid;
+  min-height: 34rem;
+  grid-template-columns: minmax(18rem, 0.76fr) minmax(0, 1.5fr);
+  gap: 0.75rem;
+  padding: 0.75rem;
+  background: var(--ui-bg-muted);
+}
+
+.home-prompt-panel {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 2rem;
+  padding: clamp(1.4rem, 3vw, 2.4rem);
+  border: 1px solid var(--ui-border-muted);
+  border-radius: 1.1rem;
+  background: var(--ui-bg-elevated);
+}
+
+.home-panel-label {
+  color: var(--ui-text-dimmed);
+  font-size: 0.6875rem;
+  font-weight: 650;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
+.home-prompt-box {
+  margin-top: auto;
+  padding: 1rem;
+  border: 1px solid var(--ui-border);
+  border-radius: 0.9rem;
+  background: color-mix(in srgb, var(--ui-bg) 70%, var(--ui-bg-elevated));
+  color: var(--ui-text-toned);
+  font-size: 0.9rem;
+  line-height: 1.75;
+}
+
+.home-prompt-box__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 1.1rem;
+  padding-top: 0.8rem;
+  border-top: 1px solid var(--ui-border-muted);
+  color: var(--ui-text-dimmed);
+  font-size: 0.72rem;
+}
+
+.home-prompt-box__meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.home-prompt-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--ui-text-dimmed);
+  font-size: 0.7rem;
+}
+
+.home-prompt-actions > span:not(:last-child) {
+  padding: 0.3rem 0.45rem;
+  border: 1px solid var(--ui-border-muted);
+  border-radius: 0.45rem;
+}
+
+.home-prompt-actions__send {
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  margin-left: auto;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--ui-text-highlighted);
+  color: var(--ui-bg-elevated);
+}
+
+.home-preview {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+  border-radius: 1.1rem;
+  background: #11151b;
+}
+
+.home-preview > img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.home-preview__shade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgb(0 0 0 / 5%), transparent 58%, rgb(0 0 0 / 48%));
+}
+
+.home-preview__caption {
+  position: absolute;
+  right: 1.2rem;
+  bottom: 1.35rem;
+  left: 1.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: rgb(255 255 255 / 72%);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}
+
+.home-preview__caption > div {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.home-preview__live {
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 50%;
+  background: #ff6b55;
+  box-shadow: 0 0 0 4px rgb(255 107 85 / 18%);
+}
+
+.home-preview__progress {
+  position: absolute;
+  right: 1.2rem;
+  bottom: 0.8rem;
+  left: 1.2rem;
+  height: 2px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: rgb(255 255 255 / 22%);
+}
+
+.home-preview__progress span {
+  display: block;
+  width: 76%;
+  height: 100%;
+  background: #fff;
+}
+
+.home-proof {
+  display: grid;
+  width: min(100%, 64rem);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 2.25rem auto 0;
+  padding-bottom: 5rem;
+}
+
+.home-proof__item {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0.55rem;
+  border-right: 1px solid var(--ui-border);
+}
+
+.home-proof__item:last-child {
+  border-right: 0;
+}
+
+.home-proof__item strong {
+  color: var(--ui-text-highlighted);
+  font-size: 1.25rem;
+  font-weight: 650;
+  letter-spacing: -0.03em;
+}
+
+.home-proof__item span {
+  color: var(--ui-text-dimmed);
+  font-size: 0.78rem;
+}
+
 .model-catalog {
   position: relative;
 }
@@ -798,6 +1114,55 @@ const selectedModelFacts = computed(() => {
 }
 
 @media (max-width: 767px) {
+  .home-hero__title {
+    line-height: 1.1;
+    letter-spacing: -0.035em;
+  }
+
+  .home-hero__title-line {
+    min-height: 1.1em;
+  }
+
+  .home-product-stage {
+    border-radius: 1.15rem;
+  }
+
+  .home-product-stage__chrome {
+    grid-template-columns: 1fr auto;
+  }
+
+  .home-product-stage__brand {
+    display: none;
+  }
+
+  .home-product-stage__body {
+    min-height: auto;
+    grid-template-columns: 1fr;
+  }
+
+  .home-prompt-panel {
+    min-height: 25rem;
+  }
+
+  .home-preview {
+    min-height: 19rem;
+  }
+
+  .home-proof {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    row-gap: 1.5rem;
+  }
+
+  .home-proof__item:nth-child(2) {
+    border-right: 0;
+  }
+
+  .home-proof__item {
+    flex-direction: column;
+    align-items: center;
+    gap: 0.1rem;
+  }
+
   .model-catalog__panel {
     padding-top: 1.5rem;
   }

@@ -18,7 +18,30 @@ pnpm dev
 
 Nuxt runtime config 从带 `NUXT_` 前缀的大写下划线环境变量映射。例如 `dashscopeApiKey` 对应 `NUXT_DASHSCOPE_API_KEY`。新增变量必须同步更新 `nuxt.config.ts`、`.env.example` 和部署配置。
 
-`NUXT_PUBLIC_APP_URL` 决定上传素材返回的绝对 URL。使用远程供应商时，该地址必须能被公网访问。
+未启用 OSS 时，`NUXT_PUBLIC_APP_URL` 决定上传素材返回的绝对 URL，使用远程供应商时该地址必须能被公网访问；启用 OSS 后，新上传素材返回 OSS 公网 URL。
+
+### 阿里云 OSS 素材转存
+
+配置以下四项后，`POST /api/files` 会在本地接收文件后自动上传到阿里云 OSS，并把 OSS 公网 URL 返回给创作台：
+
+```dotenv
+NUXT_OSS_ACCESS_KEY_ID=
+NUXT_OSS_ACCESS_KEY_SECRET=
+NUXT_OSS_BUCKET=
+NUXT_OSS_REGION=cn-beijing
+```
+
+可选配置：
+
+```dotenv
+NUXT_OSS_ENDPOINT=
+NUXT_OSS_PUBLIC_BASE_URL=
+NUXT_OSS_PREFIX=forkvdo/uploads
+```
+
+Bucket 和对象必须允许百炼读取。默认上传对象使用 `public-read` ACL；如果上传端点是内网地址，必须通过 `NUXT_OSS_PUBLIC_BASE_URL` 指定公网 HTTPS 基地址。OSS 配置完全为空时仍使用本地存储，配置不完整时上传接口返回 `503`，OSS 上传失败时返回 `502`。
+
+AccessKey 仅存在于服务端 runtime config，不会下发到浏览器。大文件分片、浏览器直传和私有对象签名 URL 尚未实现。
 
 ## 质量入口
 

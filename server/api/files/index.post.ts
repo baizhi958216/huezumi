@@ -1,3 +1,5 @@
+import { buildOssObjectKey, createOssUploader } from '../../utils/oss'
+
 interface UploadMeta {
   id: string
   name: string
@@ -32,5 +34,26 @@ export default defineEventHandler(async (event) => {
   const config = useRuntimeConfig(event)
   const configuredOrigin = String(config.public.appUrl || '').replace(/\/$/, '')
   const origin = configuredOrigin || getRequestURL(event).origin
-  return { ...meta, url: `${origin}/api/files/${id}` }
+  const localUrl = `${origin}/api/files/${id}`
+  const ossUploader = createOssUploader()
+
+  if (!ossUploader)
+    return { ...meta, url: localUrl }
+
+  try {
+    const objectKey = buildOssObjectKey(
+      String(config.ossPrefix || 'forkvdo/uploads').replace(/^\/+|\/+$/g, ''),
+      id,
+      meta.name,
+    )
+    const uploaded = await ossUploader.upload(objectKey, file.data, meta.type)
+    return { ...meta, url: uploaded.url }
+  }
+  catch (error) {
+    console.error('Failed to upload material to OSS', error instanceof Error ? error.message : 'unknown error')
+    throw createError({
+      statusCode: 502,
+      statusMessage: '素材已收到，但上传到阿里云 OSS 失败，请检查 OSS 配置和权限',
+    })
+  }
 })

@@ -9,7 +9,7 @@ forkvdo 将用户的文字和媒体输入转换为统一的生成请求，再由
 ```text
 Browser (Nuxt/Vue)
   ├─ GET  /api/providers ───────────────┐
-  ├─ POST /api/files ──> Nitro storage  │
+  ├─ POST /api/files ──> Nitro storage ──> 阿里云 OSS（可选）
   └─ /api/generations ─> API + schema ─┼─> VideoProvider ─> vendor API
                               │         │
                               └─ records┘
@@ -59,7 +59,7 @@ Browser (Nuxt/Vue)
 
 ### 上传素材
 
-上传 API 接收 multipart 文件，执行大小限制后保存到 Nitro storage，并返回公开读取 URL。供应商必须能访问该 URL，因此生产环境的 `NUXT_PUBLIC_APP_URL` 必须是公网 HTTPS 地址。
+上传 API 接收 multipart 文件，执行大小限制后保存到 Nitro storage；配置完整的阿里云 OSS 凭据后会再转存到 OSS，并返回 OSS 公网 URL，否则返回本地读取 URL。供应商必须能访问返回的 URL，因此 OSS 模式需要 Bucket / 对象允许公网读取；未启用 OSS 时生产环境的 `NUXT_PUBLIC_APP_URL` 必须是公网 HTTPS 地址。
 
 ## 4. 数据与安全边界
 
@@ -87,4 +87,5 @@ Browser (Nuxt/Vue)
 - 查询列表会并发刷新全部进行中任务，任务量增长后需要节流或后台 worker。
 - 记录没有显式 schema version，契约演进需谨慎。
 - 上传只按声明 MIME 选择大小上限，尚未做内容嗅探、病毒扫描、配额和清理。
+- OSS 素材当前同时保留本地副本；尚未实现对象生命周期清理、私有素材签名 URL 和浏览器直传。
 - `GenerationRecord.videoArchived` 是预留字段，当前查询链路尚未实现结果视频归档。

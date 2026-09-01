@@ -60,6 +60,14 @@ const referenceSlots = computed<MediaType[]>(() =>
 
 const durationSteps = computed(() => effectiveCapability.value?.duration.steps)
 const effectiveDuration = computed(() => smartDuration.value ? SMART_DURATION : duration.value)
+const durationSliderValue = computed<number | number[]>({
+  get: () => duration.value,
+  set: (value) => {
+    const next = Array.isArray(value) ? value[0] : value
+    if (next !== undefined)
+      duration.value = next
+  },
+})
 
 const selectedModelName = computed(() => selectedModel.value?.name || model.value)
 
@@ -359,7 +367,7 @@ onBeforeUnmount(polling.pause)
               </UFieldGroup>
               <template v-else>
                 <USlider
-                  v-model="duration"
+                  v-model="durationSliderValue"
                   :min="effectiveCapability?.duration.min ?? 2"
                   :max="effectiveCapability?.duration.max ?? 30"
                   :step="1"

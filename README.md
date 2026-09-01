@@ -43,7 +43,23 @@ NUXT_DASHSCOPE_REGION=cn-beijing
 NUXT_PUBLIC_APP_URL=https://your-public-domain.example.com
 ```
 
-DashScope 必须能够访问上传素材的 URL。生产环境请将 `NUXT_PUBLIC_APP_URL` 设置为平台的公网 HTTPS 地址。本地开发时，也可以直接在创作台粘贴 OSS 或其他公网素材 URL。
+未启用 OSS 时，DashScope 必须能够访问上传素材的 URL，生产环境请将 `NUXT_PUBLIC_APP_URL` 设置为平台的公网 HTTPS 地址。启用 OSS 后，新上传素材会直接返回 OSS 地址；本地开发时也可以在创作台粘贴 OSS 或其他公网素材 URL。
+
+### 使用阿里云 OSS 存储上传素材
+
+如果希望上传按钮自动把素材转存到 OSS，并将 OSS 地址直接交给百炼，在 `.env` 中补充以下配置：
+
+```dotenv
+NUXT_OSS_ACCESS_KEY_ID=你的OSS_ACCESS_KEY_ID
+NUXT_OSS_ACCESS_KEY_SECRET=你的OSS_ACCESS_KEY_SECRET
+NUXT_OSS_BUCKET=你的Bucket名称
+NUXT_OSS_REGION=cn-beijing
+NUXT_OSS_PREFIX=forkvdo/uploads
+```
+
+Bucket 需要允许对象公网读取，当前上传对象会使用 `public-read` ACL。`NUXT_OSS_ENDPOINT` 留空时会根据地域使用标准公网 Endpoint；如果配置了内网 Endpoint 或自定义域名，请同时设置 `NUXT_OSS_PUBLIC_BASE_URL` 为供应商可以访问的 HTTPS 地址。OSS 配置完整后，`POST /api/files` 返回的 `url` 将是 OSS URL；完全不配置 OSS 时仍使用本地 `.data/` 存储。
+
+AccessKey 只在服务端使用，不要把 `.env` 提交到仓库。
 
 ## Docker 部署
 

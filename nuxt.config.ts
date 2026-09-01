@@ -49,6 +49,14 @@ export default defineNuxtConfig({
     // MiniMax / 可灵 / Seedance 均可通过对应 *_BASE_URL 覆盖默认接入点
     minimaxBaseUrl: '',
     klingBaseUrl: '',
+    // 阿里云 OSS：配置完整后，上传素材会自动转存并返回 OSS URL
+    ossAccessKeyId: '',
+    ossAccessKeySecret: '',
+    ossBucket: '',
+    ossRegion: 'cn-beijing',
+    ossEndpoint: '',
+    ossPublicBaseUrl: '',
+    ossPrefix: 'forkvdo/uploads',
     public: {
       appUrl: 'http://localhost:3000',
     },

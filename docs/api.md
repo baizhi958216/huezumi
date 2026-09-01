@@ -31,6 +31,8 @@
 
 接收字段名为 `file` 的 multipart 上传。视频最大 100 MiB，其他文件最大 20 MiB。返回元数据与绝对读取 URL。
 
+当阿里云 OSS 配置完整时，文件会同时转存到 OSS，返回的 `url` 为 OSS 公网 URL；OSS 配置为空时返回本地 `/api/files/:id` URL。OSS 配置不完整返回 503，OSS 上传失败返回 502。
+
 ## `GET /api/files/:id`
 
 以内联方式返回素材，并设置一年 immutable 公共缓存。素材不存在时返回 404。
