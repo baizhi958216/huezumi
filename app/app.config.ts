@@ -58,6 +58,13 @@ export default defineAppConfig({
       },
     },
 
+    checkbox: {
+      slots: {
+        label: '!text-base',
+        description: '!text-base',
+      },
+    },
+
     progress: {
       slots: {
         base: 'rounded-full',
