@@ -44,7 +44,8 @@ function normalizeStatus(status?: string): GenerationStatus {
 /**
  * 字节跳动 Seedance（火山方舟 Ark 协议）。
  * 提交：POST /contents/generations/tasks；查询：GET /contents/generations/tasks/{id}。
- * 文本与图片放在 content 数组中，图片通过 role 区分 first_frame / last_frame / reference_image；
+ * 文本与素材放在 content 数组中，图片通过 role 区分 first_frame / last_frame / reference_image；
+ * Seedance 2.x 的参考视频与参考音频分别使用 video_url / audio_url content 项；
  * 分辨率、比例、时长、音频、种子等参数平铺在 body 顶层（非 content 内）。
  */
 export class SeedanceProvider implements VideoProvider {
@@ -58,8 +59,19 @@ export class SeedanceProvider implements VideoProvider {
       content.push({ type: 'text', text: request.prompt.trim() })
 
     for (const item of request.media) {
-      if (item.type === 'file' || item.type === 'link' || item.type === 'reference_video' || item.type === 'reference_audio')
+      if (item.type === 'file' || item.type === 'link')
         continue
+
+      if (item.type === 'reference_video') {
+        content.push({ type: 'video_url', video_url: { url: item.url }, role: item.type })
+        continue
+      }
+
+      if (item.type === 'reference_audio') {
+        content.push({ type: 'audio_url', audio_url: { url: item.url }, role: item.type })
+        continue
+      }
+
       content.push({ type: 'image_url', image_url: { url: item.url }, role: item.type })
     }
 

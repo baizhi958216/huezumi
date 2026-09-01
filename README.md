@@ -7,15 +7,24 @@ forkvdo 是一个基于 Nuxt 4 的 AI 视频生成平台。项目包含产品首
 - 文生视频
 - 首帧 / 首尾帧生成视频
 - 参考图、参考视频、参考音频组合生成
-- 480P、720P、1080P
-- 自适应、16:9、4:3、1:1、3:4、9:16 画幅
-- 2–30 秒自定义时长
+- 480P、768P、720P、1080P、2K、4K（按模型收敛）
+- 自适应、16:9、4:3、1:1、3:4、9:16、21:9 画幅
+- 2–30 秒自定义时长（按模型收敛）
 - 音轨、提示词智能改写、水印、随机种子控制
 - 本地素材上传与公网 URL 输入
 - 生成任务持久化、状态轮询与作品库
 - Docker / Docker Compose 部署
 
-默认接入阿里云百炼 `wan3.0-video-prime`。供应商代码位于 `server/services/providers`，新增供应商只需实现 `VideoProvider` 接口并在注册器中启用。
+已接入模型（能力目录见 `server/services/providers/catalog.ts`）：
+
+- 阿里云百炼：wan3.0-video / prime、happyhorse-1.1-t2v/i2v/r2v、wan2.7-t2v/i2v/r2v、MiniMax/MiniMax-H3、Kling V3 Turbo / V3 / V3 Omni（统一 `video-synthesis` 异步端点）
+- MiniMax：Hailuo 2.3 / 2.3 Fast / 02
+- 可灵：Kling V2.6 / V2.5 Turbo
+- 火山方舟：Seedance 1.5 Pro、1.0 Pro / Fast、2.0 / 2.0 Fast / 2.0 Mini、2.5
+
+以上共 24 个 API model ID（百炼 12、MiniMax 3、可灵 2、Seedance 7），只代表 forkvdo 已完成参数映射与校验的范围，不代表厂商完整产品线。百炼官方视频生成目录还包含 PixVerse、Vidu 与人像驱动；这些模型已有官方 API 文档，但其请求字段和任务结构尚未映射到平台契约。
+
+供应商代码位于 `server/services/providers`，新增供应商只需实现 `VideoProvider` 接口并在注册器中启用。
 
 ## 本地运行
 
@@ -61,15 +70,19 @@ AI 协作规则、架构、规格和验证入口分别见 `AGENTS.md`、`DESIGN.
 
 ## DashScope 实现说明
 
-平台按官方异步协议提交 `video-synthesis` 任务，保存返回的 `task_id`，再通过 `/tasks/{task_id}` 查询状态。当前采用万相 3.0 All-in-One 媒体结构，将首尾帧和参考图 / 视频 / 音频统一映射到 `input.media`。
+平台按官方异步协议提交 `video-synthesis` 任务，保存返回的 `task_id`，再通过 `/tasks/{task_id}` 查询状态。wan3.0 采用 All-in-One 媒体结构，将首尾帧和参考图 / 视频 / 音频统一映射到 `input.media`；HappyHorse、Wan 2.7、MiniMax H3 与 Kling V3 系列按各自文档的参数子集与 media 组合构造请求体（见 `dashscope.ts` 中的模型分派）。
 
 需要注意，官方协议不允许在同一任务中混用首尾帧与 `reference_*` 素材，服务端已做对应校验。
 
 参考文档：
 
+- [百炼视频生成模型目录](https://help.aliyun.com/zh/model-studio/video-generation-api/)
 - [万相 3.0 视频生成 API](https://help.aliyun.com/zh/model-studio/wan3-video-generation-api-reference)
 - [万相 2.7 图生视频 API](https://help.aliyun.com/zh/model-studio/image-to-video-general-api-reference)
 - [万相文生视频 API](https://help.aliyun.com/en/model-studio/text-to-video-api-reference)
+- [百炼可灵视频生成 API](https://help.aliyun.com/zh/model-studio/kling-video-generation-api-reference/)
+- [火山方舟视频生成任务 API](https://docs.volcengine.com/docs/82379/1520757)
+- [MiniMax 视频生成 API](https://platform.minimaxi.com/docs/api-reference/video-generation-t2v)
 
 ## 扩展新供应商
 

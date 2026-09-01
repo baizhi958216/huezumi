@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { AspectRatio, GenerationMode, GenerationRecord, MediaInput, MediaType, ProviderCapability, Resolution } from '#shared/types/generation'
-import { MODE_META, SMART_DURATION } from '#shared/types/generation'
+import { MODE_META, resolveModelCapability, SMART_DURATION } from '#shared/types/generation'
 import { useIntervalFn } from '@vueuse/core'
 
 const { data: providerCatalog } = await useFetch<ProviderCapability[]>('/api/providers')
@@ -41,39 +41,50 @@ const modelItems = computed(() => (capability.value?.models || []).map(item => (
   value: item.id,
 })))
 
-const modeOptions = computed(() => (capability.value?.modes || []).map(id => ({
+const selectedModel = computed(() => capability.value?.models.find(item => item.id === model.value))
+const effectiveCapability = computed(() => capability.value
+  ? resolveModelCapability(capability.value, model.value, resolution.value)
+  : undefined)
+
+const modeOptions = computed(() => (effectiveCapability.value?.modes || []).map(id => ({
   ...MODE_META[id],
   value: id,
 })))
 
-const resolutionOptions = computed(() => capability.value?.resolutions || [])
-const ratioOptions = computed(() => capability.value?.ratios || [])
+const resolutionOptions = computed(() => effectiveCapability.value?.resolutions || [])
+const ratioOptions = computed(() => effectiveCapability.value?.ratios || [])
 
 const referenceSlots = computed<MediaType[]>(() =>
-  (capability.value?.media || []).filter(type => type.startsWith('reference_')),
+  (effectiveCapability.value?.media || []).filter(type => type.startsWith('reference_')),
 )
 
-const durationSteps = computed(() => capability.value?.duration.steps)
+const durationSteps = computed(() => effectiveCapability.value?.duration.steps)
 const effectiveDuration = computed(() => smartDuration.value ? SMART_DURATION : duration.value)
 
-const selectedModelName = computed(() =>
-  capability.value?.models.find(item => item.id === model.value)?.name || model.value)
+const selectedModelName = computed(() => selectedModel.value?.name || model.value)
 
 const previewRatio = computed(() =>
   ratio.value === 'adaptive' ? '16 / 9' : ratio.value.replace(':', ' / '))
 
-/** 切换供应商 / 能力变化后，把所有选择收敛到该供应商支持的范围内 */
+/** 切换供应商后先选择该供应商的默认模型。 */
 watch(capability, (cap) => {
   if (!cap)
     return
   if (!cap.models.some(item => item.id === model.value))
     model.value = cap.models[0]?.id || ''
+}, { immediate: true })
+
+/** 切换模型、清晰度后，把现有选择收敛到模型级能力范围。 */
+watch(effectiveCapability, (cap) => {
+  if (!cap)
+    return
   if (!cap.modes.includes(mode.value))
     mode.value = cap.modes[0] || 'text'
   if (!cap.resolutions.includes(resolution.value))
     resolution.value = cap.resolutions.at(-1) || '1080P'
   if (cap.ratios.length && !cap.ratios.includes(ratio.value))
     ratio.value = cap.ratios.includes('16:9') ? '16:9' : (cap.ratios[0] || 'adaptive')
+  media.value = media.value.filter(item => cap.media.includes(item.type))
   const d = cap.duration
   if (d.steps && !d.steps.includes(duration.value))
     duration.value = d.steps[0] || d.min
@@ -225,6 +236,11 @@ onBeforeUnmount(polling.pause)
               <USelect v-model="model" :items="modelItems" class="w-full" placeholder="选择模型" :disabled="!modelItems.length" />
             </UFormField>
           </div>
+          <p v-if="selectedModel" class="type-caption -mt-3">
+            {{ selectedModel.description }}<template v-if="effectiveCapability?.notes">
+              ；{{ effectiveCapability.notes }}
+            </template>
+          </p>
 
           <UFormField label="提示词" :hint="`${prompt.length} / 20K`">
             <UTextarea
@@ -240,21 +256,21 @@ onBeforeUnmount(polling.pause)
           <!-- 素材输入：由供应商能力声明驱动 -->
           <div v-if="mode === 'frames'" class="grid gap-3">
             <MediaSlot
-              v-if="capability?.media.includes('first_frame')"
+              v-if="effectiveCapability?.media.includes('first_frame')"
               label="首帧" hint="上传或粘贴图片公网 URL" icon="i-lucide-panel-top"
               type="first_frame"
               :value="mediaValue('first_frame')"
-              :accept="capability?.mediaLimits.first_frame?.accept"
-              :max-bytes="capability?.mediaLimits.first_frame?.maxBytes"
+              :accept="effectiveCapability?.mediaLimits.first_frame?.accept"
+              :max-bytes="effectiveCapability?.mediaLimits.first_frame?.maxBytes"
               @change="setMedia('first_frame', $event)"
             />
             <MediaSlot
-              v-if="capability?.media.includes('last_frame')"
+              v-if="effectiveCapability?.media.includes('last_frame')"
               label="尾帧" hint="可选 · 需先提供首帧" icon="i-lucide-panel-bottom"
               type="last_frame"
               :value="mediaValue('last_frame')"
-              :accept="capability?.mediaLimits.last_frame?.accept"
-              :max-bytes="capability?.mediaLimits.last_frame?.maxBytes"
+              :accept="effectiveCapability?.mediaLimits.last_frame?.accept"
+              :max-bytes="effectiveCapability?.mediaLimits.last_frame?.maxBytes"
               @change="setMedia('last_frame', $event)"
             />
           </div>
@@ -268,13 +284,10 @@ onBeforeUnmount(polling.pause)
               :icon="type === 'reference_image' ? 'i-lucide-image' : type === 'reference_video' ? 'i-lucide-video' : type === 'reference_audio' ? 'i-lucide-audio-lines' : 'i-lucide-paperclip'"
               :type="type"
               :value="mediaValue(type)"
-              :accept="capability?.mediaLimits[type]?.accept"
-              :max-bytes="capability?.mediaLimits[type]?.maxBytes"
+              :accept="effectiveCapability?.mediaLimits[type]?.accept"
+              :max-bytes="effectiveCapability?.mediaLimits[type]?.maxBytes"
               @change="setMedia(type, $event)"
             />
-            <p v-if="capability?.notes" class="type-caption">
-              {{ capability.notes }}
-            </p>
           </div>
 
           <div class="space-y-5 border-t border-default pt-6">
@@ -347,18 +360,18 @@ onBeforeUnmount(polling.pause)
               <template v-else>
                 <USlider
                   v-model="duration"
-                  :min="capability?.duration.min ?? 2"
-                  :max="capability?.duration.max ?? 30"
+                  :min="effectiveCapability?.duration.min ?? 2"
+                  :max="effectiveCapability?.duration.max ?? 30"
                   :step="1"
                   :disabled="smartDuration"
                 />
                 <div class="mt-2 flex justify-between text-base text-dimmed">
-                  <span>{{ capability?.duration.min }} 秒</span>
-                  <span>{{ capability?.duration.max }} 秒</span>
+                  <span>{{ effectiveCapability?.duration.min }} 秒</span>
+                  <span>{{ effectiveCapability?.duration.max }} 秒</span>
                 </div>
               </template>
               <UCheckbox
-                v-if="capability?.duration.smart"
+                v-if="effectiveCapability?.duration.smart"
                 v-model="smartDuration"
                 label="智能时长 · 由模型根据内容决定"
                 class="mt-3"
@@ -366,7 +379,7 @@ onBeforeUnmount(polling.pause)
             </div>
           </div>
 
-          <UCard v-if="capability?.supportsAudio" variant="subtle" :ui="{ body: 'p-4 sm:p-4' }">
+          <UCard v-if="effectiveCapability?.supportsAudio" variant="subtle" :ui="{ body: 'p-4 sm:p-4' }">
             <div class="flex items-center justify-between gap-5">
               <div>
                 <div class="text-base text-toned font-600">
@@ -379,8 +392,8 @@ onBeforeUnmount(polling.pause)
               <USwitch v-model="audio" />
             </div>
           </UCard>
-          <p v-else-if="capability && !capability.supportsAudio" class="type-caption -mt-3">
-            {{ capability.name }} 当前模型不生成音频，输出为无声视频。
+          <p v-else-if="effectiveCapability && !effectiveCapability.supportsAudio" class="type-caption -mt-3">
+            {{ selectedModelName }} 不支持同步生成音频，输出为无声视频。
           </p>
 
           <UCollapsible v-model:open="advancedOpen">
@@ -389,14 +402,14 @@ onBeforeUnmount(polling.pause)
             </UButton>
             <template #content>
               <div class="space-y-4 pt-4">
-                <UFormField v-if="capability?.supportsNegativePrompt" label="反向提示词">
+                <UFormField v-if="effectiveCapability?.supportsNegativePrompt" label="反向提示词">
                   <UInput v-model="negativePrompt" class="w-full" placeholder="不希望出现的元素" />
                 </UFormField>
                 <div class="grid grid-cols-2 gap-3">
-                  <UCheckbox v-if="capability?.supportsPromptExtend" v-model="promptExtend" label="智能改写" />
-                  <UCheckbox v-if="capability?.supportsWatermark" v-model="watermark" label="AI 水印" />
+                  <UCheckbox v-if="effectiveCapability?.supportsPromptExtend" v-model="promptExtend" label="智能改写" />
+                  <UCheckbox v-if="effectiveCapability?.supportsWatermark" v-model="watermark" label="AI 水印" />
                 </div>
-                <UFormField v-if="capability?.supportsSeed" label="随机种子" hint="可选">
+                <UFormField v-if="effectiveCapability?.supportsSeed" label="随机种子" hint="可选">
                   <UInput v-model.number="seed" type="number" min="0" max="2147483647" placeholder="自动" class="w-full" />
                 </UFormField>
               </div>

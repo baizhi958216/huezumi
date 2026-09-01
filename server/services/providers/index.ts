@@ -1,5 +1,6 @@
 import type { GenerationRequest, ProviderCapability } from '#shared/types/generation'
 import type { VideoProvider } from './base'
+import { resolveModelCapability } from '#shared/types/generation'
 import { getCapability, providerCapabilities } from './catalog'
 import { DashScopeProvider } from './dashscope'
 import { KlingProvider } from './kling'
@@ -94,14 +95,23 @@ export function getVideoProvider(id: string): VideoProvider {
  */
 export function assertRequestSupported(capability: ProviderCapability, request: GenerationRequest) {
   const fail = (message: string) => createError({ statusCode: 422, statusMessage: message })
+  const selectedModel = request.model
+    ? capability.models.find(model => model.id === request.model)
+    : capability.models[0]
 
-  if (!capability.modes.includes(request.mode))
-    throw fail(`${capability.name} 不支持该生成模式`)
+  if (request.model && !selectedModel)
+    throw fail(`${capability.name} 不支持模型「${request.model}」`)
+
+  const effectiveCapability = resolveModelCapability(capability, selectedModel?.id, request.resolution)
+  const capabilityName = selectedModel ? `${capability.name} / ${selectedModel.name}` : capability.name
+
+  if (!effectiveCapability.modes.includes(request.mode))
+    throw fail(`${capabilityName} 不支持该生成模式`)
 
   for (const item of request.media) {
-    if (!capability.media.includes(item.type))
-      throw fail(`${capability.name} 不支持素材类型「${item.type}」`)
-    const max = capability.mediaLimits[item.type]?.max
+    if (!effectiveCapability.media.includes(item.type))
+      throw fail(`${capabilityName} 不支持素材类型「${item.type}」`)
+    const max = effectiveCapability.mediaLimits[item.type]?.max
     const count = request.media.filter(media => media.type === item.type).length
     if (max !== undefined && count > max)
       throw fail(`「${item.type}」最多允许 ${max} 份`)
@@ -111,27 +121,27 @@ export function assertRequestSupported(capability: ProviderCapability, request: 
   if (types.includes('last_frame') && !types.includes('first_frame'))
     throw fail('使用尾帧时必须同时提供首帧')
 
-  if (!capability.resolutions.includes(request.resolution))
-    throw fail(`${capability.name} 不支持 ${request.resolution} 清晰度，可选：${capability.resolutions.join(' / ')}`)
+  if (!effectiveCapability.resolutions.includes(request.resolution))
+    throw fail(`${capabilityName} 不支持 ${request.resolution} 清晰度，可选：${effectiveCapability.resolutions.join(' / ')}`)
 
-  if (capability.ratios.length && !capability.ratios.includes(request.ratio))
-    throw fail(`${capability.name} 不支持 ${request.ratio} 画幅，可选：${capability.ratios.join(' / ')}`)
+  if (effectiveCapability.ratios.length && !effectiveCapability.ratios.includes(request.ratio))
+    throw fail(`${capabilityName} 不支持 ${request.ratio} 画幅，可选：${effectiveCapability.ratios.join(' / ')}`)
 
-  if (request.duration === -1 && !capability.duration.smart)
-    throw fail(`${capability.name} 不支持智能时长`)
+  if (request.duration === -1 && !effectiveCapability.duration.smart)
+    throw fail(`${capabilityName} 不支持智能时长`)
   if (request.duration > 0) {
-    if (capability.duration.steps && !capability.duration.steps.includes(request.duration))
-      throw fail(`${capability.name} 时长仅支持 ${capability.duration.steps.join(' / ')} 秒`)
-    if (!capability.duration.steps && (request.duration < capability.duration.min || request.duration > capability.duration.max))
-      throw fail(`${capability.name} 时长需在 ${capability.duration.min}–${capability.duration.max} 秒之间`)
+    if (effectiveCapability.duration.steps && !effectiveCapability.duration.steps.includes(request.duration))
+      throw fail(`${capabilityName} 在 ${request.resolution} 下时长仅支持 ${effectiveCapability.duration.steps.join(' / ')} 秒`)
+    if (!effectiveCapability.duration.steps && (request.duration < effectiveCapability.duration.min || request.duration > effectiveCapability.duration.max))
+      throw fail(`${capabilityName} 时长需在 ${effectiveCapability.duration.min}–${effectiveCapability.duration.max} 秒之间`)
   }
 
-  if (request.audio && !capability.supportsAudio)
-    throw fail(`${capability.name} 暂不支持同步生成音频`)
-  if (request.negativePrompt && !capability.supportsNegativePrompt)
-    throw fail(`${capability.name} 不支持反向提示词`)
-  if (request.seed !== undefined && !capability.supportsSeed)
-    throw fail(`${capability.name} 不支持固定种子`)
-  if (request.promptExtend && !capability.supportsPromptExtend)
-    throw fail(`${capability.name} 不支持提示词智能改写`)
+  if (request.audio && !effectiveCapability.supportsAudio)
+    throw fail(`${capabilityName} 暂不支持同步生成音频`)
+  if (request.negativePrompt && !effectiveCapability.supportsNegativePrompt)
+    throw fail(`${capabilityName} 不支持反向提示词`)
+  if (request.seed !== undefined && !effectiveCapability.supportsSeed)
+    throw fail(`${capabilityName} 不支持固定种子`)
+  if (request.promptExtend && !effectiveCapability.supportsPromptExtend)
+    throw fail(`${capabilityName} 不支持提示词智能改写`)
 }

@@ -15,7 +15,7 @@ export const generationSchema = z.object({
     url: z.string().min(1),
     name: z.string().optional(),
   })).max(10).default([]),
-  resolution: z.enum(['480P', '768P', '720P', '1080P']).default('1080P'),
+  resolution: z.enum(['480P', '768P', '720P', '1080P', '2K', '4K']).default('1080P'),
   ratio: z.enum(['adaptive', '16:9', '4:3', '1:1', '3:4', '9:16', '21:9']).default('16:9'),
   /** SMART_DURATION(-1) 表示由模型智能决定时长 */
   duration: z.number().int().refine(value => value === SMART_DURATION || (value >= 2 && value <= 30), {

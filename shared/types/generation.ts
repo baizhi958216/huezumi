@@ -22,7 +22,7 @@ export type MediaType
 /** 生成模式。UI 按模式组织素材输入，后端按模式校验组合合法性。 */
 export type GenerationMode = 'text' | 'frames' | 'reference'
 
-export type Resolution = '480P' | '768P' | '720P' | '1080P'
+export type Resolution = '480P' | '768P' | '720P' | '1080P' | '2K' | '4K'
 
 export type AspectRatio = 'adaptive' | '16:9' | '4:3' | '1:1' | '3:4' | '9:16' | '21:9'
 
@@ -94,6 +94,25 @@ export interface ModelSpec {
   description: string
   /** 首页 / 创作台展示用的角标，如「高速」「标准」 */
   badge?: string
+  /** 同一供应商下模型之间的能力差异；未填写的字段继承供应商能力。 */
+  capabilities?: ModelCapabilityOverride
+}
+
+export interface ModelCapabilityOverride {
+  modes?: GenerationMode[]
+  media?: MediaType[]
+  resolutions?: Resolution[]
+  ratios?: AspectRatio[]
+  duration?: DurationCapability
+  supportsAudio?: boolean
+  supportsNegativePrompt?: boolean
+  supportsSeed?: boolean
+  supportsPromptExtend?: boolean
+  /** 指定分辨率下允许的离散时长，用于表达 1080P 仅支持 6 秒等组合限制。 */
+  durationByResolution?: Partial<Record<Resolution, number[]>>
+  /** 模型级素材限制；仅覆盖声明过的类型，其余类型继承供应商级限制。 */
+  mediaLimits?: Partial<Record<MediaType, ProviderMediaLimit>>
+  notes?: string
 }
 
 /** 某一种素材输入的能力与限制，用于驱动 UI 的上传控件与校验提示。 */
@@ -161,6 +180,44 @@ export interface ProviderCapability {
   supportsMediaOnly: boolean
   notes?: string
   docsUrl?: string
+}
+
+/**
+ * 把供应商能力与选中模型的覆盖项合并，供创作台和 API 校验共用。
+ * resolution 传入后会进一步收敛该清晰度对应的离散时长。
+ */
+export function resolveModelCapability(
+  provider: ProviderCapability,
+  modelId?: string,
+  resolution?: Resolution,
+): ProviderCapability {
+  const model = provider.models.find(item => item.id === modelId)
+  const override = model?.capabilities
+  if (!override)
+    return provider
+
+  const durationSteps = resolution ? override.durationByResolution?.[resolution] : undefined
+  const duration = {
+    ...(override.duration || provider.duration),
+    ...(durationSteps ? { steps: durationSteps } : {}),
+  }
+
+  return {
+    ...provider,
+    modes: override.modes || provider.modes,
+    media: override.media || provider.media,
+    resolutions: override.resolutions || provider.resolutions,
+    ratios: override.ratios || provider.ratios,
+    duration,
+    supportsAudio: override.supportsAudio ?? provider.supportsAudio,
+    supportsNegativePrompt: override.supportsNegativePrompt ?? provider.supportsNegativePrompt,
+    supportsSeed: override.supportsSeed ?? provider.supportsSeed,
+    supportsPromptExtend: override.supportsPromptExtend ?? provider.supportsPromptExtend,
+    mediaLimits: override.mediaLimits
+      ? { ...provider.mediaLimits, ...override.mediaLimits }
+      : provider.mediaLimits,
+    notes: override.notes || provider.notes,
+  }
 }
 
 /** 生成模式的展示元数据，与供应商能力无关，供 UI 复用。 */

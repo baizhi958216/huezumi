@@ -18,7 +18,7 @@ export default defineNuxtConfig({
         { name: 'theme-color', content: '#f7f8fa', media: '(prefers-color-scheme: light)' },
         { name: 'theme-color', content: '#08090b', media: '(prefers-color-scheme: dark)' },
         { property: 'og:title', content: 'forkvdo — AI 视频生成平台' },
-        { property: 'og:description', content: '支持文生视频、首尾帧和多模态参考生成，最高 1080P / 30 秒。' },
+        { property: 'og:description', content: '支持文生视频、首尾帧和多模态参考生成，最高 4K / 30 秒。' },
         { property: 'og:image', content: '/images/hero-cinematic.png' },
       ],
       link: [

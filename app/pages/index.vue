@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import type { ProviderCapability } from '#shared/types/generation'
-import { MODE_META } from '#shared/types/generation'
+import type { ModelSpec, ProviderCapability } from '#shared/types/generation'
+import { MODE_META, resolveModelCapability } from '#shared/types/generation'
 import AnimatedContent from '~/components/vuebits/AnimatedContent.vue'
 import CountUp from '~/components/vuebits/CountUp.vue'
 import DotGrid from '~/components/vuebits/DotGrid.vue'
@@ -10,21 +10,6 @@ import SplitText from '~/components/vuebits/SplitText.vue'
 const { data: providerCatalog } = await useFetch<ProviderCapability[]>('/api/providers')
 const colorMode = useColorMode()
 const isDark = computed(() => colorMode.value === 'dark')
-
-const providerEcosystem = [
-  { name: '阿里云万相', current: true },
-  { name: 'MiniMax 海螺', current: true },
-  { name: '可灵 Kling', current: true },
-  { name: 'Seedance 即梦', current: true },
-  { name: 'Google Veo', current: false },
-  { name: 'OpenAI Sora', current: false },
-  { name: 'Runway', current: false },
-  { name: 'Luma Dream Machine', current: false },
-  { name: 'Pika', current: false },
-  { name: 'Vidu', current: false },
-  { name: '腾讯混元视频', current: false },
-  { name: 'PixVerse', current: false },
-]
 
 const modes = Object.entries(MODE_META).map(([key, value]) => ({
   ...value,
@@ -46,10 +31,12 @@ const workflow = [
 
 const marqueeItems = [
   'WAN 3.0 PRIME',
+  'HAPPYHORSE 1.1',
+  'MINIMAX H3',
   'HAILUO 2.3',
   'KLING V2.6',
-  'SEEDANCE 1.5 PRO',
-  '480P – 1080P',
+  'SEEDANCE 2.5',
+  '480P – 4K',
   '最长 30 秒',
   '同步音频',
   '首尾帧控制',
@@ -60,7 +47,11 @@ const marqueeItems = [
 const faqItems = [
   {
     label: '平台接入了哪些模型供应商？',
-    content: '目前阿里云百炼（万相 Wan 3.0）、MiniMax 海螺、可灵 Kling 与字节跳动 Seedance 四家平台的适配器与能力声明已全部就绪。配置对应环境变量后即自动上线，前端选项、校验与参数映射无需改代码。',
+    content: '目前阿里云百炼、MiniMax 海螺、可灵 Kling 与字节跳动 Seedance 四家平台的适配器与能力声明已全部就绪。配置对应环境变量后即自动上线，前端选项、校验与参数映射无需改代码。',
+  },
+  {
+    label: '为什么每家平台只列了少数几个模型？',
+    content: '矩阵统计的是本平台已完成适配、校验和参数映射的 API model ID，不是厂商的完整产品线。百炼官方视频目录包含 HappyHorse、万相、人像驱动、PixVerse、可灵和 Vidu 六类；forkvdo 当前映射 HappyHorse、万相、可灵，并额外接入百炼模型市场的 MiniMax H3。PixVerse、Vidu 和人像驱动已有官方 API，但请求字段与任务结构尚未完成平台映射。',
   },
   {
     label: '不同平台的能力差异怎么处理？',
@@ -80,18 +71,116 @@ const faqItems = [
   },
 ]
 
-const providerStats = computed(() => ({
-  online: providerCatalog.value?.filter(item => item.enabled).length || 0,
-  total: providerCatalog.value?.length || 0,
-  models: providerCatalog.value?.reduce((sum, item) => sum + item.models.length, 0) || 0,
-}))
+const supportedModelCount = computed(() =>
+  providerCatalog.value?.reduce((sum, item) => sum + item.models.length, 0) || 0)
 
-function formatDuration(capability: ProviderCapability) {
-  if (capability.duration.steps)
-    return capability.duration.steps.map(step => `${step}s`).join(' / ')
-  const base = `${capability.duration.min}–${capability.duration.max}s`
-  return capability.duration.smart ? `${base} · 智能` : base
+const selectedProviderId = ref('dashscope')
+const selectedModelId = ref('')
+const selectedProvider = computed(() =>
+  providerCatalog.value?.find(item => item.id === selectedProviderId.value) || providerCatalog.value?.[0])
+const selectedModel = computed(() =>
+  selectedProvider.value?.models.find(model => model.id === selectedModelId.value) || selectedProvider.value?.models[0])
+const supportedModelItems = computed(() => (providerCatalog.value || []).flatMap(provider =>
+  provider.models.map(model => ({
+    label: formatCatalogModelName(model.name),
+    value: `${provider.id}:${model.id}`,
+    providerId: provider.id,
+    modelId: model.id,
+  }))))
+const selectedModelKey = computed({
+  get: () => supportedModelItems.value.find(item =>
+    item.providerId === selectedProvider.value?.id && item.modelId === selectedModel.value?.id)?.value || '',
+  set: (value: string) => {
+    const item = supportedModelItems.value.find(option => option.value === value)
+    if (!item)
+      return
+
+    selectedProviderId.value = item.providerId
+    selectedModelId.value = item.modelId
+  },
+})
+const selectedModelIndex = computed(() => Math.max(0, supportedModelItems.value.findIndex(item =>
+  item.providerId === selectedProvider.value?.id && item.modelId === selectedModel.value?.id)))
+
+watch(selectedProvider, (provider) => {
+  if (provider && !provider.models.some(model => model.id === selectedModelId.value))
+    selectedModelId.value = provider.models[0]?.id || ''
+}, { immediate: true })
+
+function formatCatalogModelName(name: string) {
+  return name.replace(/（百炼）$/, '')
 }
+
+function formatModelDuration(provider: ProviderCapability, model: ModelSpec) {
+  const capability = resolveModelCapability(provider, model.id)
+  const durationByResolution = model.capabilities?.durationByResolution
+
+  if (durationByResolution) {
+    return capability.resolutions
+      .filter(resolution => durationByResolution[resolution]?.length)
+      .map(resolution => `${resolution} ${durationByResolution[resolution]?.join('/')} 秒`)
+      .join(' · ')
+  }
+
+  const { min, max, smart, steps } = capability.duration
+  if (steps?.length) {
+    const values = steps.map(value => `${value} 秒`).join(' / ')
+    return smart ? `${values} / 智能` : values
+  }
+
+  const base = min === max ? `${min} 秒` : `${min}–${max} 秒`
+  return smart ? `${base} / 智能` : base
+}
+
+function formatModelRatios(provider: ProviderCapability, model: ModelSpec) {
+  const capability = resolveModelCapability(provider, model.id)
+  if (!capability.ratios.length)
+    return '跟随素材'
+
+  return capability.ratios
+    .map(ratio => ratio === 'adaptive' ? '自适应' : ratio)
+    .join(' / ')
+}
+
+function formatModelModes(provider: ProviderCapability, model: ModelSpec) {
+  const capability = resolveModelCapability(provider, model.id)
+  return [
+    capability.modes.includes('text') ? '文生' : '',
+    capability.modes.includes('frames')
+      ? (capability.media.includes('last_frame') ? '首尾帧' : '首帧')
+      : '',
+    capability.modes.includes('reference') ? '参考生' : '',
+  ].filter(Boolean).join(' · ')
+}
+
+function formatModelResolutions(provider: ProviderCapability, model: ModelSpec) {
+  return resolveModelCapability(provider, model.id).resolutions.join(' / ')
+}
+
+function formatModelAudio(provider: ProviderCapability, model: ModelSpec) {
+  if (!resolveModelCapability(provider, model.id).supportsAudio)
+    return '无声'
+  if (model.id.includes('kling-v3-turbo'))
+    return '固定有声'
+  if (model.id === 'MiniMax/MiniMax-H3')
+    return '固定立体声'
+  if (model.id.startsWith('wan2.7-'))
+    return '原生有声'
+  return '可生成音频'
+}
+
+const selectedModelFacts = computed(() => {
+  if (!selectedProvider.value || !selectedModel.value)
+    return []
+
+  return [
+    { kind: 'modes', label: '生成方式', icon: 'i-lucide-wand-sparkles', value: formatModelModes(selectedProvider.value, selectedModel.value) },
+    { kind: 'resolution', label: '清晰度', icon: 'i-lucide-scan', value: formatModelResolutions(selectedProvider.value, selectedModel.value) },
+    { kind: 'duration', label: '输出时长', icon: 'i-lucide-timer', value: formatModelDuration(selectedProvider.value, selectedModel.value) },
+    { kind: 'ratio', label: '画幅', icon: 'i-lucide-frame', value: formatModelRatios(selectedProvider.value, selectedModel.value) },
+    { kind: 'audio', label: '音频', icon: 'i-lucide-audio-lines', value: formatModelAudio(selectedProvider.value, selectedModel.value) },
+  ]
+})
 </script>
 
 <template>
@@ -105,7 +194,7 @@ function formatDuration(capability: ProviderCapability) {
         <AnimatedContent :distance="32" :duration="0.8" class-name="max-w-2xl">
           <UBadge color="neutral" variant="outline" size="lg" class="mb-8 gap-2 bg-elevated/90 px-3 py-1 backdrop-blur">
             <span class="h-1.5 w-1.5 rounded-full bg-emerald-600" />
-            {{ providerStats.online }}/{{ providerStats.total }} 平台在线 · {{ providerStats.models }} 个模型可选
+            {{ supportedModelCount }} 个 API 模型已适配 · 最高 4K
           </UBadge>
 
           <h1 class="type-display">
@@ -114,7 +203,7 @@ function formatDuration(capability: ProviderCapability) {
           </h1>
 
           <p class="type-lead mt-7 max-w-xl">
-            文字、首尾帧、参考图、参考视频、参考音频，自由组合输入。一套任务结构接入阿里云百炼、MiniMax、可灵与 Seedance，最高 1080P、最长 30 秒、支持同步生成声音。
+            文字、首尾帧、参考图、参考视频、参考音频，自由组合输入。一个创作流程覆盖项目已适配的全部模型，最高 4K、最长 30 秒、支持同步生成声音。
           </p>
 
           <div class="mt-9 flex flex-wrap gap-3">
@@ -129,7 +218,7 @@ function formatDuration(capability: ProviderCapability) {
           <div class="mt-11 flex flex-wrap items-center gap-x-8 gap-y-3">
             <div
               v-for="item in [
-                { value: 1080, suffix: 'P', label: '最高清晰度' },
+                { value: 4, suffix: 'K', label: '最高清晰度' },
                 { value: 30, suffix: ' 秒', label: '单次最长时长' },
                 { value: 6, suffix: ' 种', label: '输入组合方式' },
               ]" :key="item.label" class="flex items-baseline gap-2"
@@ -172,157 +261,95 @@ function formatDuration(capability: ProviderCapability) {
       />
     </section>
 
-    <!-- ============================ 能力矩阵 ============================ -->
+    <!-- ============================ 模型目录 ============================ -->
     <section id="capabilities" class="mx-auto max-w-[1440px] px-5 py-20 md:px-8 md:py-24">
       <AnimatedContent :distance="28" :duration="0.65">
         <div class="flex flex-col justify-between gap-6 md:flex-row md:items-end">
           <div>
             <p class="type-kicker">
-              PROVIDER MATRIX
+              MODEL CATALOG
             </p>
             <h2 class="type-section-title mt-3 max-w-2xl">
-              多供应商接入，一份能力清单
+              项目已支持的模型
             </h2>
           </div>
-          <p class="type-body max-w-md">
-            当前已连接 {{ providerStats.total }} 家服务商、{{ providerStats.models }} 个模型。适配器架构可以继续扩展，不把产品锁在单一模型上。
-          </p>
         </div>
       </AnimatedContent>
 
       <AnimatedContent :distance="24" :duration="0.7" :delay="0.05">
-        <UCard class="mt-12 overflow-hidden" :ui="{ body: 'p-0 sm:p-0' }">
-          <div class="panel-scroll overflow-x-auto">
-            <table class="w-full min-w-[1180px] table-fixed border-collapse text-left">
-              <colgroup>
-                <col class="w-[150px]">
-                <col class="w-[180px]">
-                <col class="w-[200px]">
-                <col class="w-[140px]">
-                <col class="w-[210px]">
-                <col class="w-[130px]">
-                <col class="w-[70px]">
-                <col class="w-[100px]">
-              </colgroup>
-              <thead>
-                <tr class="border-b border-default bg-muted/50">
-                  <th class="type-kicker whitespace-nowrap px-5 py-3.5">
-                    平台
-                  </th>
-                  <th class="type-kicker whitespace-nowrap px-5 py-3.5">
-                    模型
-                  </th>
-                  <th class="type-kicker whitespace-nowrap px-5 py-3.5">
-                    生成方式
-                  </th>
-                  <th class="type-kicker whitespace-nowrap px-5 py-3.5">
-                    清晰度
-                  </th>
-                  <th class="type-kicker whitespace-nowrap px-5 py-3.5">
-                    画幅
-                  </th>
-                  <th class="type-kicker whitespace-nowrap px-5 py-3.5">
-                    时长
-                  </th>
-                  <th class="type-kicker whitespace-nowrap px-5 py-3.5">
-                    音频
-                  </th>
-                  <th class="type-kicker whitespace-nowrap px-5 py-3.5">
-                    状态
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr
-                  v-for="item in providerCatalog"
-                  :key="item.id"
-                  class="border-b border-muted transition last:border-0 hover:bg-muted/30"
-                >
-                  <td class="px-5 py-4 align-top">
-                    <div class="whitespace-nowrap text-base text-highlighted font-600">
-                      {{ item.name }}
-                    </div>
-                    <div class="type-caption mt-0.5 whitespace-nowrap">
-                      {{ item.vendor }}
-                    </div>
-                  </td>
-                  <td class="px-5 py-4 align-top">
-                    <div v-for="model in item.models" :key="model.id" class="whitespace-nowrap text-base text-toned leading-7">
-                      {{ model.name }}
-                    </div>
-                    <div v-if="!item.models.length" class="type-caption">
-                      —
-                    </div>
-                  </td>
-                  <td class="px-5 py-4 align-top">
-                    <div class="flex flex-nowrap gap-1.5">
-                      <UBadge v-for="mode in item.modes" :key="mode" color="neutral" variant="subtle" size="md">
-                        {{ MODE_META[mode].label }}
-                      </UBadge>
-                    </div>
-                  </td>
-                  <td class="px-5 py-4 align-top">
-                    <div class="flex flex-wrap gap-1.5">
-                      <UBadge v-for="resolutionItem in item.resolutions" :key="resolutionItem" color="neutral" variant="outline" size="md">
-                        {{ resolutionItem }}
-                      </UBadge>
-                    </div>
-                  </td>
-                  <td class="px-5 py-4 align-top">
-                    <div v-if="item.ratios.length" class="flex flex-wrap gap-1.5">
-                      <UBadge v-for="ratioItem in item.ratios" :key="ratioItem" color="neutral" variant="outline" size="md">
-                        {{ ratioItem === 'adaptive' ? '自适应' : ratioItem }}
-                      </UBadge>
-                    </div>
-                    <span v-else class="type-caption whitespace-nowrap">跟随素材</span>
-                  </td>
-                  <td class="type-mono whitespace-nowrap px-5 py-4 align-top text-toned">
-                    {{ formatDuration(item) }}
-                  </td>
-                  <td class="px-5 py-4 align-top">
-                    <span
-                      :class="item.supportsAudio ? 'i-lucide-circle-check text-emerald-600' : 'i-lucide-minus text-dimmed'"
-                      class="text-base"
-                      :aria-label="item.supportsAudio ? '支持音频' : '不支持音频'"
-                    />
-                  </td>
-                  <td class="px-5 py-4 align-top">
-                    <UBadge :color="item.enabled ? 'success' : 'neutral'" variant="subtle" size="md">
-                      {{ item.enabled ? '在线' : '待配置' }}
-                    </UBadge>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </UCard>
-      </AnimatedContent>
-
-      <AnimatedContent :distance="18" :duration="0.55" :delay="0.08">
-        <div class="mt-8 border-y border-default py-6">
-          <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div class="shrink-0">
-              <p class="type-label">
-                可扩展 Provider 生态
-              </p>
+        <div class="model-catalog mt-12">
+          <div class="model-catalog__toolbar">
+            <div>
+              <label class="type-kicker block" for="catalog-model">选择模型</label>
               <p class="type-caption mt-1">
-                实心状态为已内置适配器，其余为可继续接入的适配目标。
+                共 {{ supportedModelCount }} 个已适配 API model ID
               </p>
             </div>
-            <div class="flex flex-wrap gap-2 lg:justify-end">
-              <UBadge
-                v-for="provider in providerEcosystem"
-                :key="provider.name"
-                color="neutral"
-                :variant="provider.current ? 'solid' : 'outline'"
-                size="lg"
-                class="whitespace-nowrap"
-              >
-                <span :class="provider.current ? 'bg-emerald-400' : 'bg-dimmed'" class="mr-1.5 h-1.5 w-1.5 rounded-full" />
-                {{ provider.name }}
-              </UBadge>
+            <div class="model-catalog__picker">
+              <USelect
+                id="catalog-model"
+                v-model="selectedModelKey"
+                :items="supportedModelItems"
+                size="xl"
+                class="w-full"
+                aria-label="选择项目支持的模型"
+              />
             </div>
           </div>
+
+          <Transition name="model-swap" mode="out-in">
+            <div
+              v-if="selectedProvider && selectedModel"
+              :key="selectedModelKey"
+              class="model-catalog__panel"
+              aria-live="polite"
+            >
+              <div class="model-catalog__bento">
+                <article class="model-catalog__identity">
+                  <div class="flex items-start justify-between gap-4">
+                    <span class="model-catalog__eyebrow">
+                      MODEL {{ String(selectedModelIndex + 1).padStart(2, '0') }} / {{ supportedModelCount }}
+                    </span>
+                    <span class="i-lucide-aperture text-xl text-signal-500" aria-hidden="true" />
+                  </div>
+                  <div class="mt-auto pt-14">
+                    <div class="flex flex-wrap items-center gap-2">
+                      <h3 class="text-2xl text-highlighted font-650">
+                        {{ formatCatalogModelName(selectedModel.name) }}
+                      </h3>
+                      <UBadge v-if="selectedModel.badge" color="neutral" variant="subtle" size="sm">
+                        {{ selectedModel.badge }}
+                      </UBadge>
+                    </div>
+                    <p class="type-caption mt-3 max-w-xl">
+                      {{ selectedModel.description }}
+                    </p>
+                    <code class="model-catalog__model-id">{{ selectedModel.id }}</code>
+                  </div>
+                </article>
+
+                <article
+                  v-for="fact in selectedModelFacts"
+                  :key="fact.kind"
+                  class="model-catalog__fact"
+                  :class="`model-catalog__fact--${fact.kind}`"
+                >
+                  <div class="flex items-center justify-between gap-4">
+                    <span class="model-catalog__eyebrow">{{ fact.label }}</span>
+                    <span :class="fact.icon" class="text-lg text-dimmed" aria-hidden="true" />
+                  </div>
+                  <p class="model-catalog__fact-value">
+                    {{ fact.value }}
+                  </p>
+                </article>
+
+                <div v-if="selectedModel.capabilities?.notes" class="model-catalog__note">
+                  <span class="i-lucide-info mt-0.5 shrink-0 text-signal-500" aria-hidden="true" />
+                  <p>{{ selectedModel.capabilities.notes }}</p>
+                </div>
+              </div>
+            </div>
+          </Transition>
         </div>
       </AnimatedContent>
     </section>
@@ -445,7 +472,7 @@ function formatDuration(capability: ProviderCapability) {
       <div class="mx-auto grid max-w-[1440px] px-5 md:grid-cols-4 md:px-8 divide-y divide-default md:divide-x md:divide-y-0">
         <div class="py-10 md:px-8 md:first:pl-0">
           <div class="text-4xl font-300 tracking-tight text-highlighted">
-            <CountUp :to="1080" :duration="1.6" />P
+            <CountUp :to="4" :duration="1.6" />K
           </div>
           <p class="type-caption mt-2">
             最高输出清晰度
@@ -464,12 +491,12 @@ function formatDuration(capability: ProviderCapability) {
             <CountUp :to="7" :duration="1.4" /> 类
           </div>
           <p class="type-caption mt-2">
-            多模态参考素材
+            平台支持的输入素材类型
           </p>
         </div>
         <div class="py-10 md:px-8">
           <div class="text-4xl font-300 tracking-tight text-highlighted">
-            <CountUp :to="providerStats.models" :duration="1.2" /> 个
+            <CountUp :to="supportedModelCount" :duration="1.2" /> 个
           </div>
           <p class="type-caption mt-2">
             可选生成模型
@@ -551,3 +578,254 @@ function formatDuration(capability: ProviderCapability) {
     </footer>
   </div>
 </template>
+
+<style scoped>
+.model-catalog {
+  position: relative;
+}
+
+.model-catalog__toolbar {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 2rem;
+  padding: 1.25rem 0;
+  border-block: 1px solid var(--ui-border);
+}
+
+.model-catalog__picker {
+  width: min(100%, 23rem);
+  flex: none;
+}
+
+.model-catalog__panel {
+  padding-top: 1.25rem;
+}
+
+.model-catalog__bento {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.7rem;
+}
+
+.model-catalog__identity,
+.model-catalog__fact,
+.model-catalog__note {
+  border: 1px solid color-mix(in srgb, var(--ui-border) 86%, transparent);
+  border-radius: var(--radius-2xl);
+  background: var(--ui-bg-elevated);
+  box-shadow: var(--shadow-soft);
+}
+
+.model-catalog__identity,
+.model-catalog__fact {
+  position: relative;
+  overflow: hidden;
+  transition:
+    border-color 90ms ease,
+    background-color 90ms ease,
+    transform 120ms var(--ease-cinematic),
+    box-shadow 180ms var(--ease-cinematic);
+}
+
+.model-catalog__identity::after,
+.model-catalog__fact::after {
+  position: absolute;
+  inset: auto -15% -55% 25%;
+  height: 80%;
+  border-radius: 50%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--color-signal-500) 9%, transparent), transparent 66%);
+  content: '';
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 180ms ease;
+}
+
+.model-catalog__identity:hover,
+.model-catalog__fact:hover {
+  border-color: color-mix(in srgb, var(--color-signal-500) 34%, var(--ui-border));
+  background: color-mix(in srgb, var(--ui-bg-elevated) 86%, var(--color-signal-50));
+  box-shadow: var(--shadow-soft);
+  transform: translateY(-2px);
+}
+
+.model-catalog__identity:hover::after,
+.model-catalog__fact:hover::after {
+  opacity: 1;
+}
+
+.model-catalog__identity {
+  display: flex;
+  min-height: 15rem;
+  flex-direction: column;
+  padding: 1.4rem;
+  background: linear-gradient(
+    145deg,
+    color-mix(in srgb, var(--ui-bg-elevated) 90%, var(--color-signal-50)),
+    var(--ui-bg-muted)
+  );
+}
+
+.model-catalog__eyebrow {
+  color: var(--ui-text-dimmed);
+  font-family: var(--font-sans);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.model-catalog__model-id {
+  display: block;
+  width: fit-content;
+  max-width: 100%;
+  margin-top: 1.25rem;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--ui-bg-elevated) 72%, transparent);
+  color: var(--ui-text-dimmed);
+  font-size: 0.75rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.model-catalog__fact {
+  display: flex;
+  min-height: 7.15rem;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 1.2rem;
+}
+
+.model-catalog__fact-value {
+  position: relative;
+  z-index: 1;
+  margin-top: 2rem;
+  color: var(--ui-text-highlighted);
+  font-size: clamp(1rem, 1.35vw, 1.25rem);
+  font-weight: 600;
+  line-height: 1.45;
+  letter-spacing: -0.012em;
+  overflow-wrap: anywhere;
+}
+
+.model-catalog__note {
+  display: flex;
+  gap: 0.75rem;
+  padding: 1rem 1.15rem;
+  color: var(--ui-text-dimmed);
+  font-size: 0.8125rem;
+  line-height: 1.65;
+}
+
+.model-swap-enter-active {
+  transition:
+    opacity 280ms var(--ease-cinematic),
+    transform 280ms var(--ease-cinematic);
+}
+
+.model-swap-leave-active {
+  transition:
+    opacity 160ms ease-in,
+    transform 160ms ease-in;
+}
+
+.model-swap-enter-from {
+  opacity: 0;
+  transform: translateY(10px) scale(0.995);
+}
+
+.model-swap-leave-to {
+  opacity: 0;
+  transform: translateY(-5px) scale(0.998);
+}
+
+:global(.dark) .model-catalog__identity:hover,
+:global(.dark) .model-catalog__fact:hover {
+  background: color-mix(in srgb, var(--ui-bg-elevated) 90%, var(--color-signal-950));
+}
+
+@media (min-width: 640px) {
+  .model-catalog__bento {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .model-catalog__identity,
+  .model-catalog__fact--modes,
+  .model-catalog__note {
+    grid-column: span 2;
+  }
+}
+
+@media (min-width: 1024px) {
+  .model-catalog__bento {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+  }
+
+  .model-catalog__identity {
+    grid-column: 1 / 6;
+    grid-row: 1 / 3;
+  }
+
+  .model-catalog__fact--modes {
+    grid-column: 6 / 13;
+    grid-row: 1;
+  }
+
+  .model-catalog__fact--resolution {
+    grid-column: 6 / 9;
+    grid-row: 2;
+  }
+
+  .model-catalog__fact--duration {
+    grid-column: 9 / 13;
+    grid-row: 2;
+  }
+
+  .model-catalog__fact--ratio {
+    grid-column: 1 / 7;
+  }
+
+  .model-catalog__fact--audio {
+    grid-column: 7 / 13;
+  }
+
+  .model-catalog__note {
+    grid-column: 1 / 13;
+  }
+}
+
+@media (max-width: 767px) {
+  .model-catalog__panel {
+    padding-top: 1.5rem;
+  }
+
+  .model-catalog__toolbar {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .model-catalog__picker {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .model-catalog__identity,
+  .model-catalog__fact,
+  .model-catalog__identity::after,
+  .model-catalog__fact::after,
+  .model-swap-enter-active,
+  .model-swap-leave-active {
+    transition: none;
+  }
+
+  .model-catalog__identity:hover,
+  .model-catalog__fact:hover {
+    transform: none;
+  }
+}
+</style>

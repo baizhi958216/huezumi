@@ -21,7 +21,7 @@ Browser (Nuxt/Vue)
 
 ### 表现层
 
-`app/` 负责页面、交互和展示。创作台从 `/api/providers` 获取能力，供应商、模型、画幅、时长和素材控件不应写死为某一家协议。
+`app/` 负责页面、交互和展示。创作台从 `/api/providers` 获取能力，供应商、模型、画幅、时长和素材控件不应写死为某一家协议。供应商能力表示平台接入能力的并集；同一供应商下的模型差异由 `ModelSpec.capabilities` 覆盖，客户端通过 `resolveModelCapability` 得到当前模型的有效能力。
 
 ### HTTP 与编排层
 
@@ -33,7 +33,7 @@ Browser (Nuxt/Vue)
 
 ### 供应商层
 
-每个适配器实现 `VideoProvider.submit()` 与 `VideoProvider.getTask()`。`catalog.ts` 是能力声明的唯一来源，`index.ts` 负责凭据探测和实例创建。上游状态、错误和用量必须在适配器内归一化。
+每个适配器实现 `VideoProvider.submit()` 与 `VideoProvider.getTask()`。`catalog.ts` 是能力声明的唯一来源，`index.ts` 负责凭据探测、实例创建和模型级组合校验。上游状态、错误和用量必须在适配器内归一化。
 
 ### 持久化
 

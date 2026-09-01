@@ -94,6 +94,8 @@ export class KlingProvider implements VideoProvider {
 
     if (request.watermark)
       body.watermark = true
+    if ((request.model || 'kling-v2-6') === 'kling-v2-6')
+      body.sound = request.audio ? 'on' : 'off'
 
     const response = await $fetch<KlingTaskResponse>(`${this.config.baseUrl}/videos/${kind}`, {
       method: 'POST',
