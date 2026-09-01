@@ -28,9 +28,9 @@ pnpm dev
 至少需要在 `.env` 中配置：
 
 ```dotenv
-DASHSCOPE_API_KEY=sk-xxx
-DASHSCOPE_WORKSPACE_ID=your-workspace-id
-DASHSCOPE_REGION=cn-beijing
+NUXT_DASHSCOPE_API_KEY=sk-xxx
+NUXT_DASHSCOPE_WORKSPACE_ID=your-workspace-id
+NUXT_DASHSCOPE_REGION=cn-beijing
 NUXT_PUBLIC_APP_URL=https://your-public-domain.example.com
 ```
 
@@ -52,7 +52,12 @@ pnpm dev
 pnpm build
 pnpm lint
 pnpm lint:fix
+pnpm typecheck
+pnpm check
+pnpm check:full
 ```
+
+AI 协作规则、架构、规格和验证入口分别见 `AGENTS.md`、`DESIGN.md`、`spec/` 与 `harness/`；文档索引见 `docs/README.md`。
 
 ## DashScope 实现说明
 
