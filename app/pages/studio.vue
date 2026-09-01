@@ -71,12 +71,12 @@ watch(capability, (cap) => {
   if (!cap.modes.includes(mode.value))
     mode.value = cap.modes[0] || 'text'
   if (!cap.resolutions.includes(resolution.value))
-    resolution.value = cap.resolutions[cap.resolutions.length - 1]
+    resolution.value = cap.resolutions.at(-1) || '1080P'
   if (cap.ratios.length && !cap.ratios.includes(ratio.value))
-    ratio.value = cap.ratios.includes('16:9') ? '16:9' : cap.ratios[0]
+    ratio.value = cap.ratios.includes('16:9') ? '16:9' : (cap.ratios[0] || 'adaptive')
   const d = cap.duration
   if (d.steps && !d.steps.includes(duration.value))
-    duration.value = d.steps[0]
+    duration.value = d.steps[0] || d.min
   if (!d.steps && (duration.value < d.min || duration.value > d.max))
     duration.value = Math.min(Math.max(5, d.min), d.max)
   smartDuration.value = false

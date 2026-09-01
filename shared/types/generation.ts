@@ -133,6 +133,11 @@ export interface DurationCapability {
   steps?: number[]
 }
 
+export type ProviderMediaLimit = Pick<MediaCapability, 'max' | 'accept' | 'extensions' | 'maxBytes' | 'duration' | 'totalDuration'> & {
+  /** 覆盖该供应商下的通用素材提示。 */
+  hint?: string
+}
+
 /** 供应商能力声明。前端完全由这份声明驱动，不硬编码任何一家供应商的参数。 */
 export interface ProviderCapability {
   id: ProviderId
@@ -143,7 +148,7 @@ export interface ProviderCapability {
   models: ModelSpec[]
   modes: GenerationMode[]
   media: MediaType[]
-  mediaLimits: Partial<Record<MediaType, Pick<MediaCapability, 'max' | 'accept' | 'extensions' | 'maxBytes' | 'duration' | 'totalDuration'>>>
+  mediaLimits: Partial<Record<MediaType, ProviderMediaLimit>>
   resolutions: Resolution[]
   ratios: AspectRatio[]
   duration: DurationCapability

@@ -111,6 +111,8 @@ export class KlingProvider implements VideoProvider {
 
   async getTask(encodedTaskId: string): Promise<ProviderTaskResult> {
     const [kind, taskId] = encodedTaskId.split(':')
+    if (!taskId)
+      throw new Error('可灵任务 ID 格式无效')
     const endpoint = kind === 'image2video' ? 'image2video' : 'text2video'
     const response = await $fetch<KlingTaskResponse>(`${this.config.baseUrl}/videos/${endpoint}/${encodeURIComponent(taskId)}`, {
       headers: this.headers(),
