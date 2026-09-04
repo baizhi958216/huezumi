@@ -333,6 +333,65 @@ const promptPresets = [
   { title: '知识科普', icon: 'i-lucide-atom', prompt: '用清晰的三维动画展示光合作用过程，从叶片微观结构进入细胞，信息准确，镜头平稳，教育科普风格。' },
 ]
 
+const route = useRoute()
+const reusedFromId = ref<string>()
+
+async function loadFromTask(fromId: string) {
+  try {
+    const prior = await $fetch<GenerationRecord>(`/api/generations/${fromId}`)
+    if (prior) {
+      if (prior.provider)
+        providerId.value = prior.provider
+      if (prior.model)
+        model.value = prior.model
+      if (prior.mode)
+        mode.value = prior.mode
+      if (prior.prompt)
+        prompt.value = prior.prompt
+      if (prior.negativePrompt) {
+        negativePrompt.value = prior.negativePrompt
+        advancedOpen.value = true
+      }
+      if (prior.media)
+        media.value = [...prior.media]
+      if (prior.resolution)
+        resolution.value = prior.resolution
+      if (prior.ratio)
+        ratio.value = prior.ratio
+      if (prior.duration !== undefined) {
+        if (prior.duration === -1) {
+          smartDuration.value = true
+        }
+        else {
+          smartDuration.value = false
+          duration.value = prior.duration
+        }
+      }
+      if (prior.audio !== undefined)
+        audio.value = prior.audio
+      if (prior.promptExtend !== undefined)
+        promptExtend.value = prior.promptExtend
+      if (prior.watermark !== undefined)
+        watermark.value = prior.watermark
+      if (prior.seed !== undefined) {
+        seed.value = prior.seed
+        advancedOpen.value = true
+      }
+      reusedFromId.value = prior.id
+    }
+  }
+  catch (error) {
+    console.warn('Failed to load prior task for studio reuse', error)
+  }
+}
+
+onMounted(() => {
+  const fromId = route.query.from
+  if (typeof fromId === 'string' && fromId) {
+    loadFromTask(fromId)
+  }
+})
+
 onBeforeUnmount(polling.pause)
 </script>
 
@@ -354,6 +413,15 @@ onBeforeUnmount(polling.pause)
             <UBadge :color="capability?.enabled ? 'success' : 'warning'" variant="subtle" size="sm">
               {{ capability?.enabled ? `${capability.name} 在线` : '未配置凭据' }}
             </UBadge>
+          </div>
+          <div v-if="reusedFromId" class="mt-2.5 flex items-center justify-between rounded-lg bg-primary/10 px-3 py-1.5 text-xs text-primary">
+            <span class="flex items-center gap-1.5 truncate">
+              <span class="i-lucide-sparkles text-xs shrink-0" />
+              <span class="truncate">已回填任务 {{ reusedFromId.slice(0, 8) }} 的生成参数与参考素材</span>
+            </span>
+            <button type="button" class="ml-2 text-xs hover:underline shrink-0" @click="reusedFromId = undefined">
+              关闭
+            </button>
           </div>
           <UFieldGroup class="mt-3 w-full">
             <UButton
