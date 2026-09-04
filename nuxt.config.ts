@@ -67,11 +67,25 @@ export default defineNuxtConfig({
     ossOutputPrefix: 'forkvdo/outputs',
     ossMaxOutputBytes: 1073741824,
     ossTransferTimeoutMs: 300000,
+    // ComfyUI 工作流：本地托管或连接其他机器上已运行的服务
+    comfyuiMode: 'auto',
+    comfyuiDir: '',
+    comfyuiPython: '',
+    comfyuiHost: '127.0.0.1',
+    comfyuiPort: 8188,
+    comfyuiArgs: '',
+    comfyuiRemoteBaseUrl: '',
+    comfyuiStartTimeoutMs: 180000,
+    comfyuiProbeTimeoutMs: 1500,
     public: {
       appUrl: 'http://localhost:3000',
     },
   },
   nitro: {
+    experimental: {
+      // 工作流页面通过服务端的 WebSocket 代理接收 ComfyUI 的执行事件
+      websocket: true,
+    },
     storage: {
       data: {
         driver: 'fs',
