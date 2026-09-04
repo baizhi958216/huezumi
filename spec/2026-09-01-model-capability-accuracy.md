@@ -1,6 +1,6 @@
 # 模型级能力准确性
 
-- 状态：accepted
+- 状态：completed
 - 创建日期：2026-09-01
 - 相关设计：`DESIGN.md`
 

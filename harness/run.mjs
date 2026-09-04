@@ -1,5 +1,6 @@
 import { spawnSync } from 'node:child_process'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
+import { dirname, resolve } from 'node:path'
 import process from 'node:process'
 
 const full = process.argv.includes('--full')
@@ -92,4 +93,82 @@ function validateRepository() {
     if (!gitignore.split(/\r?\n/).includes(ignored))
       throw new Error(`.gitignore must contain ${ignored}`)
   }
+
+  validateSpecs()
+  validateMarkdownLinks()
+  validateTrackedRuntimeFiles()
+}
+
+function validateSpecs() {
+  const allowedStatuses = new Set(['draft', 'accepted', 'completed', 'superseded'])
+  const specFiles = readdirSync('spec')
+    .filter(file => file.endsWith('.md') && !['README.md', '_template.md'].includes(file))
+    .map(file => `spec/${file}`)
+
+  for (const file of specFiles) {
+    const content = readFileSync(file, 'utf8')
+    const status = content.match(/^- 状态：([^\r\n]+)$/m)?.[1]?.trim()
+    if (!status)
+      throw new Error(`${file} must declare a status`)
+    if (!allowedStatuses.has(status))
+      throw new Error(`${file} has unsupported status: ${status}`)
+    if (status === 'completed' && /^- \[ \]/m.test(content))
+      throw new Error(`${file} is completed but still has unchecked acceptance items`)
+    if (status === 'superseded' && !/继任|替代|supersed/i.test(content))
+      throw new Error(`${file} is superseded but does not identify its successor`)
+  }
+}
+
+function validateMarkdownLinks() {
+  const roots = ['AGENTS.md', 'CLAUDE.md', 'DESIGN.md', 'README.md', '.github', 'docs', 'harness', 'spec']
+  const markdownFiles = roots.flatMap(collectMarkdownFiles)
+
+  for (const file of markdownFiles) {
+    const content = readFileSync(file, 'utf8')
+    for (const match of content.matchAll(/!?\[[^\]]*\]\(([^)]+)\)/g)) {
+      let target = match[1].trim()
+      if (target.startsWith('<'))
+        target = target.slice(1, target.indexOf('>'))
+      else
+        target = target.split(/\s+["']/)[0]
+
+      if (!target || target.startsWith('#') || target.startsWith('/') || /^[a-z][a-z\d+.-]*:/i.test(target))
+        continue
+
+      const fileTarget = decodeURIComponent(target.split('#')[0].split('?')[0])
+      if (fileTarget && !existsSync(resolve(dirname(file), fileTarget)))
+        throw new Error(`Broken Markdown link in ${file}: ${target}`)
+    }
+  }
+}
+
+function collectMarkdownFiles(path) {
+  if (!existsSync(path))
+    return []
+  if (!statSync(path).isDirectory())
+    return path.endsWith('.md') ? [path] : []
+  return readdirSync(path, { withFileTypes: true }).flatMap((entry) => {
+    const child = `${path}/${entry.name}`
+    if (entry.isDirectory())
+      return collectMarkdownFiles(child)
+    return entry.name.endsWith('.md') ? [child] : []
+  })
+}
+
+function validateTrackedRuntimeFiles() {
+  const result = spawnSync('git', ['ls-files', '-z'], {
+    cwd: process.cwd(),
+    encoding: 'utf8',
+  })
+  if (result.error)
+    throw result.error
+  if (result.status !== 0)
+    throw new Error('Unable to inspect tracked files with git ls-files')
+
+  const forbidden = result.stdout
+    .split('\0')
+    .filter(Boolean)
+    .filter(file => file === '.env' || /^(?:\.data|\.nuxt|\.output|node_modules)\//.test(file))
+  if (forbidden.length)
+    throw new Error(`Runtime or sensitive files must not be tracked: ${forbidden.join(', ')}`)
 }

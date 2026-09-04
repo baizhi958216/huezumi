@@ -1,6 +1,6 @@
 # 生成结果视频 OSS 归档
 
-- 状态：implemented
+- 状态：completed
 - 负责人：
 - 创建日期：2026-09-02
 - 相关 issue / ADR：`docs/decisions/001-oss-material-storage.md`

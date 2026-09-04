@@ -1,6 +1,6 @@
 # 百炼家族与 Seedance 2.x 多模型扩展
 
-- 状态：accepted
+- 状态：completed
 - 创建日期：2026-09-01
 - 相关设计：`DESIGN.md`、`spec/2026-09-01-model-capability-accuracy.md`
 
@@ -54,7 +54,7 @@
 ## 验收条件
 
 - [x] 首页模型目录显示 24 个已适配 API model ID（dashscope 12、minimax 3、kling 2、seedance 7），通过一个不展示供应商层级的全量模型选择器，一次展示一个模型的生成方式、清晰度、时长、画幅和音频。
-- [ ] 创作台选择 happyhorse-1.1-i2v 时：无画幅选择器（跟随首帧）、时长 3–15、480P/720P/1080P；选择 MiniMax/MiniMax-H3 时：清晰度为 768P/2K、时长 4–15、高级选项不含反向提示词/种子/改写。
+- [x] 创作台选择 happyhorse-1.1-i2v 时：无画幅选择器（跟随首帧）、时长 3–15、480P/720P/1080P；选择 MiniMax/MiniMax-H3 时：清晰度为 768P/2K、时长 4–15、高级选项不含反向提示词/种子/改写。
 - [x] `assertRequestSupported` 按模型级覆盖拒绝：向 happyhorse 传 negativePrompt、向 H3 传 1080P、向 wan2.7-r2v 传 15 秒等组合返回 422。
 - [x] 使用脱敏 `$fetch` mock 核对适配器请求体：HappyHorse/H3 不下发未声明字段，Kling Omni 与 Seedance 的视频/音频素材映射正确。
 - [x] `pnpm check:full` 通过。

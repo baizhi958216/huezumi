@@ -5,5 +5,6 @@
 - [`api.md`](api.md)：当前 HTTP API 概览。
 - [`../spec/README.md`](../spec/README.md)：规格的创建和生命周期。
 - [`decisions/README.md`](decisions/README.md)：架构决策记录（ADR）。
+- [`../harness/README.md`](../harness/README.md)：统一、无凭据的工程验证入口。
 
 文档应描述已经存在且可验证的事实。计划中的行为放入 `spec/`，只有落地后才同步到这里。
