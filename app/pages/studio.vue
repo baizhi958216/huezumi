@@ -173,13 +173,13 @@ const progress = computed(() => {
 })
 
 const polling = useIntervalFn(async () => {
-  if (!task.value || ['SUCCEEDED', 'FAILED'].includes(task.value.status)) {
+  if (!task.value || ['SUCCEEDED', 'FAILED', 'UNKNOWN'].includes(task.value.status)) {
     polling.pause()
     return
   }
   try {
     task.value = await $fetch<GenerationRecord>(`/api/generations/${task.value.id}`)
-    if (['SUCCEEDED', 'FAILED'].includes(task.value.status))
+    if (['SUCCEEDED', 'FAILED', 'UNKNOWN'].includes(task.value.status))
       polling.pause()
   }
   catch {}
@@ -231,6 +231,14 @@ async function generate() {
   finally {
     submitting.value = false
   }
+}
+
+async function refreshTaskExplicitly() {
+  if (!task.value)
+    return
+  task.value = await $fetch<GenerationRecord>(`/api/generations/${task.value.id}?refresh=1`)
+  if (['PENDING', 'RUNNING'].includes(task.value.status))
+    polling.resume()
 }
 
 const promptPresets = [
