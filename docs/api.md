@@ -43,6 +43,44 @@ Runway Dev 当前接入 Gen-4.5、WAN 3.0、Seedance 2/2.5、Hailuo 3 和 Gemini
 
 以内联方式返回素材，并设置一年 immutable 公共缓存。素材不存在时返回 404。
 
+## ComfyUI 工作流模块
+
+`/api/comfyui/**` 是浏览器与 ComfyUI 进程之间的唯一通道。所有响应经过 Nuxt 转发，错误信息不携带上游堆栈或凭据。
+
+| 方法   | 路径                             | 说明                                                                                                           |
+| ------ | -------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| GET    | `/api/comfyui/status`            | 模式（local/remote）、安装状态、运行状态、基地址、进程 pid、`system_stats`、进程日志尾部、安装任务状态         |
+| POST   | `/api/comfyui/install`           | body `{ installDeps?: boolean }`，异步执行 clone / 装依赖；`remote` 模式返回 `409`                             |
+| POST   | `/api/comfyui/start`             | 拉起本地进程并等待就绪；`remote` 模式返回 `409`                                                                |
+| POST   | `/api/comfyui/stop`              | 停止本地进程；`remote` 模式返回 `409`                                                                          |
+| GET    | `/api/comfyui/object-info`       | 节点定义；`?refresh=1` 强制回源                                                                                |
+| POST   | `/api/comfyui/prompt`            | body `{ prompt, clientId?, front?, workflow? }` → `{ promptId, number, nodeErrors }`；上游校验失败映射为 `422` |
+| GET    | `/api/comfyui/history`           | `?maxItems=` 历史列表                                                                                          |
+| GET    | `/api/comfyui/history/:promptId` | 单条历史，含 outputs                                                                                           |
+| GET    | `/api/comfyui/queue`             | `{ queueRunning, queuePending }`                                                                               |
+| POST   | `/api/comfyui/queue`             | body `{ clear?: true, delete?: number[] }`                                                                     |
+| POST   | `/api/comfyui/interrupt`         | 中断当前执行                                                                                                   |
+| POST   | `/api/comfyui/free`              | body `{ unloadModels?, freeMemory? }`                                                                          |
+| POST   | `/api/comfyui/upload`            | multipart `image` → `{ name, subfolder, type }`，成功后失效 object_info 缓存                                   |
+| GET    | `/api/comfyui/view`              | `?filename=&subfolder=&type=&preview=` 二进制流；`type` 必须是 `input                                          | output | temp` |
+| GET    | `/api/comfyui/workflows`         | 工作流列表                                                                                                     |
+| POST   | `/api/comfyui/workflows`         | body `{ id?, name, graph }` 保存（`id` 存在则更新）                                                            |
+| GET    | `/api/comfyui/workflows/:id`     | 读取单个                                                                                                       |
+| DELETE | `/api/comfyui/workflows/:id`     | 删除                                                                                                           |
+| WS     | `/api/comfyui/ws?clientId=`      | WebSocket 代理，逐帧转发 ComfyUI `/ws` 事件                                                                    |
+
+通用状态码：
+
+| 状态码 | 含义                                                       |
+| ------ | ---------------------------------------------------------- |
+| 404    | 工作流 id 不存在                                           |
+| 409    | 在 `remote` 模式调用本地启停/安装                          |
+| 422    | 提交体校验失败（来自 ComfyUI 的 `{ error, node_errors }`） |
+| 502    | ComfyUI 不可达或返回异常                                   |
+| 504    | 本地启动就绪探测超时                                       |
+
+`prompt` 提交体可附带 `workflow` 字段（标准 ComfyUI workflow JSON），服务端会写入 `extra_data.extra_pnginfo.workflow`，官方前端据此可重新打开图。输入控件顺序依赖 `object_info` 的声明顺序；可选控件排在必填控件之前的少数节点会导致导入时控件错位，已记录为已知限制。
+
 ## 契约演进
 
 修改 API 时同时更新共享类型、Zod schema、能力校验、相关 spec 和本文。破坏性修改需要版本化或兼容窗口，不得静默改变已持久化记录的含义。
