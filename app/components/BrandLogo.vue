@@ -42,7 +42,7 @@ withDefaults(defineProps<{ compact?: boolean }>(), { compact: false })
   transition: filter 180ms ease;
 }
 
-:global(.dark) .brand-logo__wordmark {
+:global(.dark .brand-logo__wordmark) {
   filter: invert(1) hue-rotate(180deg) brightness(1.1);
 }
 </style>

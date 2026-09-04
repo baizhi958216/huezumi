@@ -98,6 +98,8 @@
     scrollbar-gutter: stable;
     scrollbar-width: none;
     -webkit-text-size-adjust: 100%;
+    background-color: var(--ui-bg);
+    color: var(--ui-text);
   }
 
   html::-webkit-scrollbar {
