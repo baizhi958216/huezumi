@@ -189,13 +189,13 @@ async function upload(event: Event) {
 </script>
 
 <template>
-  <UCard variant="subtle" :ui="{ body: 'p-3 sm:p-3' }">
-    <div class="flex items-start gap-3">
+  <UCard variant="subtle" :ui="{ body: 'p-2.5 sm:p-3' }">
+    <div class="flex items-start gap-2.5">
       <div class="min-w-0 flex-1">
-        <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
-          <div class="flex items-center gap-2">
-            <span class="type-label">{{ label }}</span>
-            <UBadge color="neutral" variant="subtle" size="sm">
+        <div class="mb-1.5 flex flex-wrap items-center justify-between gap-2">
+          <div class="flex items-center gap-1.5">
+            <span class="type-label text-xs font-semibold text-toned">{{ label }}</span>
+            <UBadge color="neutral" variant="subtle" size="xs">
               {{ values.length }}<span v-if="max !== undefined"> / {{ max }}</span>
             </UBadge>
           </div>
@@ -203,6 +203,7 @@ async function upload(event: Event) {
             color="neutral"
             variant="ghost"
             size="xs"
+            class="text-xs"
             :icon="uploading ? 'i-lucide-loader-circle' : 'i-lucide-upload'"
             :disabled="uploading || !canAdd"
             :loading="uploading"
@@ -212,18 +213,18 @@ async function upload(event: Event) {
           </UButton>
         </div>
 
-        <div v-if="values.length" class="mb-2 space-y-1.5">
+        <div v-if="values.length" class="mb-2 space-y-1">
           <div
             v-for="(item, index) in values"
             :key="`${item.url}-${index}`"
-            class="flex min-w-0 items-center gap-2 rounded-md border border-default bg-default/50 px-2 py-1.5"
+            class="flex min-w-0 items-center gap-2 rounded-md border border-default bg-default/50 px-2 py-1"
           >
-            <img v-if="isImage" :src="item.url" :alt="item.name || `${label} ${index + 1}`" class="h-9 w-9 shrink-0 rounded object-cover">
-            <span v-else :class="uploading ? 'i-lucide-loader-circle' : icon" class="shrink-0 text-base text-dimmed" />
-            <span class="min-w-0 flex-1 truncate text-sm" :title="item.name || item.url">
+            <img v-if="isImage" :src="item.url" :alt="item.name || `${label} ${index + 1}`" class="h-8 w-8 shrink-0 rounded object-cover">
+            <span v-else :class="uploading ? 'i-lucide-loader-circle' : icon" class="shrink-0 text-sm text-dimmed" />
+            <span class="min-w-0 flex-1 truncate text-xs" :title="item.name || item.url">
               {{ item.name || item.url }}
             </span>
-            <span v-if="needsDuration && item.duration !== undefined" class="shrink-0 text-xs text-dimmed">
+            <span v-if="needsDuration && item.duration !== undefined" class="shrink-0 text-[11px] text-dimmed">
               {{ formatDuration(item.duration) }}
             </span>
             <UButton
@@ -237,12 +238,12 @@ async function upload(event: Event) {
           </div>
         </div>
 
-        <div class="flex flex-col gap-2 sm:flex-row">
+        <div class="flex flex-col gap-1.5 sm:flex-row">
           <UInput
             v-model="urlDraft"
             :placeholder="values.length ? '继续粘贴公网 URL' : hint"
-            size="sm"
-            class="min-w-0 flex-1"
+            size="xs"
+            class="min-w-0 flex-1 text-xs"
             icon="i-lucide-link"
             :disabled="!canAdd"
             @keyup.enter="addUrl"
@@ -255,8 +256,8 @@ async function upload(event: Event) {
             :min="durationLimit?.min"
             :max="durationLimit?.max"
             step="0.001"
-            size="sm"
-            class="sm:w-32"
+            size="xs"
+            class="sm:w-28 text-xs"
             placeholder="时长（秒）"
             aria-label="参考视频时长（秒）"
             :disabled="!canAdd"
@@ -265,20 +266,21 @@ async function upload(event: Event) {
           <UButton
             color="neutral"
             variant="outline"
-            size="sm"
+            size="xs"
+            class="text-xs shrink-0"
             :disabled="!urlDraft.trim() || !canAdd"
             @click="addUrl"
           >
             添加
           </UButton>
         </div>
-        <p class="type-caption mt-1.5">
+        <p class="type-caption mt-1 text-[11px] text-dimmed">
           {{ max !== undefined ? `最多 ${max} 份，可多选文件或逐个添加 URL` : '可多选文件或逐个添加 URL' }}
         </p>
-        <p v-if="needsDuration" class="type-caption mt-1.5">
+        <p v-if="needsDuration" class="type-caption mt-1 text-[11px] text-dimmed">
           本地上传会自动读取视频时长；粘贴 URL 时请填写时长，RollDek 按该时长计费。
         </p>
-        <p v-if="errorMessage" class="type-caption mt-1.5 text-error">
+        <p v-if="errorMessage" class="type-caption mt-1 text-[11px] text-error">
           {{ errorMessage }}
         </p>
       </div>

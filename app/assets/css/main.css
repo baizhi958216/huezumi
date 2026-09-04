@@ -204,24 +204,24 @@
 }
 
 @utility type-body {
-  font-size: 1.0625rem;
+  font-size: 1rem;
   font-weight: 400;
-  line-height: 1.8;
+  line-height: 1.75;
   letter-spacing: 0;
   color: var(--ui-text-muted);
 }
 
 @utility type-caption {
-  font-size: 1rem;
+  font-size: 0.8125rem;
   font-weight: 400;
-  line-height: 1.7;
+  line-height: 1.6;
   letter-spacing: 0;
   color: var(--ui-text-dimmed);
 }
 
 @utility type-kicker {
   font-family: var(--font-sans);
-  font-size: 1rem;
+  font-size: 0.75rem;
   font-weight: 600;
   line-height: 1.5;
   letter-spacing: 0.08em;
@@ -231,16 +231,16 @@
 
 @utility type-mono {
   font-family: var(--font-sans);
-  font-size: 1rem;
+  font-size: 0.8125rem;
   font-weight: 500;
   line-height: 1.6;
   letter-spacing: 0.04em;
 }
 
 @utility type-label {
-  font-size: 1rem;
+  font-size: 0.875rem;
   font-weight: 550;
-  line-height: 1.55;
+  line-height: 1.5;
   letter-spacing: 0;
   color: var(--ui-text-toned);
 }
