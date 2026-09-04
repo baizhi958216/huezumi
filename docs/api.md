@@ -4,11 +4,17 @@
 
 ## `GET /api/providers`
 
-返回供应商能力目录。`enabled` 由服务端凭据是否齐全决定，不返回任何凭据内容。
+返回供应商能力目录及各供应商的启用状态；不会返回服务端凭据。
 
 ## `POST /api/generations`
 
 提交统一的 `GenerationRequest`。请求结构以 `shared/types/generation.ts` 和 `server/utils/generation-schema.ts` 为准。
+
+`media` 是有序数组，同一种 `type` 可以重复出现，用于提交多张参考图、多个参考视频或多个参考音频。平台会按当前模型能力校验单类上限及跨类型组合上限；当前请求最多包含 50 份素材。创作台会将每一份素材分别保留并提交，公网 URL 仍需满足供应商可访问要求。
+
+RollDek 的 `reference_video` 素材必须携带自身的 `duration`（秒），服务端会映射为上游 `reference_videos[].duration`；这与顶层生成输出时长字段无关。RollDek 还要求提示词和所有素材 URL 均为服务端可访问的公网 HTTPS 地址。其模型 ID 的 `-480p` / `-720p` / `-1080p` 后缀决定输出清晰度，覆盖请求中的清晰度选择。
+
+Runway Dev 当前接入 Gen-4.5、WAN 3.0、Seedance 2/2.5、Hailuo 3 和 Gemini Omni Flash。适配器根据输入素材选择 `POST /v1/text_to_video`、`/v1/image_to_video` 或 `/v1/video_to_video`，将统一的首尾帧、参考图、参考视频和参考音频映射到 Runway 对应字段，并按模型映射像素 ratio / resolution。Runway 素材 URL 必须是公网 HTTPS 且满足供应商的 HEAD、Content-Type 和大小要求；任务完成后的输出 URL 为临时地址，服务端会沿用统一结果归档流程。
 
 常见错误：
 
@@ -21,11 +27,11 @@
 
 ## `GET /api/generations`
 
-返回全部生成记录，按 `createdAt` 倒序排列。接口会并发刷新所有 `PENDING`/`RUNNING` 记录；刷新单条失败时保留旧记录并写服务端日志。
+返回全部生成记录，按 `createdAt` 倒序排列。接口会并发刷新所有 `PENDING`/`RUNNING` 记录；供应商任务成功时同步把结果归档到 OSS。刷新或归档单条失败时保留旧记录并写服务端日志。
 
 ## `GET /api/generations/:id`
 
-返回单条记录并刷新进行中状态。记录不存在时返回 404。
+返回单条记录并刷新进行中状态。`?refresh=1` 可显式恢复状态待确认的任务，或重试任意供应商已成功但尚未归档的任务；只查询原供应商任务，不会重新提交。`outputArchive` 返回归档状态和非敏感错误码，内部 OSS object key 不进入响应。记录不存在时返回 404。
 
 ## `POST /api/files`
 

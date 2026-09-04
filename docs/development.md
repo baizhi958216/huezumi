@@ -20,7 +20,7 @@ Nuxt runtime config 从带 `NUXT_` 前缀的大写下划线环境变量映射。
 
 未启用 OSS 时，`NUXT_PUBLIC_APP_URL` 决定上传素材返回的绝对 URL，使用远程供应商时该地址必须能被公网访问；启用 OSS 后，新上传素材返回 OSS 公网 URL。
 
-### 阿里云 OSS 素材转存
+### 阿里云 OSS 素材与结果转存
 
 配置以下四项后，`POST /api/files` 会在本地接收文件后自动上传到阿里云 OSS，并把 OSS 公网 URL 返回给创作台：
 
@@ -37,11 +37,39 @@ NUXT_OSS_REGION=cn-beijing
 NUXT_OSS_ENDPOINT=
 NUXT_OSS_PUBLIC_BASE_URL=
 NUXT_OSS_PREFIX=forkvdo/uploads
+NUXT_OSS_OUTPUT_PREFIX=forkvdo/outputs
+NUXT_OSS_MAX_OUTPUT_BYTES=1073741824
+NUXT_OSS_TRANSFER_TIMEOUT_MS=300000
 ```
 
-Bucket 和对象必须允许百炼读取。默认上传对象使用 `public-read` ACL；如果上传端点是内网地址，必须通过 `NUXT_OSS_PUBLIC_BASE_URL` 指定公网 HTTPS 基地址。OSS 配置完全为空时仍使用本地存储，配置不完整时上传接口返回 `503`，OSS 上传失败时返回 `502`。
+Bucket 和对象必须允许百炼及作品库浏览器读取。默认上传对象使用 `public-read` ACL；如果上传端点是内网地址，必须通过 `NUXT_OSS_PUBLIC_BASE_URL` 指定公网 HTTPS 基地址。OSS 配置完全为空时输入素材仍使用本地存储，生成结果保留供应商临时地址并把归档标记为失败；配置不完整时素材上传接口返回 `503`。
 
-AccessKey 仅存在于服务端 runtime config，不会下发到浏览器。大文件分片、浏览器直传和私有对象签名 URL 尚未实现。
+生成任务变为 `SUCCEEDED` 时，服务端会将供应商结果下载到随机临时目录，在字节数和时间限制内上传到 `NUXT_OSS_OUTPUT_PREFIX`，成功后用 OSS URL 替换记录中的临时地址。归档失败不会把生成任务改成失败，可在作品库点击“重试归档”。
+
+AccessKey 和 OSS object key 仅存在于服务端，不会下发到浏览器。大文件分片、断点续传、浏览器直传、私有对象签名 URL 和生命周期清理尚未实现。
+
+### RollDek
+
+RollDek 通过 `POST /v1/videos` 提交 WAN 3.0 异步任务，通过 `GET /v1/videos/{task_id}` 查询；默认地址为 `https://rolldek.com`。配置：
+
+```dotenv
+NUXT_ROLLDEK_API_KEY=
+NUXT_ROLLDEK_BASE_URL=https://rolldek.com
+```
+
+平台目录登记 12 个带分辨率后缀的模型。适配器发送推荐的字符串 `seconds`，并将模型后缀对应的清晰度同时写入 `size` 和 `resolution`；比例同时写入 `aspect_ratio` 和兼容别名 `ratio`。完成任务从 `metadata.url` 读取签名视频直链，随后沿用统一的 OSS 结果归档流程。RollDek 参考视频必须通过统一 `media[].duration` 传递素材自身时长；创作台本地上传自动读取，粘贴 URL 时由用户填写。
+
+### Runway Dev
+
+Runway 当前接入 Gen-4.5、WAN 3.0、Seedance 2/2.5、Hailuo 3 和 Gemini Omni Flash。配置：
+
+```dotenv
+NUXT_RUNWAY_API_KEY=
+NUXT_RUNWAY_BASE_URL=https://api.dev.runwayml.com
+NUXT_RUNWAY_MODEL=gen4.5
+```
+
+服务端根据请求素材选择 `POST /v1/text_to_video`、`/v1/image_to_video` 或 `POST /v1/video_to_video`。Runway 的 `references`、`referenceVideos`、`referenceAudio` 和 `promptVideo` 分别承载平台的参考图、参考视频、参考音频和主视频输入；Seedance 系列的智能时长会映射为官方 `auto`。平台按模型官方 ratio / resolution 约束请求，Runway 要求素材 URL 使用公网 HTTPS，完成输出地址会在 24–48 小时内失效，因此生产环境应配置 OSS 以归档结果。
 
 ## 质量入口
 
