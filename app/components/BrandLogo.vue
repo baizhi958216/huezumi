@@ -3,13 +3,46 @@ withDefaults(defineProps<{ compact?: boolean }>(), { compact: false })
 </script>
 
 <template>
-  <span class="inline-flex items-center gap-2.5">
-    <svg class="h-8 w-8 shrink-0 rounded-[7px] ring-1 ring-default" viewBox="0 0 32 32" fill="none" aria-hidden="true">
-      <rect width="32" height="32" rx="7" fill="#0c0d0f" />
-      <path d="M9.25 9.25v5.2c0 1.05.52 2.03 1.4 2.61l3.2 2.13c.88.59 1.4 1.57 1.4 2.62v1" stroke="white" stroke-width="2.25" stroke-linecap="round" />
-      <path d="M15.25 9.25v1.7a3.2 3.2 0 0 1-1.43 2.66l-3.17 2.12" stroke="white" stroke-width="2.25" stroke-linecap="round" />
-      <path d="m19 10.25 5.75 4.1a2 2 0 0 1 0 3.3L19 21.75v-11.5Z" fill="white" />
-    </svg>
-    <span v-if="!compact" class="text-base text-highlighted font-700 tracking-[-0.02em]">forkvdo</span>
+  <span class="brand-logo">
+    <img
+      v-if="compact"
+      src="/favicon.svg"
+      alt=""
+      width="32"
+      height="32"
+      class="brand-logo__mark"
+      aria-hidden="true"
+    >
+    <img
+      v-else
+      src="/images/forkvdo-logo-nav.png"
+      alt="forkvdo"
+      width="2029"
+      height="530"
+      class="brand-logo__wordmark"
+    >
   </span>
 </template>
+
+<style scoped>
+.brand-logo {
+  display: inline-flex;
+  align-items: center;
+}
+
+.brand-logo__mark {
+  width: 2rem;
+  height: 2rem;
+  flex: none;
+}
+
+.brand-logo__wordmark {
+  width: auto;
+  height: 1.9rem;
+  transition: filter 180ms ease;
+}
+
+:global(.dark) .brand-logo__wordmark {
+  filter: invert(1) hue-rotate(180deg) brightness(1.1);
+}
+</style>

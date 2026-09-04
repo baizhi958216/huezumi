@@ -25,8 +25,6 @@ function toggleColorMode() {
 const navigation = [
   { label: '创作台', to: '/studio' },
   { label: '作品库', to: '/projects' },
-  { label: '模型目录', to: '/#capabilities' },
-  { label: '使用流程', to: '/#workflow' },
 ]
 
 function isActive(to: string) {
