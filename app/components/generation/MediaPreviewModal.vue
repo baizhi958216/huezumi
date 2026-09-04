@@ -52,16 +52,16 @@ onUnmounted(() => {
     >
       <div
         v-if="open && item"
-        class="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 p-4 backdrop-blur-md"
+        class="fixed inset-0 z-[100] flex items-center justify-center bg-black/55 p-4 backdrop-blur-md dark:bg-black/85"
         @click.self="close"
       >
-        <div class="relative max-h-[90vh] max-w-[90vw] flex flex-col items-center overflow-hidden rounded-2xl border border-white/10 bg-zinc-950 shadow-2xl">
+        <div class="relative max-h-[90vh] max-w-[90vw] flex flex-col items-center overflow-hidden rounded-2xl border border-default bg-elevated shadow-2xl dark:border-white/10 dark:bg-zinc-950">
           <!-- 头部标题栏 -->
-          <div class="w-full flex items-center justify-between border-b border-white/10 px-5 py-3">
-            <div class="flex items-center gap-2 text-sm text-zinc-200">
+          <div class="w-full flex items-center justify-between border-b border-default px-5 py-3 dark:border-white/10">
+            <div class="flex min-w-0 items-center gap-2 text-sm text-highlighted dark:text-zinc-200">
               <span v-if="meta" :class="meta.icon" class="text-base text-primary" />
               <span class="font-medium">{{ meta?.label || '参考素材' }}</span>
-              <span v-if="item.name" class="max-w-md truncate text-xs text-zinc-400">
+              <span v-if="item.name" class="max-w-md truncate text-xs text-muted dark:text-zinc-400">
                 · {{ item.name }}
               </span>
             </div>
@@ -70,14 +70,14 @@ onUnmounted(() => {
                 :href="item.url"
                 target="_blank"
                 rel="noopener noreferrer"
-                class="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs text-zinc-400 transition hover:bg-white/10 hover:text-white"
+                class="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs text-muted transition hover:bg-muted hover:text-highlighted dark:text-zinc-400 dark:hover:bg-white/10 dark:hover:text-white"
               >
                 <span class="i-lucide-external-link text-xs" />
                 新窗口打开
               </a>
               <button
                 type="button"
-                class="rounded-lg p-1.5 text-zinc-400 transition hover:bg-white/10 hover:text-white"
+                class="rounded-lg p-1.5 text-muted transition hover:bg-muted hover:text-highlighted dark:text-zinc-400 dark:hover:bg-white/10 dark:hover:text-white"
                 @click="close"
               >
                 <span class="i-lucide-x text-lg" />
@@ -105,14 +105,14 @@ onUnmounted(() => {
               <div class="h-16 w-16 flex items-center justify-center rounded-2xl bg-primary/10 text-primary">
                 <span class="i-lucide-audio-lines text-3xl" />
               </div>
-              <p class="text-sm font-medium text-zinc-200">
+              <p class="text-sm font-medium text-highlighted dark:text-zinc-200">
                 {{ item.name || '参考音频' }}
               </p>
               <audio :src="item.url" controls class="w-full" />
             </div>
             <div v-else class="flex flex-col items-center gap-3 py-8 text-center">
-              <span class="i-lucide-file-text text-4xl text-zinc-400" />
-              <p class="text-sm text-zinc-300">
+              <span class="i-lucide-file-text text-4xl text-muted dark:text-zinc-400" />
+              <p class="text-sm text-toned dark:text-zinc-300">
                 {{ item.name || item.url }}
               </p>
               <a

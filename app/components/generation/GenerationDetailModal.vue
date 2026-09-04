@@ -2,6 +2,7 @@
 import type { GenerationRecord, MediaInput } from '#shared/types/generation'
 import { MEDIA_META, MODE_META } from '#shared/types/generation'
 import { useClipboard } from '@vueuse/core'
+import MediaPreviewModal from './MediaPreviewModal.vue'
 
 const props = defineProps<{
   record?: GenerationRecord
@@ -233,13 +234,13 @@ async function triggerRefresh() {
     >
       <div
         v-if="open && record"
-        class="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-3 sm:p-6 backdrop-blur-md"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-3 backdrop-blur-md dark:bg-black/85 sm:p-6"
         @click.self="emit('update:open', false)"
       >
         <!-- 弹窗主框体 -->
-        <div class="relative max-h-[94vh] w-full max-w-7xl flex flex-col overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-950 shadow-2xl lg:h-[88vh]">
+        <div class="relative flex max-h-[94vh] w-full max-w-7xl flex-col overflow-hidden rounded-2xl border border-default bg-elevated shadow-2xl dark:border-zinc-800 dark:bg-zinc-950 lg:h-[88vh]">
           <!-- 顶栏导航与状态条 -->
-          <div class="flex shrink-0 items-center justify-between border-b border-zinc-800/80 bg-zinc-900/60 px-4 py-3 sm:px-6">
+          <div class="flex shrink-0 items-center justify-between border-b border-default bg-elevated px-4 py-3 dark:border-zinc-800/80 dark:bg-zinc-900/60 sm:px-6">
             <div class="flex items-center gap-3">
               <UBadge :color="statusColor[record.status]" variant="solid" size="md">
                 {{ statusText[record.status] }}
@@ -261,12 +262,12 @@ async function triggerRefresh() {
 
             <!-- 上下件切换与关闭按钮 -->
             <div class="flex items-center gap-1.5 sm:gap-2">
-              <span v-if="currentIndex !== undefined && totalCount" class="mr-2 text-xs font-mono text-zinc-400">
+              <span v-if="currentIndex !== undefined && totalCount" class="mr-2 font-mono text-xs text-muted dark:text-zinc-400">
                 {{ currentIndex + 1 }} / {{ totalCount }}
               </span>
               <button
                 type="button"
-                class="rounded-lg p-1.5 text-zinc-400 transition hover:bg-zinc-800 hover:text-white disabled:opacity-30"
+                class="rounded-lg p-1.5 text-muted transition hover:bg-muted hover:text-highlighted dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white disabled:opacity-30"
                 :disabled="currentIndex === 0"
                 title="上一个作品 (Left Arrow)"
                 @click="emit('prev')"
@@ -275,17 +276,17 @@ async function triggerRefresh() {
               </button>
               <button
                 type="button"
-                class="rounded-lg p-1.5 text-zinc-400 transition hover:bg-zinc-800 hover:text-white disabled:opacity-30"
+                class="rounded-lg p-1.5 text-muted transition hover:bg-muted hover:text-highlighted dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white disabled:opacity-30"
                 :disabled="currentIndex !== undefined && totalCount !== undefined && currentIndex >= totalCount - 1"
                 title="下一个作品 (Right Arrow)"
                 @click="emit('next')"
               >
                 <span class="i-lucide-chevron-right text-lg" />
               </button>
-              <div class="mx-1 h-4 w-px bg-zinc-800" />
+              <div class="mx-1 h-4 w-px bg-default dark:bg-zinc-800" />
               <button
                 type="button"
-                class="rounded-lg p-1.5 text-zinc-400 transition hover:bg-zinc-800 hover:text-white"
+                class="rounded-lg p-1.5 text-muted transition hover:bg-muted hover:text-highlighted dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white"
                 title="关闭 (Esc)"
                 @click="emit('update:open', false)"
               >
@@ -456,15 +457,15 @@ async function triggerRefresh() {
             </div>
 
             <!-- 右侧：全维度生成检视面板 (Prompt, Reference Materials, Parameters) -->
-            <div class="studio-scroll flex flex-col border-t border-zinc-800 bg-zinc-900/40 lg:w-[460px] lg:border-l lg:border-t-0 overflow-y-auto">
+            <div class="studio-scroll flex flex-col overflow-y-auto border-t border-default bg-default dark:border-zinc-800 dark:bg-zinc-900/40 lg:w-[460px] lg:border-l lg:border-t-0">
               <!-- 快捷创作联动卡片 -->
-              <div class="border-b border-zinc-800/80 bg-zinc-900/70 p-4 sm:p-5">
+              <div class="border-b border-default bg-muted/50 p-4 dark:border-zinc-800/80 dark:bg-zinc-900/70 sm:p-5">
                 <div class="flex items-center justify-between">
                   <div>
-                    <h3 class="text-sm font-semibold text-zinc-100">
+                    <h3 class="text-sm font-semibold text-highlighted dark:text-zinc-100">
                       {{ MODE_META[record.mode]?.label || 'AI 视频生成' }}
                     </h3>
-                    <p class="mt-0.5 text-xs text-zinc-400">
+                    <p class="mt-0.5 text-xs text-muted dark:text-zinc-400">
                       {{ formatDate(record.createdAt) }}
                     </p>
                   </div>
@@ -480,20 +481,20 @@ async function triggerRefresh() {
               </div>
 
               <!-- 提示词模块 -->
-              <div class="border-b border-zinc-800/80 p-4 sm:p-5 space-y-4">
+              <div class="space-y-4 border-b border-default p-4 dark:border-zinc-800/80 sm:p-5">
                 <div>
                   <div class="flex items-center justify-between">
-                    <span class="type-kicker text-xs text-zinc-400">PROMPT / 正向提示词</span>
+                    <span class="type-kicker text-xs text-muted dark:text-zinc-400">PROMPT / 正向提示词</span>
                     <button
                       type="button"
-                      class="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-zinc-400 transition hover:bg-zinc-800 hover:text-white"
+                      class="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-muted transition hover:bg-muted hover:text-highlighted dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white"
                       @click="copyText(record.prompt, 'prompt')"
                     >
                       <span :class="copiedKey === 'prompt' ? 'i-lucide-check text-emerald-400' : 'i-lucide-copy'" class="text-xs" />
                       <span>{{ copiedKey === 'prompt' ? '已复制' : '复制' }}</span>
                     </button>
                   </div>
-                  <div class="mt-2 rounded-xl border border-zinc-800 bg-zinc-950/60 p-3 text-xs leading-relaxed text-zinc-200 whitespace-pre-wrap max-h-48 overflow-y-auto">
+                  <div class="mt-2 max-h-48 overflow-y-auto whitespace-pre-wrap rounded-xl border border-default bg-muted/50 p-3 text-xs leading-relaxed text-toned dark:border-zinc-800 dark:bg-zinc-950/60 dark:text-zinc-200">
                     {{ record.prompt || '（无提示词）' }}
                   </div>
                 </div>
@@ -501,32 +502,32 @@ async function triggerRefresh() {
                 <!-- 反向提示词 -->
                 <div v-if="record.negativePrompt">
                   <div class="flex items-center justify-between">
-                    <span class="type-kicker text-xs text-zinc-400">NEGATIVE PROMPT / 负向提示词</span>
+                    <span class="type-kicker text-xs text-muted dark:text-zinc-400">NEGATIVE PROMPT / 负向提示词</span>
                     <button
                       type="button"
-                      class="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-zinc-400 transition hover:bg-zinc-800 hover:text-white"
+                      class="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-muted transition hover:bg-muted hover:text-highlighted dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white"
                       @click="copyText(record.negativePrompt, 'negativePrompt')"
                     >
                       <span :class="copiedKey === 'negativePrompt' ? 'i-lucide-check text-emerald-400' : 'i-lucide-copy'" class="text-xs" />
                       <span>{{ copiedKey === 'negativePrompt' ? '已复制' : '复制' }}</span>
                     </button>
                   </div>
-                  <div class="mt-2 rounded-xl border border-zinc-800 bg-zinc-950/60 p-3 text-xs leading-relaxed text-zinc-300 whitespace-pre-wrap max-h-28 overflow-y-auto">
+                  <div class="mt-2 max-h-28 overflow-y-auto whitespace-pre-wrap rounded-xl border border-default bg-muted/50 p-3 text-xs leading-relaxed text-toned dark:border-zinc-800 dark:bg-zinc-950/60 dark:text-zinc-300">
                     {{ record.negativePrompt }}
                   </div>
                 </div>
               </div>
 
               <!-- 原始参考素材展区 (Reference Materials) -->
-              <div class="border-b border-zinc-800/80 p-4 sm:p-5">
+              <div class="border-b border-default dark:border-zinc-800/80 p-4 sm:p-5">
                 <div class="flex items-center justify-between">
                   <div class="flex items-center gap-2">
-                    <span class="type-kicker text-xs text-zinc-400">REFERENCE MEDIA / 原始参考素材</span>
+                    <span class="type-kicker text-xs text-muted dark:text-zinc-400">REFERENCE MEDIA / 原始参考素材</span>
                     <UBadge color="neutral" variant="subtle" size="xs">
                       {{ record.media?.length || 0 }}
                     </UBadge>
                   </div>
-                  <span class="text-[11px] text-zinc-500">点击可原尺寸放大或试听</span>
+                  <span class="text-[11px] text-dimmed dark:text-zinc-500">点击可原尺寸放大或试听</span>
                 </div>
 
                 <!-- 素材列表 -->
@@ -534,12 +535,12 @@ async function triggerRefresh() {
                   <div
                     v-for="(item, idx) in record.media"
                     :key="`${item.url}-${idx}`"
-                    class="group flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-zinc-800/90 bg-zinc-950/50 p-2.5 transition hover:border-zinc-700 hover:bg-zinc-900/80"
+                    class="group flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-default bg-elevated p-2.5 transition hover:border-accented hover:bg-muted/70 dark:border-zinc-800/90 dark:bg-zinc-950/50 dark:hover:border-zinc-700 dark:hover:bg-zinc-900/80"
                     @click="openMediaPreview(item)"
                   >
                     <div class="min-w-0 flex items-center gap-2.5">
                       <!-- 缩略图或图标 -->
-                      <div class="relative h-11 w-11 shrink-0 overflow-hidden rounded-lg bg-zinc-900 flex items-center justify-center">
+                      <div class="relative h-11 w-11 shrink-0 flex items-center justify-center overflow-hidden rounded-lg bg-muted dark:bg-zinc-900">
                         <img
                           v-if="item.type.includes('frame') || item.type === 'reference_image'"
                           :src="item.url"
@@ -548,7 +549,7 @@ async function triggerRefresh() {
                         >
                         <span v-else-if="item.type === 'reference_video'" class="i-lucide-video text-xl text-amber-400" />
                         <span v-else-if="item.type === 'reference_audio'" class="i-lucide-audio-lines text-xl text-emerald-400" />
-                        <span v-else class="i-lucide-file-text text-xl text-zinc-400" />
+                        <span v-else class="i-lucide-file-text text-xl text-muted dark:text-zinc-400" />
                       </div>
 
                       <div class="min-w-0 flex-1">
@@ -560,22 +561,22 @@ async function triggerRefresh() {
                           >
                             {{ MEDIA_META[item.type]?.label || item.type }}
                           </UBadge>
-                          <span v-if="item.duration" class="text-[10px] font-mono text-zinc-400">
+                          <span v-if="item.duration" class="text-[10px] font-mono text-muted dark:text-zinc-400">
                             {{ item.duration }}秒
                           </span>
                         </div>
-                        <p class="mt-1 truncate text-xs text-zinc-300 group-hover:text-white" :title="item.name || item.url">
+                        <p class="mt-1 truncate text-xs text-toned group-hover:text-highlighted dark:text-zinc-300 dark:group-hover:text-white" :title="item.name || item.url">
                           {{ item.name || item.url }}
                         </p>
                       </div>
                     </div>
 
-                    <span class="i-lucide-external-link shrink-0 text-zinc-500 transition group-hover:text-zinc-300" />
+                    <span class="i-lucide-external-link shrink-0 text-dimmed transition group-hover:text-toned dark:text-zinc-500 dark:group-hover:text-zinc-300" />
                   </div>
                 </div>
 
-                <div v-else class="mt-2 rounded-xl border border-dashed border-zinc-800/80 py-4 text-center">
-                  <p class="text-xs text-zinc-500">
+                <div v-else class="mt-2 rounded-xl border border-dashed border-default dark:border-zinc-800/80 py-4 text-center">
+                  <p class="text-xs text-dimmed dark:text-zinc-500">
                     此任务为纯文本生成，未附带原始参考素材。
                   </p>
                 </div>
@@ -583,75 +584,75 @@ async function triggerRefresh() {
 
               <!-- 规格参数清单 (Technical Parameters) -->
               <div class="p-4 sm:p-5 space-y-3">
-                <span class="type-kicker text-xs text-zinc-400">SPECIFICATIONS / 技术参数</span>
+                <span class="type-kicker text-xs text-muted dark:text-zinc-400">SPECIFICATIONS / 技术参数</span>
                 <div class="grid grid-cols-2 gap-2 text-xs">
-                  <div class="rounded-lg border border-zinc-800/70 bg-zinc-950/40 p-2.5">
-                    <span class="text-zinc-500">供应商平台</span>
-                    <p class="mt-0.5 font-medium text-zinc-200">
+                  <div class="rounded-lg border border-default bg-muted/50 dark:border-zinc-800/70 dark:bg-zinc-950/40 p-2.5">
+                    <span class="text-dimmed dark:text-zinc-500">供应商平台</span>
+                    <p class="mt-0.5 font-medium text-toned dark:text-zinc-200">
                       {{ record.provider }}
                     </p>
                   </div>
-                  <div class="rounded-lg border border-zinc-800/70 bg-zinc-950/40 p-2.5">
-                    <span class="text-zinc-500">模型版本</span>
-                    <p class="mt-0.5 truncate font-medium text-zinc-200" :title="record.model">
+                  <div class="rounded-lg border border-default bg-muted/50 dark:border-zinc-800/70 dark:bg-zinc-950/40 p-2.5">
+                    <span class="text-dimmed dark:text-zinc-500">模型版本</span>
+                    <p class="mt-0.5 truncate font-medium text-toned dark:text-zinc-200" :title="record.model">
                       {{ record.model || '标准默认' }}
                     </p>
                   </div>
-                  <div class="rounded-lg border border-zinc-800/70 bg-zinc-950/40 p-2.5">
-                    <span class="text-zinc-500">清晰度</span>
-                    <p class="mt-0.5 font-medium text-zinc-200">
+                  <div class="rounded-lg border border-default bg-muted/50 dark:border-zinc-800/70 dark:bg-zinc-950/40 p-2.5">
+                    <span class="text-dimmed dark:text-zinc-500">清晰度</span>
+                    <p class="mt-0.5 font-medium text-toned dark:text-zinc-200">
                       {{ record.resolution }}
                     </p>
                   </div>
-                  <div class="rounded-lg border border-zinc-800/70 bg-zinc-950/40 p-2.5">
-                    <span class="text-zinc-500">设定画幅</span>
-                    <p class="mt-0.5 font-medium text-zinc-200">
+                  <div class="rounded-lg border border-default bg-muted/50 dark:border-zinc-800/70 dark:bg-zinc-950/40 p-2.5">
+                    <span class="text-dimmed dark:text-zinc-500">设定画幅</span>
+                    <p class="mt-0.5 font-medium text-toned dark:text-zinc-200">
                       {{ record.ratio }}
                     </p>
                   </div>
-                  <div class="rounded-lg border border-zinc-800/70 bg-zinc-950/40 p-2.5">
-                    <span class="text-zinc-500">生成时长</span>
-                    <p class="mt-0.5 font-medium text-zinc-200">
+                  <div class="rounded-lg border border-default bg-muted/50 dark:border-zinc-800/70 dark:bg-zinc-950/40 p-2.5">
+                    <span class="text-dimmed dark:text-zinc-500">生成时长</span>
+                    <p class="mt-0.5 font-medium text-toned dark:text-zinc-200">
                       {{ record.duration === -1 ? '模型智能决策' : `${record.duration} 秒` }}
                     </p>
                   </div>
-                  <div class="rounded-lg border border-zinc-800/70 bg-zinc-950/40 p-2.5">
-                    <span class="text-zinc-500">生成音频</span>
-                    <p class="mt-0.5 font-medium text-zinc-200">
+                  <div class="rounded-lg border border-default bg-muted/50 dark:border-zinc-800/70 dark:bg-zinc-950/40 p-2.5">
+                    <span class="text-dimmed dark:text-zinc-500">生成音频</span>
+                    <p class="mt-0.5 font-medium text-toned dark:text-zinc-200">
                       {{ record.audio ? '开启声画同步' : '纯画面静音' }}
                     </p>
                   </div>
-                  <div class="rounded-lg border border-zinc-800/70 bg-zinc-950/40 p-2.5">
+                  <div class="rounded-lg border border-default bg-muted/50 dark:border-zinc-800/70 dark:bg-zinc-950/40 p-2.5">
                     <div class="flex items-center justify-between">
-                      <span class="text-zinc-500">随机种子 (Seed)</span>
+                      <span class="text-dimmed dark:text-zinc-500">随机种子 (Seed)</span>
                       <button
                         v-if="record.seed !== undefined"
                         type="button"
-                        class="text-[10px] text-zinc-400 hover:text-white"
+                        class="text-[10px] text-muted dark:text-zinc-400 hover:text-highlighted dark:hover:text-white"
                         @click="copyText(String(record.seed), 'seed')"
                       >
                         {{ copiedKey === 'seed' ? '已复制' : '复制' }}
                       </button>
                     </div>
-                    <p class="mt-0.5 font-mono text-zinc-200">
+                    <p class="mt-0.5 font-mono text-toned dark:text-zinc-200">
                       {{ record.seed ?? '随机自动' }}
                     </p>
                   </div>
-                  <div class="rounded-lg border border-zinc-800/70 bg-zinc-950/40 p-2.5">
-                    <span class="text-zinc-500">智能改写 / 水印</span>
-                    <p class="mt-0.5 font-medium text-zinc-200">
+                  <div class="rounded-lg border border-default bg-muted/50 dark:border-zinc-800/70 dark:bg-zinc-950/40 p-2.5">
+                    <span class="text-dimmed dark:text-zinc-500">智能改写 / 水印</span>
+                    <p class="mt-0.5 font-medium text-toned dark:text-zinc-200">
                       {{ record.promptExtend ? '改写:开' : '改写:关' }} · {{ record.watermark ? '带水印' : '无水印' }}
                     </p>
                   </div>
                 </div>
 
                 <!-- 任务与持久化存储状态 -->
-                <div class="rounded-xl border border-zinc-800/80 bg-zinc-950/60 p-3 space-y-2 text-xs">
+                <div class="space-y-2 rounded-xl border border-default bg-muted/50 p-3 text-xs dark:border-zinc-800/80 dark:bg-zinc-950/60">
                   <div class="flex items-center justify-between">
-                    <span class="text-zinc-500">本地任务 ID</span>
+                    <span class="text-dimmed dark:text-zinc-500">本地任务 ID</span>
                     <button
                       type="button"
-                      class="font-mono text-[11px] text-zinc-400 transition hover:text-white"
+                      class="font-mono text-[11px] text-muted dark:text-zinc-400 transition hover:text-highlighted dark:hover:text-white"
                       @click="copyText(record.id, 'taskId')"
                     >
                       {{ record.id.slice(0, 16) }}...
@@ -659,17 +660,17 @@ async function triggerRefresh() {
                     </button>
                   </div>
                   <div class="flex items-center justify-between">
-                    <span class="text-zinc-500">供应商任务 ID</span>
-                    <span class="font-mono text-[11px] text-zinc-400">
+                    <span class="text-dimmed dark:text-zinc-500">供应商任务 ID</span>
+                    <span class="font-mono text-[11px] text-muted dark:text-zinc-400">
                       {{ record.providerTaskId ? `${record.providerTaskId.slice(0, 16)}...` : '—' }}
                     </span>
                   </div>
                   <div class="flex items-center justify-between">
-                    <span class="text-zinc-500">创建时间</span>
-                    <span class="text-[11px] text-zinc-300">{{ formatDate(record.createdAt) }}</span>
+                    <span class="text-dimmed dark:text-zinc-500">创建时间</span>
+                    <span class="text-[11px] text-toned dark:text-zinc-300">{{ formatDate(record.createdAt) }}</span>
                   </div>
-                  <div class="flex items-center justify-between border-t border-zinc-800/80 pt-2">
-                    <span class="text-zinc-500">OSS 结果归档</span>
+                  <div class="flex items-center justify-between border-t border-default dark:border-zinc-800/80 pt-2">
+                    <span class="text-dimmed dark:text-zinc-500">OSS 结果归档</span>
                     <div class="flex items-center gap-1.5">
                       <UBadge
                         :color="record.videoArchived ? 'success' : record.outputArchive?.status === 'failed' ? 'warning' : 'neutral'"
