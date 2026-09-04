@@ -6,8 +6,9 @@ interface OssUploadResult {
   url: string
 }
 
-interface OssUploader {
+export interface OssUploader {
   upload: (key: string, data: Uint8Array, contentType: string) => Promise<OssUploadResult>
+  uploadFile: (key: string, path: string, contentType: string, timeoutMs: number) => Promise<OssUploadResult>
 }
 
 function trimSlashes(value: string) {
@@ -87,10 +88,30 @@ export function createOssUploader(): OssUploader | undefined {
         : result.url
       return { key, url }
     },
+    async uploadFile(key, path, contentType, timeoutMs) {
+      const result = await client.put(key, path, {
+        timeout: timeoutMs,
+        mime: contentType,
+        headers: {
+          'Cache-Control': 'public, max-age=31536000, immutable',
+          'Content-Type': contentType,
+          'x-oss-object-acl': 'public-read',
+        },
+      })
+      const url = publicBaseUrl
+        ? `${publicBaseUrl}/${encodeObjectKey(key)}`
+        : result.url
+      return { key, url }
+    },
   }
 }
 
 export function buildOssObjectKey(prefix: string, id: string, fileName?: string) {
   const extension = fileName?.match(/\.[a-z0-9]{1,10}$/i)?.[0].toLowerCase() || ''
   return [prefix, `${id}${extension}`].filter(Boolean).join('/')
+}
+
+export function buildOssOutputObjectKey(prefix: string, generationId: string, extension: string) {
+  const safeExtension = ['mp4', 'webm', 'mov'].includes(extension) ? extension : 'mp4'
+  return [prefix, `${generationId}.${safeExtension}`].filter(Boolean).join('/')
 }

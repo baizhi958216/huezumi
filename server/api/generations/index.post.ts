@@ -1,4 +1,5 @@
 import type { GenerationRecord } from '#shared/types/generation'
+import { toPublicGenerationRecord } from '#shared/types/generation'
 import { assertRequestSupported, getVideoProvider } from '../../services/providers'
 import { getCapability } from '../../services/providers/catalog'
 import { generationSchema } from '../../utils/generation-schema'
@@ -27,10 +28,12 @@ export default defineEventHandler(async (event) => {
     id: crypto.randomUUID(),
     providerTaskId: result.taskId,
     status: result.status,
+    videoArchived: false,
+    outputArchive: { status: 'not_started' },
     createdAt: now,
     updatedAt: now,
   }
 
   await useStorage('data').setItem(`generations:${record.id}`, record)
-  return record
+  return toPublicGenerationRecord(record)
 })

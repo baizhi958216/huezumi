@@ -1,5 +1,6 @@
 import type { GenerationRecord } from '#shared/types/generation'
-import { getVideoProvider } from '../../services/providers'
+import { toPublicGenerationRecord } from '#shared/types/generation'
+import { refreshGeneration } from '../../services/generations'
 
 export default defineEventHandler(async () => {
   const storage = useStorage('data')
@@ -11,14 +12,12 @@ export default defineEventHandler(async () => {
     if (!['PENDING', 'RUNNING'].includes(record.status))
       return
     try {
-      const latest = await getVideoProvider(record.provider).getTask(record.providerTaskId)
-      Object.assign(record, latest, { updatedAt: new Date().toISOString() })
-      await storage.setItem(`generations:${record.id}`, record)
+      await refreshGeneration(record)
     }
     catch (error) {
       console.error(`Failed to refresh generation ${record.id}`, error)
     }
   }))
 
-  return validRecords.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+  return validRecords.sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map(toPublicGenerationRecord)
 })

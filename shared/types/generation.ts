@@ -57,13 +57,29 @@ export interface GenerationRequest {
 
 export type GenerationStatus = 'PENDING' | 'RUNNING' | 'SUCCEEDED' | 'FAILED' | 'UNKNOWN'
 
+export type OutputArchiveStatus = 'not_started' | 'archived' | 'failed'
+export type GenerationErrorCode
+  = | 'OUTPUT_ARCHIVE_NOT_CONFIGURED'
+    | 'OUTPUT_TRANSFER_FAILED'
+    | 'OUTPUT_ARCHIVE_FAILED'
+export interface OutputArchiveRecord {
+  status: OutputArchiveStatus
+  attemptedAt?: string
+  completedAt?: string
+  errorCode?: 'OUTPUT_ARCHIVE_NOT_CONFIGURED' | 'OUTPUT_TRANSFER_FAILED' | 'OUTPUT_ARCHIVE_FAILED'
+  /** Internal OSS object key. API serializers must remove it. */
+  objectKey?: string
+}
+
 export interface GenerationRecord extends GenerationRequest {
   id: string
   providerTaskId: string
   status: GenerationStatus
   videoUrl?: string
-  /** 视频已转存到本地持久化目录，避免供应商链接 24 小时后失效 */
+  /** 最终 videoUrl 已指向 OSS 归档，不再依赖供应商临时地址。 */
   videoArchived?: boolean
+  outputArchive?: OutputArchiveRecord
+  errorCode?: GenerationErrorCode
   error?: string
   /** 供应商返回的用量统计（分辨率、帧率、实际比例等） */
   usage?: {
@@ -86,6 +102,7 @@ export interface ProviderSubmitResult {
 export interface ProviderTaskResult {
   status: GenerationStatus
   videoUrl?: string
+  errorCode?: GenerationErrorCode
   error?: string
   usage?: GenerationRecord['usage']
 }
@@ -200,6 +217,22 @@ export interface ProviderCapability {
   supportsMediaOnly: boolean
   notes?: string
   docsUrl?: string
+}
+
+export type PublicOutputArchiveRecord = Omit<OutputArchiveRecord, 'objectKey'>
+export type PublicGenerationRecord = Omit<GenerationRecord, 'outputArchive'> & {
+  outputArchive?: PublicOutputArchiveRecord
+}
+
+/** One explicit response boundary prevents storage-only fields from leaking. */
+export function toPublicGenerationRecord(record: GenerationRecord): PublicGenerationRecord {
+  const { outputArchive, ...publicRecord } = record
+  const result: PublicGenerationRecord = { ...publicRecord }
+  if (outputArchive) {
+    const { objectKey: _objectKey, ...publicArchive } = outputArchive
+    result.outputArchive = publicArchive
+  }
+  return result
 }
 
 /**

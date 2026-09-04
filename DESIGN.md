@@ -11,7 +11,7 @@ Browser (Nuxt/Vue)
   ├─ GET  /api/providers ───────────────┐
   ├─ POST /api/files ──> Nitro storage ──> 阿里云 OSS（可选）
   └─ /api/generations ─> API + schema ─┼─> VideoProvider ─> vendor API
-                              │         │
+                              │         ├─> 结果归档 ─> 阿里云 OSS（可选）
                               └─ records┘
 ```
 
@@ -33,11 +33,12 @@ Browser (Nuxt/Vue)
 
 ### 供应商层
 
-每个适配器实现 `VideoProvider.submit()` 与 `VideoProvider.getTask()`。`catalog.ts` 是能力声明的唯一来源，`index.ts` 负责凭据探测、实例创建和模型级组合校验。上游状态、错误和用量必须在适配器内归一化。
+每个适配器实现 `VideoProvider.submit()` 与 `VideoProvider.getTask()`。`catalog.ts` 是静态供应商能力声明源；`index.ts` 负责凭据探测、实例创建和模型级组合校验。上游状态、错误和用量必须在适配器内归一化。
 
 ### 持久化
 
 - `generations:{id}`：完整的 `GenerationRecord`。
+- `forkvdo/outputs/{id}.{ext}`：OSS 中的生成结果视频；`GenerationRecord.outputArchive` 保存归档状态。
 - `uploads:{id}:meta`：上传元数据。
 - `uploads:{id}:data`：上传二进制内容。
 
@@ -55,7 +56,7 @@ Browser (Nuxt/Vue)
 
 ### 查询任务
 
-列表和详情 API 读取本地记录。仅当状态为 `PENDING` 或 `RUNNING` 时查询供应商，并把归一化结果写回。查询接口当前兼有读和刷新副作用。
+列表和详情 API 读取本地记录。状态为 `PENDING` 或 `RUNNING` 时查询供应商，并把归一化结果写回；任务成功后，服务端把供应商临时结果下载到受限临时文件并上传 OSS，再以 OSS URL 替换 `videoUrl`。成功但未归档的历史或失败记录可通过显式刷新重试，且不会重新提交生成任务。查询接口当前兼有读、刷新和结果归档副作用。
 
 ### 上传素材
 
@@ -88,4 +89,4 @@ Browser (Nuxt/Vue)
 - 记录没有显式 schema version，契约演进需谨慎。
 - 上传只按声明 MIME 选择大小上限，尚未做内容嗅探、病毒扫描、配额和清理。
 - OSS 素材当前同时保留本地副本；尚未实现对象生命周期清理、私有素材签名 URL 和浏览器直传。
-- `GenerationRecord.videoArchived` 是预留字段，当前查询链路尚未实现结果视频归档。
+- 结果视频归档在查询请求中同步执行；任务量增长后需要迁移到后台 worker，并增加分片断点续传和孤儿对象清理。

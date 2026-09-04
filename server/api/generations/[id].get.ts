@@ -1,5 +1,6 @@
 import type { GenerationRecord } from '#shared/types/generation'
-import { getVideoProvider } from '../../services/providers'
+import { toPublicGenerationRecord } from '#shared/types/generation'
+import { refreshGeneration } from '../../services/generations'
 
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')
@@ -8,16 +9,8 @@ export default defineEventHandler(async (event) => {
   if (!record)
     throw createError({ statusCode: 404, statusMessage: '未找到该生成任务' })
 
-  if (['PENDING', 'RUNNING'].includes(record.status)) {
-    try {
-      const latest = await getVideoProvider(record.provider).getTask(record.providerTaskId)
-      Object.assign(record, latest, { updatedAt: new Date().toISOString() })
-      await storage.setItem(`generations:${id}`, record)
-    }
-    catch (error) {
-      console.error('Failed to refresh generation task', error)
-    }
-  }
+  const refresh = getQuery(event).refresh === '1'
+  await refreshGeneration(record, refresh)
 
-  return record
+  return toPublicGenerationRecord(record)
 })

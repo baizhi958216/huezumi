@@ -57,6 +57,9 @@ export default defineNuxtConfig({
     ossEndpoint: '',
     ossPublicBaseUrl: '',
     ossPrefix: 'forkvdo/uploads',
+    ossOutputPrefix: 'forkvdo/outputs',
+    ossMaxOutputBytes: 1073741824,
+    ossTransferTimeoutMs: 300000,
     public: {
       appUrl: 'http://localhost:3000',
     },

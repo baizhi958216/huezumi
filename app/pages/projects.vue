@@ -13,6 +13,20 @@ const statusColor = { PENDING: 'warning', RUNNING: 'info', SUCCEEDED: 'success',
 function formatDate(value: string) {
   return new Intl.DateTimeFormat('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(value))
 }
+
+const refreshingId = ref<string>()
+async function refreshRecord(record: GenerationRecord) {
+  refreshingId.value = record.id
+  try {
+    const updated = await $fetch<GenerationRecord>(`/api/generations/${record.id}?refresh=1`)
+    const index = records.value?.findIndex(item => item.id === record.id) ?? -1
+    if (records.value && index >= 0)
+      records.value[index] = updated
+  }
+  finally {
+    refreshingId.value = undefined
+  }
+}
 </script>
 
 <template>
@@ -67,6 +81,12 @@ function formatDate(value: string) {
           <UBadge :color="statusColor[record.status]" variant="solid" size="md" class="absolute right-3 top-3">
             {{ statusText[record.status] }}
           </UBadge>
+          <UBadge v-if="record.videoArchived" color="success" variant="solid" size="md" class="absolute left-3 top-3">
+            OSS 已归档
+          </UBadge>
+          <UBadge v-else-if="record.status === 'SUCCEEDED' && record.outputArchive?.status === 'failed'" color="warning" variant="solid" size="md" class="absolute left-3 top-3">
+            归档失败
+          </UBadge>
         </div>
         <div class="p-5">
           <p class="type-body line-clamp-2 min-h-12">
@@ -84,7 +104,7 @@ function formatDate(value: string) {
             </UBadge>
             <span class="type-caption ml-auto">{{ formatDate(record.createdAt) }}</span>
           </div>
-          <div v-if="record.videoUrl" class="mt-4 border-t border-muted pt-4">
+          <div v-if="record.videoUrl" class="mt-4 flex flex-wrap items-center gap-3 border-t border-muted pt-4">
             <UButton
               :to="record.videoUrl"
               target="_blank"
@@ -95,6 +115,31 @@ function formatDate(value: string) {
               class="px-0"
             >
               下载视频
+            </UButton>
+            <UButton
+              v-if="record.status === 'SUCCEEDED' && !record.videoArchived"
+              color="neutral"
+              variant="ghost"
+              size="sm"
+              icon="i-lucide-cloud-upload"
+              :loading="refreshingId === record.id"
+              class="px-0"
+              @click="refreshRecord(record)"
+            >
+              {{ record.outputArchive?.status === 'failed' ? '重试归档' : '归档到 OSS' }}
+            </UButton>
+          </div>
+          <div v-else-if="record.status === 'UNKNOWN' || record.outputArchive?.status === 'failed'" class="mt-4 border-t border-muted pt-4">
+            <UButton
+              color="neutral"
+              variant="ghost"
+              size="sm"
+              icon="i-lucide-refresh-cw"
+              :loading="refreshingId === record.id"
+              class="px-0"
+              @click="refreshRecord(record)"
+            >
+              查询原任务
             </UButton>
           </div>
         </div>
