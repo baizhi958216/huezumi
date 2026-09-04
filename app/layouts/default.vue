@@ -8,10 +8,11 @@ const route = useRoute()
 const isDark = computed(() => colorMode.value === 'dark')
 const isHome = computed(() => route.path === '/')
 const isWorkspace = computed(() => route.path.startsWith('/studio'))
+const isWorkflow = computed(() => route.path.startsWith('/workflow'))
 const navRoot = ref<HTMLElement>()
 const navGlass = ref<HTMLElement>()
 const mainClass = computed(() => {
-  if (isHome.value)
+  if (isHome.value || isWorkflow.value)
     return 'pt-0'
   if (isWorkspace.value)
     return 'pt-[72px]'
@@ -25,6 +26,7 @@ function toggleColorMode() {
 const navigation = [
   { label: '创作台', to: '/studio' },
   { label: '作品库', to: '/projects' },
+  { label: '工作流', to: '/workflow' },
 ]
 
 function isActive(to: string) {
@@ -87,7 +89,7 @@ onBeforeUnmount(() => animationCleanup?.())
 
 <template>
   <div class="min-h-screen bg-default text-highlighted">
-    <header ref="navRoot" class="liquid-nav" :class="{ 'liquid-nav--workspace': isWorkspace }" aria-label="主导航">
+    <header v-if="!isWorkflow" ref="navRoot" class="liquid-nav" :class="{ 'liquid-nav--workspace': isWorkspace }" aria-label="主导航">
       <div ref="navGlass" class="liquid-nav__motion">
         <GlassSurface class="liquid-nav__glass" :blur="isWorkspace ? 12 : 18">
           <template v-if="isWorkspace">
@@ -105,6 +107,9 @@ onBeforeUnmount(() => animationCleanup?.())
               </UButton>
               <UButton to="/projects" color="neutral" variant="ghost" size="sm" icon="i-lucide-library" class="liquid-nav__workspace-button">
                 作品库
+              </UButton>
+              <UButton to="/workflow" color="neutral" variant="ghost" size="sm" icon="i-lucide-workflow" class="liquid-nav__workspace-button">
+                工作流
               </UButton>
               <ClientOnly>
                 <UButton
