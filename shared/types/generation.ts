@@ -33,6 +33,8 @@ export interface MediaInput {
   type: MediaType
   url: string
   name?: string
+  /** 参考视频时长（秒）；供应商需要时用于计费或协议字段。 */
+  duration?: number
 }
 
 export interface GenerationRequest {
@@ -112,7 +114,22 @@ export interface ModelCapabilityOverride {
   durationByResolution?: Partial<Record<Resolution, number[]>>
   /** 模型级素材限制；仅覆盖声明过的类型，其余类型继承供应商级限制。 */
   mediaLimits?: Partial<Record<MediaType, ProviderMediaLimit>>
+  /** 模型级素材组合限制；用于表达跨类型的总数上限。 */
+  mediaCombinationLimits?: MediaCombinationLimit[]
   notes?: string
+}
+
+/**
+ * 跨素材类型的数量限制。
+ *
+ * `types` 统计参与限制的素材类型；当 `whenTypes` 存在时，仅在请求中同时出现
+ * 这些触发类型后生效。例如可灵 Omni 带参考视频时，参考图上限收紧为 4 张。
+ */
+export interface MediaCombinationLimit {
+  types: MediaType[]
+  max: number
+  whenTypes?: MediaType[]
+  message: string
 }
 
 /** 某一种素材输入的能力与限制，用于驱动 UI 的上传控件与校验提示。 */
@@ -155,6 +172,8 @@ export interface DurationCapability {
 export type ProviderMediaLimit = Pick<MediaCapability, 'max' | 'accept' | 'extensions' | 'maxBytes' | 'duration' | 'totalDuration'> & {
   /** 覆盖该供应商下的通用素材提示。 */
   hint?: string
+  /** 该素材是否必须携带自身时长（秒），例如 RollDek 参考视频按秒计费。 */
+  requiresDuration?: boolean
 }
 
 /** 供应商能力声明。前端完全由这份声明驱动，不硬编码任何一家供应商的参数。 */
@@ -168,6 +187,7 @@ export interface ProviderCapability {
   modes: GenerationMode[]
   media: MediaType[]
   mediaLimits: Partial<Record<MediaType, ProviderMediaLimit>>
+  mediaCombinationLimits?: MediaCombinationLimit[]
   resolutions: Resolution[]
   ratios: AspectRatio[]
   duration: DurationCapability
@@ -216,7 +236,48 @@ export function resolveModelCapability(
     mediaLimits: override.mediaLimits
       ? { ...provider.mediaLimits, ...override.mediaLimits }
       : provider.mediaLimits,
+    mediaCombinationLimits: override.mediaCombinationLimits ?? provider.mediaCombinationLimits,
     notes: override.notes || provider.notes,
+  }
+}
+
+export type MediaValidationIssue
+  = | { kind: 'unsupported', type: MediaType }
+    | { kind: 'count', type: MediaType, max: number }
+    | { kind: 'duration_required', type: MediaType }
+    | { kind: 'duration_range', type: MediaType, min: number, max: number }
+    | { kind: 'combination', limit: MediaCombinationLimit }
+
+/** 返回第一条素材数量、时长或组合校验错误，供前端提示和服务端 422 共用。 */
+export function getMediaValidationIssue(
+  capability: ProviderCapability,
+  media: MediaInput[],
+): MediaValidationIssue | undefined {
+  const counts = new Map<MediaType, number>()
+  for (const item of media) {
+    if (!capability.media.includes(item.type))
+      return { kind: 'unsupported', type: item.type }
+
+    const count = (counts.get(item.type) || 0) + 1
+    counts.set(item.type, count)
+    const limit = capability.mediaLimits[item.type]
+    const max = limit?.max
+    if (max !== undefined && count > max)
+      return { kind: 'count', type: item.type, max }
+    if (limit?.requiresDuration && item.duration === undefined)
+      return { kind: 'duration_required', type: item.type }
+    if (item.duration !== undefined && limit?.duration
+      && (item.duration < limit.duration.min || item.duration > limit.duration.max)) {
+      return { kind: 'duration_range', type: item.type, min: limit.duration.min, max: limit.duration.max }
+    }
+  }
+
+  for (const limit of capability.mediaCombinationLimits || []) {
+    if (limit.whenTypes && !limit.whenTypes.every(type => counts.has(type)))
+      continue
+    const count = media.filter(item => limit.types.includes(item.type)).length
+    if (count > limit.max)
+      return { kind: 'combination', limit }
   }
 }
 

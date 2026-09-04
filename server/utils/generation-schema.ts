@@ -14,7 +14,9 @@ export const generationSchema = z.object({
     type: mediaType,
     url: z.string().min(1),
     name: z.string().optional(),
-  })).max(10).default([]),
+    duration: z.number().positive().max(30).optional(),
+  // 2.5 supports 30 images + 10 videos + 10 audio files in one request.
+  })).max(50).default([]),
   resolution: z.enum(['480P', '768P', '720P', '1080P', '2K', '4K']).default('1080P'),
   ratio: z.enum(['adaptive', '16:9', '4:3', '1:1', '3:4', '9:16', '21:9']).default('16:9'),
   /** SMART_DURATION(-1) 表示由模型智能决定时长 */

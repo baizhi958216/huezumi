@@ -1,60 +1,184 @@
 <script setup lang="ts">
-import type { MediaType } from '#shared/types/generation'
+import type { MediaInput, MediaType } from '#shared/types/generation'
 
 const props = defineProps<{
   label: string
   hint: string
   icon: string
   type: MediaType
-  value?: string
+  values: MediaInput[]
   accept?: string
+  max?: number
   maxBytes?: number
+  durationLimit?: { min: number, max: number }
+  requiresDuration?: boolean
 }>()
 
-const emit = defineEmits<{ change: [payload: { type: MediaType, url: string, name?: string } | null] }>()
+const emit = defineEmits<{ change: [payload: MediaInput[]] }>()
 
 const uploading = ref(false)
+const uploadProgress = ref(0)
+const uploadTotal = ref(0)
 const errorMessage = ref('')
 const input = ref<HTMLInputElement>()
-const url = ref(props.value || '')
-const fileName = ref('')
+const urlDraft = ref('')
+const durationDraft = ref('')
 
 const defaultAccept = computed(() =>
   props.type.includes('audio') ? 'audio/*' : props.type.includes('video') ? 'video/*' : 'image/*',
 )
 
 const isImage = computed(() => props.type.includes('frame') || props.type === 'reference_image')
+const canAdd = computed(() => props.max === undefined || props.values.length < props.max)
+const needsDuration = computed(() => props.requiresDuration && props.type === 'reference_video')
 
-watch(() => props.value, (value) => {
-  url.value = value || ''
-  if (!value)
-    fileName.value = ''
-})
+function commit(values: MediaInput[]) {
+  emit('change', values)
+}
 
-function commitUrl() {
-  emit('change', url.value.trim() ? { type: props.type, url: url.value.trim() } : null)
+function formatDuration(duration: number) {
+  const value = Number.isInteger(duration) ? String(duration) : duration.toFixed(3).replace(/0+$/, '').replace(/\.$/, '')
+  return `${value} 秒`
+}
+
+function getDurationError(duration: number) {
+  if (!Number.isFinite(duration) || duration <= 0)
+    return '请输入有效的参考视频时长（秒）'
+
+  const limit = props.durationLimit
+  if (limit && (duration < limit.min || duration > limit.max))
+    return `参考视频时长需在 ${limit.min}–${limit.max} 秒之间`
+
+  return ''
+}
+
+function readDurationDraft(): number | null | undefined {
+  if (!needsDuration.value)
+    return undefined
+
+  const duration = Number(durationDraft.value)
+  const durationError = getDurationError(duration)
+  if (durationError) {
+    errorMessage.value = durationError
+    return null
+  }
+  return Math.round(duration * 1000) / 1000
+}
+
+function readVideoDuration(file: File): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const video = document.createElement('video')
+    const objectUrl = URL.createObjectURL(file)
+    const cleanup = () => {
+      URL.revokeObjectURL(objectUrl)
+      video.onloadedmetadata = null
+      video.onerror = null
+    }
+
+    video.preload = 'metadata'
+    video.onloadedmetadata = () => {
+      const duration = Math.round(video.duration * 1000) / 1000
+      const durationError = getDurationError(duration)
+      if (durationError) {
+        cleanup()
+        reject(new Error(`${file.name}：${durationError}`))
+        return
+      }
+      cleanup()
+      resolve(duration)
+    }
+    video.onerror = () => {
+      cleanup()
+      reject(new Error(`${file.name}：无法读取视频时长，请确认文件可正常播放`))
+    }
+    video.src = objectUrl
+    video.load()
+  })
+}
+
+function getUploadErrorMessage(error: unknown) {
+  if (typeof error !== 'object' || error === null)
+    return '部分素材上传失败，请重试'
+
+  const record = error as Record<string, unknown>
+  const data = record.data
+  if (typeof data === 'object' && data !== null) {
+    const statusMessage = (data as Record<string, unknown>).statusMessage
+    if (typeof statusMessage === 'string' && statusMessage)
+      return statusMessage
+  }
+  if (typeof record.message === 'string' && record.message)
+    return record.message
+  return '部分素材上传失败，请重试'
+}
+
+function addUrl() {
+  const url = urlDraft.value.trim()
+  if (!url)
+    return
+  if (!canAdd.value) {
+    errorMessage.value = `最多添加 ${props.max} 份${props.label}`
+    return
+  }
+  const duration = readDurationDraft()
+  if (duration === null)
+    return
+
+  const item: MediaInput = { type: props.type, url }
+  if (duration !== undefined)
+    item.duration = duration
+  commit([...props.values, item])
+  urlDraft.value = ''
+  durationDraft.value = ''
+  errorMessage.value = ''
+}
+
+function remove(index: number) {
+  commit(props.values.filter((_, itemIndex) => itemIndex !== index))
+  errorMessage.value = ''
 }
 
 async function upload(event: Event) {
-  const file = (event.target as HTMLInputElement).files?.[0]
-  if (!file)
+  const files = Array.from((event.target as HTMLInputElement).files || [])
+  if (!files.length)
     return
+
   errorMessage.value = ''
-  if (props.maxBytes && file.size > props.maxBytes) {
-    errorMessage.value = `文件过大，上限 ${Math.round(props.maxBytes / 1024 / 1024)}MB`
+  if (props.max !== undefined && props.values.length + files.length > props.max) {
+    errorMessage.value = `最多上传 ${props.max} 份${props.label}`
+    if (input.value)
+      input.value.value = ''
     return
   }
-  uploading.value = true
-  try {
-    const body = new FormData()
-    body.append('file', file)
-    const result = await $fetch<{ url: string, name: string }>('/api/files', { method: 'POST', body })
-    url.value = result.url
-    fileName.value = result.name
-    emit('change', { type: props.type, url: result.url, name: result.name })
+
+  const oversized = files.find(file => props.maxBytes && file.size > props.maxBytes)
+  if (oversized && props.maxBytes) {
+    errorMessage.value = `${oversized.name} 过大，上限 ${Math.round(props.maxBytes / 1024 / 1024)}MB`
+    if (input.value)
+      input.value.value = ''
+    return
   }
-  catch (error: any) {
-    errorMessage.value = error?.data?.statusMessage || '上传失败，请重试'
+
+  uploading.value = true
+  uploadProgress.value = 0
+  uploadTotal.value = files.length
+  try {
+    const uploaded: MediaInput[] = []
+    for (const [index, file] of files.entries()) {
+      const duration = needsDuration.value ? await readVideoDuration(file) : undefined
+      const body = new FormData()
+      body.append('file', file)
+      const result = await $fetch<{ url: string, name: string }>('/api/files', { method: 'POST', body })
+      const item: MediaInput = { type: props.type, url: result.url, name: result.name }
+      if (duration !== undefined)
+        item.duration = duration
+      uploaded.push(item)
+      uploadProgress.value = index + 1
+    }
+    commit([...props.values, ...uploaded])
+  }
+  catch (error: unknown) {
+    errorMessage.value = getUploadErrorMessage(error)
   }
   finally {
     uploading.value = false
@@ -62,71 +186,103 @@ async function upload(event: Event) {
       input.value.value = ''
   }
 }
-
-function clear() {
-  url.value = ''
-  fileName.value = ''
-  errorMessage.value = ''
-  if (input.value)
-    input.value.value = ''
-  emit('change', null)
-}
 </script>
 
 <template>
   <UCard variant="subtle" :ui="{ body: 'p-3 sm:p-3' }">
-    <div class="flex items-center gap-3">
-      <div class="relative h-16 w-16 shrink-0">
-        <UButton
-          color="neutral"
-          variant="outline"
-          class="h-16 w-16 overflow-hidden p-0"
-          :ui="{ base: 'justify-center' }"
-          :aria-label="value ? `${label}已就绪` : `上传${label}`"
-          @click="value ? undefined : input?.click()"
-        >
-          <img v-if="value && isImage" :src="value" :alt="label" class="h-full w-full object-cover">
-          <span v-else :class="uploading ? 'i-lucide-loader-circle animate-spin' : icon" class="text-lg text-dimmed" />
-        </UButton>
-        <UButton
-          v-if="value"
-          color="neutral"
-          variant="solid"
-          icon="i-lucide-x"
-          size="xs"
-          class="absolute -right-1.5 -top-1.5 shadow-card"
-          aria-label="移除素材"
-          @click="clear"
-        />
-      </div>
-
+    <div class="flex items-start gap-3">
       <div class="min-w-0 flex-1">
-        <div class="mb-1 flex items-center justify-between gap-2">
-          <span class="type-label">{{ label }}</span>
+        <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
+          <div class="flex items-center gap-2">
+            <span class="type-label">{{ label }}</span>
+            <UBadge color="neutral" variant="subtle" size="sm">
+              {{ values.length }}<span v-if="max !== undefined"> / {{ max }}</span>
+            </UBadge>
+          </div>
           <UButton
             color="neutral"
             variant="ghost"
             size="xs"
             :icon="uploading ? 'i-lucide-loader-circle' : 'i-lucide-upload'"
-            :disabled="uploading"
+            :disabled="uploading || !canAdd"
+            :loading="uploading"
             @click="input?.click()"
           >
-            {{ uploading ? '上传中' : '上传' }}
+            {{ uploading ? `上传中 ${uploadProgress}/${uploadTotal}` : '选择文件' }}
           </UButton>
         </div>
-        <UInput
-          v-model="url"
-          :placeholder="fileName || hint"
-          size="sm"
-          class="w-full"
-          icon="i-lucide-link"
-          @change="commitUrl"
-        />
+
+        <div v-if="values.length" class="mb-2 space-y-1.5">
+          <div
+            v-for="(item, index) in values"
+            :key="`${item.url}-${index}`"
+            class="flex min-w-0 items-center gap-2 rounded-md border border-default bg-default/50 px-2 py-1.5"
+          >
+            <img v-if="isImage" :src="item.url" :alt="item.name || `${label} ${index + 1}`" class="h-9 w-9 shrink-0 rounded object-cover">
+            <span v-else :class="uploading ? 'i-lucide-loader-circle' : icon" class="shrink-0 text-base text-dimmed" />
+            <span class="min-w-0 flex-1 truncate text-sm" :title="item.name || item.url">
+              {{ item.name || item.url }}
+            </span>
+            <span v-if="needsDuration && item.duration !== undefined" class="shrink-0 text-xs text-dimmed">
+              {{ formatDuration(item.duration) }}
+            </span>
+            <UButton
+              color="neutral"
+              variant="ghost"
+              size="xs"
+              icon="i-lucide-x"
+              :aria-label="`移除${label}${index + 1}`"
+              @click="remove(index)"
+            />
+          </div>
+        </div>
+
+        <div class="flex flex-col gap-2 sm:flex-row">
+          <UInput
+            v-model="urlDraft"
+            :placeholder="values.length ? '继续粘贴公网 URL' : hint"
+            size="sm"
+            class="min-w-0 flex-1"
+            icon="i-lucide-link"
+            :disabled="!canAdd"
+            @keyup.enter="addUrl"
+          />
+          <UInput
+            v-if="needsDuration"
+            v-model="durationDraft"
+            type="number"
+            inputmode="decimal"
+            :min="durationLimit?.min"
+            :max="durationLimit?.max"
+            step="0.001"
+            size="sm"
+            class="sm:w-32"
+            placeholder="时长（秒）"
+            aria-label="参考视频时长（秒）"
+            :disabled="!canAdd"
+            @keyup.enter="addUrl"
+          />
+          <UButton
+            color="neutral"
+            variant="outline"
+            size="sm"
+            :disabled="!urlDraft.trim() || !canAdd"
+            @click="addUrl"
+          >
+            添加
+          </UButton>
+        </div>
+        <p class="type-caption mt-1.5">
+          {{ max !== undefined ? `最多 ${max} 份，可多选文件或逐个添加 URL` : '可多选文件或逐个添加 URL' }}
+        </p>
+        <p v-if="needsDuration" class="type-caption mt-1.5">
+          本地上传会自动读取视频时长；粘贴 URL 时请填写时长，RollDek 按该时长计费。
+        </p>
         <p v-if="errorMessage" class="type-caption mt-1.5 text-error">
           {{ errorMessage }}
         </p>
       </div>
     </div>
-    <input ref="input" type="file" class="hidden" :accept="accept || defaultAccept" @change="upload">
+    <input ref="input" type="file" class="hidden" :accept="accept || defaultAccept" :multiple="max === undefined || max > 1" @change="upload">
   </UCard>
 </template>

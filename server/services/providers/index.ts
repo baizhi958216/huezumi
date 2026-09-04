@@ -1,6 +1,6 @@
 import type { GenerationRequest, ProviderCapability } from '#shared/types/generation'
 import type { VideoProvider } from './base'
-import { resolveModelCapability } from '#shared/types/generation'
+import { getMediaValidationIssue, resolveModelCapability } from '#shared/types/generation'
 import { getCapability, providerCapabilities } from './catalog'
 import { DashScopeProvider } from './dashscope'
 import { KlingProvider } from './kling'
@@ -116,6 +116,18 @@ export function assertRequestSupported(capability: ProviderCapability, request: 
     if (max !== undefined && count > max)
       throw fail(`「${item.type}」最多允许 ${max} 份`)
   }
+
+  const mediaIssue = getMediaValidationIssue(effectiveCapability, request.media)
+  if (mediaIssue?.kind === 'unsupported')
+    throw fail(`${capabilityName} 不支持素材类型「${mediaIssue.type}」`)
+  if (mediaIssue?.kind === 'count')
+    throw fail(`「${mediaIssue.type}」最多允许 ${mediaIssue.max} 份`)
+  if (mediaIssue?.kind === 'duration_required')
+    throw fail(`「${mediaIssue.type}」必须提供素材自身时长（秒）`)
+  if (mediaIssue?.kind === 'duration_range')
+    throw fail(`「${mediaIssue.type}」素材时长需在 ${mediaIssue.min}–${mediaIssue.max} 秒之间`)
+  if (mediaIssue?.kind === 'combination')
+    throw fail(mediaIssue.limit.message)
 
   const types = request.media.map(item => item.type)
   if (types.includes('last_frame') && !types.includes('first_frame'))

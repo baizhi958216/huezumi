@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { AspectRatio, GenerationMode, GenerationRecord, MediaInput, MediaType, ProviderCapability, Resolution } from '#shared/types/generation'
-import { MODE_META, resolveModelCapability, SMART_DURATION } from '#shared/types/generation'
+import { getMediaValidationIssue, MEDIA_META, MODE_META, resolveModelCapability, SMART_DURATION } from '#shared/types/generation'
 import { useIntervalFn } from '@vueuse/core'
 
 const { data: providerCatalog } = await useFetch<ProviderCapability[]>('/api/providers')
@@ -103,6 +103,8 @@ watch(effectiveCapability, (cap) => {
     audio.value = false
   if (!cap.supportsPromptExtend)
     promptExtend.value = false
+  const mediaIssue = getMediaValidationIssue(cap, media.value)
+  errorMessage.value = mediaIssue ? formatMediaValidationIssue(mediaIssue) : ''
 }, { immediate: true })
 
 watch(mode, () => {
@@ -110,14 +112,54 @@ watch(mode, () => {
   errorMessage.value = ''
 })
 
-function setMedia(type: MediaType, value: MediaInput | null) {
-  media.value = media.value.filter(item => item.type !== type)
-  if (value)
-    media.value.push(value)
+function formatMediaValidationIssue(issue: ReturnType<typeof getMediaValidationIssue>) {
+  if (!issue)
+    return ''
+  if (issue.kind === 'unsupported')
+    return `${selectedModelName.value} 不支持${MEDIA_META[issue.type].label}`
+  if (issue.kind === 'count')
+    return `「${MEDIA_META[issue.type].label}」最多允许 ${issue.max} 份`
+  if (issue.kind === 'duration_required')
+    return `「${MEDIA_META[issue.type].label}」必须提供素材自身时长（秒）`
+  if (issue.kind === 'duration_range')
+    return `「${MEDIA_META[issue.type].label}」时长需在 ${issue.min}–${issue.max} 秒之间`
+  return issue.limit.message
 }
 
-function mediaValue(type: MediaType) {
-  return media.value.find(item => item.type === type)?.url
+/** 将跨类型总数限制折算成当前素材槽位的可添加数量，减少无效上传。 */
+function mediaSlotMax(type: MediaType) {
+  const cap = effectiveCapability.value
+  const baseMax = cap?.mediaLimits[type]?.max
+  if (!cap)
+    return baseMax
+
+  let max = baseMax
+  for (const limit of cap.mediaCombinationLimits || []) {
+    if (!limit.types.includes(type))
+      continue
+    const active = !limit.whenTypes || limit.whenTypes.every(trigger => trigger === type || media.value.some(item => item.type === trigger))
+    if (!active)
+      continue
+    const otherCount = media.value.filter(item => item.type !== type && limit.types.includes(item.type)).length
+    const remaining = Math.max(limit.max - otherCount, 0)
+    max = max === undefined ? remaining : Math.min(max, remaining)
+  }
+  return max
+}
+
+function setMedia(type: MediaType, values: MediaInput[]) {
+  const next = [...media.value.filter(item => item.type !== type), ...values]
+  const mediaIssue = effectiveCapability.value && getMediaValidationIssue(effectiveCapability.value, next)
+  if (mediaIssue) {
+    errorMessage.value = formatMediaValidationIssue(mediaIssue)
+    return
+  }
+  media.value = next
+  errorMessage.value = ''
+}
+
+function mediaValues(type: MediaType) {
+  return media.value.filter(item => item.type === type)
 }
 
 const progress = computed(() => {
@@ -153,6 +195,11 @@ async function generate() {
   }
   if (mode.value === 'frames' && !media.value.some(item => item.type === 'first_frame') && !prompt.value.trim()) {
     errorMessage.value = '首尾帧模式至少上传一张首帧图片，或填写提示词'
+    return
+  }
+  const mediaIssue = effectiveCapability.value && getMediaValidationIssue(effectiveCapability.value, media.value)
+  if (mediaIssue) {
+    errorMessage.value = formatMediaValidationIssue(mediaIssue)
     return
   }
 
@@ -267,7 +314,8 @@ onBeforeUnmount(polling.pause)
               v-if="effectiveCapability?.media.includes('first_frame')"
               label="首帧" hint="上传或粘贴图片公网 URL" icon="i-lucide-panel-top"
               type="first_frame"
-              :value="mediaValue('first_frame')"
+              :values="mediaValues('first_frame')"
+              :max="mediaSlotMax('first_frame')"
               :accept="effectiveCapability?.mediaLimits.first_frame?.accept"
               :max-bytes="effectiveCapability?.mediaLimits.first_frame?.maxBytes"
               @change="setMedia('first_frame', $event)"
@@ -276,7 +324,8 @@ onBeforeUnmount(polling.pause)
               v-if="effectiveCapability?.media.includes('last_frame')"
               label="尾帧" hint="可选 · 需先提供首帧" icon="i-lucide-panel-bottom"
               type="last_frame"
-              :value="mediaValue('last_frame')"
+              :values="mediaValues('last_frame')"
+              :max="mediaSlotMax('last_frame')"
               :accept="effectiveCapability?.mediaLimits.last_frame?.accept"
               :max-bytes="effectiveCapability?.mediaLimits.last_frame?.maxBytes"
               @change="setMedia('last_frame', $event)"
