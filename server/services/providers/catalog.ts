@@ -1,4 +1,4 @@
-import type { ProviderCapability } from '#shared/types/generation'
+import type { GenerationMode, MediaType, ModelSpec, ProviderCapability, Resolution } from '#shared/types/generation'
 
 /**
  * 供应商能力目录 —— 全平台唯一的"谁支持什么"声明源。
@@ -23,6 +23,305 @@ const frameLimits = {
 const imageReferenceLimit = { accept: 'image/*', extensions: ['jpg', 'jpeg', 'png', 'webp'], maxBytes: 20 * 1024 * 1024 }
 const videoReferenceLimit = { accept: 'video/*', extensions: ['mp4', 'mov'], maxBytes: 100 * 1024 * 1024, duration: { min: 1, max: 30 } }
 const audioReferenceLimit = { accept: 'audio/*', extensions: ['mp3', 'wav'], maxBytes: 15 * 1024 * 1024, duration: { min: 2, max: 30 } }
+
+const rollDekResolutions: Extract<Resolution, '480P' | '720P' | '1080P'>[] = ['480P', '720P', '1080P']
+const rollDekVideoModes: GenerationMode[] = ['text', 'frames', 'reference']
+const rollDekVideoMedia: MediaType[] = ['first_frame', 'last_frame', 'reference_image', 'reference_video', 'reference_audio']
+const rollDekImageModes: GenerationMode[] = ['frames', 'reference']
+const rollDekImageMedia: MediaType[] = ['first_frame', 'last_frame', 'reference_image', 'reference_audio']
+
+/** Runway URL 输入限制；本地上传先转为公网 URL，因此按 URL 上限约束文件选择。 */
+const runwayImageLimit = {
+  accept: 'image/*',
+  extensions: ['jpg', 'jpeg', 'png', 'webp'],
+  maxBytes: 16 * 1024 * 1024,
+}
+const runwayVideoLimit = {
+  accept: 'video/*',
+  extensions: ['mp4', 'mov', 'webm', 'mkv'],
+  maxBytes: 32 * 1024 * 1024,
+  duration: { min: 1, max: 30 },
+  totalDuration: 30,
+}
+const runwayAudioLimit = {
+  accept: 'audio/*',
+  extensions: ['mp3', 'wav', 'flac', 'm4a', 'aac'],
+  maxBytes: 32 * 1024 * 1024,
+  duration: { min: 2, max: 30 },
+  totalDuration: 30,
+}
+const runwayFrameLimit = { ...runwayImageLimit, max: 1 }
+const runwayMultimodalMedia: MediaType[] = ['first_frame', 'last_frame', 'reference_image', 'reference_video', 'reference_audio']
+
+const runwayModels: ModelSpec[] = [
+  {
+    id: 'gen4.5',
+    name: 'Gen-4.5',
+    description: '文生 / 首帧图生 · 2–10 秒',
+    badge: '旗舰',
+    capabilities: {
+      modes: ['text', 'frames'],
+      media: ['first_frame'],
+      resolutions: ['720P'],
+      ratios: ['16:9', '9:16', '4:3', '1:1', '3:4', '21:9'],
+      duration: { min: 2, max: 10, smart: false, videoAware: false },
+      supportsAudio: false,
+      supportsNegativePrompt: false,
+      supportsSeed: true,
+      supportsPromptExtend: false,
+      supportsWatermark: false,
+      supportsMediaOnly: false,
+      mediaLimits: { first_frame: runwayFrameLimit },
+      notes: '官方 image_to_video 端点同时支持文本生成；无首帧时省略 promptImage。官方没有独立 resolution 字段，实际尺寸由 ratio 决定。',
+    },
+  },
+  {
+    id: 'wan3',
+    name: 'WAN 3.0',
+    description: '文本 / 图片 / 视频 / 音频参考 · 2–30 秒',
+    badge: '多模态',
+    capabilities: {
+      modes: ['text', 'frames', 'reference'],
+      media: runwayMultimodalMedia,
+      resolutions: ['480P', '720P', '1080P'],
+      ratios: ['adaptive', '16:9', '4:3', '1:1', '3:4', '9:16'],
+      duration: { min: 2, max: 30, smart: false, videoAware: false },
+      supportsAudio: true,
+      supportsNegativePrompt: false,
+      supportsSeed: false,
+      supportsPromptExtend: false,
+      supportsWatermark: false,
+      supportsMediaOnly: false,
+      mediaLimits: {
+        first_frame: runwayFrameLimit,
+        last_frame: runwayFrameLimit,
+        reference_image: { ...runwayImageLimit, max: 10 },
+        reference_video: { ...runwayVideoLimit, max: 5, totalDuration: 15 },
+        reference_audio: { ...runwayAudioLimit, max: 5, totalDuration: 15 },
+      },
+      notes: '无视频输入时使用 text_to_video 或 image_to_video；参考视频和参考音频分别映射到 referenceVideos、referenceAudio。',
+    },
+  },
+  {
+    id: 'seedance2_5',
+    name: 'Seedance 2.5',
+    description: '文本 / 图片 / 视频 / 音频参考 · 4–30 秒',
+    badge: '多模态',
+    capabilities: {
+      modes: ['text', 'frames', 'reference'],
+      media: runwayMultimodalMedia,
+      resolutions: ['480P', '720P', '1080P'],
+      ratios: ['21:9', '16:9', '4:3', '1:1', '3:4', '9:16'],
+      duration: { min: 4, max: 30, smart: true, videoAware: false },
+      supportsAudio: true,
+      supportsNegativePrompt: false,
+      supportsSeed: true,
+      supportsPromptExtend: false,
+      supportsWatermark: false,
+      supportsMediaOnly: false,
+      mediaLimits: {
+        first_frame: runwayFrameLimit,
+        last_frame: runwayFrameLimit,
+        reference_image: { ...runwayImageLimit, max: 30 },
+        reference_video: { ...runwayVideoLimit, max: 9 },
+        reference_audio: { ...runwayAudioLimit, max: 10 },
+      },
+      notes: '图片请求使用 promptImage，视频请求使用 video_to_video；视频模式固定为官方 reference，不把平台 reference 模式冒充 extend/edit。',
+    },
+  },
+  {
+    id: 'seedance2',
+    name: 'Seedance 2.0',
+    description: '文本 / 图片 / 视频 / 音频参考 · 4–15 秒',
+    badge: '多模态',
+    capabilities: {
+      modes: ['text', 'frames', 'reference'],
+      media: runwayMultimodalMedia,
+      resolutions: ['480P', '720P', '1080P', '4K'],
+      ratios: ['21:9', '16:9', '4:3', '1:1', '3:4', '9:16'],
+      duration: { min: 4, max: 15, smart: true, videoAware: false },
+      supportsAudio: true,
+      supportsNegativePrompt: false,
+      supportsSeed: true,
+      supportsPromptExtend: false,
+      supportsWatermark: false,
+      supportsMediaOnly: false,
+      mediaLimits: {
+        first_frame: runwayFrameLimit,
+        last_frame: runwayFrameLimit,
+        reference_image: { ...runwayImageLimit, max: 9 },
+        reference_video: { ...runwayVideoLimit, max: 3, totalDuration: 15 },
+        reference_audio: { ...runwayAudioLimit, max: 3, totalDuration: 15 },
+      },
+      notes: '支持 480P、720P、1080P 和 4K 的官方像素 ratio；带视频参考时切换到 video_to_video。',
+    },
+  },
+  {
+    id: 'seedance2_fast',
+    name: 'Seedance 2.0 Fast',
+    description: '高速多模态生成 · 4–15 秒',
+    badge: '高速 / 多模态',
+    capabilities: {
+      modes: ['text', 'frames', 'reference'],
+      media: runwayMultimodalMedia,
+      resolutions: ['480P', '720P'],
+      ratios: ['21:9', '16:9', '4:3', '1:1', '3:4', '9:16'],
+      duration: { min: 4, max: 15, smart: true, videoAware: false },
+      supportsAudio: true,
+      supportsNegativePrompt: false,
+      supportsSeed: true,
+      supportsPromptExtend: false,
+      supportsWatermark: false,
+      supportsMediaOnly: false,
+      mediaLimits: {
+        first_frame: runwayFrameLimit,
+        last_frame: runwayFrameLimit,
+        reference_image: { ...runwayImageLimit, max: 9 },
+        reference_video: { ...runwayVideoLimit, max: 3, totalDuration: 15 },
+        reference_audio: { ...runwayAudioLimit, max: 3, totalDuration: 15 },
+      },
+      notes: '官方仅开放 480P / 720P；请求结构与 Seedance 2.0 一致。',
+    },
+  },
+  {
+    id: 'seedance2_mini',
+    name: 'Seedance 2.0 Mini',
+    description: '轻量多模态生成 · 4–15 秒',
+    badge: '轻量 / 多模态',
+    capabilities: {
+      modes: ['text', 'frames', 'reference'],
+      media: runwayMultimodalMedia,
+      resolutions: ['480P', '720P'],
+      ratios: ['21:9', '16:9', '4:3', '1:1', '3:4', '9:16'],
+      duration: { min: 4, max: 15, smart: true, videoAware: false },
+      supportsAudio: true,
+      supportsNegativePrompt: false,
+      supportsSeed: true,
+      supportsPromptExtend: false,
+      supportsWatermark: false,
+      supportsMediaOnly: false,
+      mediaLimits: {
+        first_frame: runwayFrameLimit,
+        last_frame: runwayFrameLimit,
+        reference_image: { ...runwayImageLimit, max: 9 },
+        reference_video: { ...runwayVideoLimit, max: 3, totalDuration: 15 },
+        reference_audio: { ...runwayAudioLimit, max: 3, totalDuration: 15 },
+      },
+      notes: '官方仅开放 480P / 720P；请求结构与 Seedance 2.0 一致。',
+    },
+  },
+  {
+    id: 'hailuo3',
+    name: 'Hailuo 3',
+    description: '文本 / 图片 / 视频 / 音频参考 · 5–15 秒',
+    badge: '多模态',
+    capabilities: {
+      modes: ['text', 'frames', 'reference'],
+      media: runwayMultimodalMedia,
+      resolutions: ['768P', '2K'],
+      ratios: ['21:9', '16:9', '4:3', '1:1', '3:4', '9:16'],
+      duration: { min: 5, max: 15, smart: false, videoAware: false },
+      supportsAudio: false,
+      supportsNegativePrompt: false,
+      supportsSeed: false,
+      supportsPromptExtend: false,
+      supportsWatermark: false,
+      supportsMediaOnly: false,
+      mediaLimits: {
+        first_frame: runwayFrameLimit,
+        last_frame: runwayFrameLimit,
+        reference_image: { ...runwayImageLimit, max: 9 },
+        reference_video: { ...runwayVideoLimit, max: 2, totalDuration: 15 },
+        reference_audio: { ...runwayAudioLimit, max: 3, totalDuration: 15 },
+      },
+      notes: '图片和视频分别走 image_to_video、video_to_video；官方将 768P / 2K 作为独立 resolution 字段。',
+    },
+  },
+  {
+    id: 'gemini_omni_flash',
+    name: 'Gemini Omni Flash',
+    description: '文本 / 首帧 / 视频编辑 · 3–10 秒',
+    badge: '视频编辑',
+    capabilities: {
+      modes: ['text', 'frames', 'reference'],
+      media: ['first_frame', 'reference_image', 'reference_video'],
+      resolutions: ['720P'],
+      ratios: ['16:9', '9:16'],
+      duration: { min: 3, max: 10, smart: false, videoAware: false },
+      supportsAudio: false,
+      supportsNegativePrompt: false,
+      supportsSeed: false,
+      supportsPromptExtend: false,
+      supportsWatermark: false,
+      supportsMediaOnly: false,
+      mediaLimits: {
+        first_frame: runwayFrameLimit,
+        // Gemini 的 image_to_video 只接受一个首帧；视频编辑模式的额外参考图
+        // 能力没有在平台契约中按 endpoint 区分，因此统一收敛为一个，避免 UI
+        // 允许多个图片后被 image_to_video 拒绝。
+        reference_image: { ...runwayImageLimit, max: 1 },
+        reference_video: { ...runwayVideoLimit, max: 1, totalDuration: 10 },
+      },
+      notes: '单视频输入走 video_to_video，输出 720P 且时长跟随输入（最多 10 秒）；视频编辑可额外带参考图。',
+    },
+  },
+]
+
+/** RollDek 模型名自带清晰度后缀；每个模型只开放与后缀一致的 platform resolution。 */
+const rollDekModels: ModelSpec[] = [
+  ...rollDekResolutions.map(resolution => ({
+    id: `wan3.0-video-${resolution.toLowerCase()}`,
+    name: `WAN 3.0 标准 · ${resolution}`,
+    description: '文生 / 首尾帧 / 多模态参考',
+    badge: '标准',
+    capabilities: {
+      modes: rollDekVideoModes,
+      media: rollDekVideoMedia,
+      resolutions: [resolution],
+      duration: { min: 2, max: 30, smart: false, videoAware: false },
+      notes: `模型后缀固定输出 ${resolution}；参考视频时长计入计费秒数。`,
+    },
+  })),
+  ...rollDekResolutions.map(resolution => ({
+    id: `wan3.0-video-prime-${resolution.toLowerCase()}`,
+    name: `WAN 3.0 Prime · ${resolution}`,
+    description: '高速版 · 文生 / 首尾帧 / 多模态参考',
+    badge: '高速',
+    capabilities: {
+      modes: rollDekVideoModes,
+      media: rollDekVideoMedia,
+      resolutions: [resolution],
+      duration: { min: 2, max: 30, smart: false, videoAware: false },
+      notes: `模型后缀固定输出 ${resolution}；参考视频时长计入计费秒数。`,
+    },
+  })),
+  ...rollDekResolutions.map(resolution => ({
+    id: `wan3.0-image-${resolution.toLowerCase()}`,
+    name: `WAN 3.0 Image · ${resolution}`,
+    description: '图生视频专用 · 图片 / 音频参考',
+    badge: '图生',
+    capabilities: {
+      modes: rollDekImageModes,
+      media: rollDekImageMedia,
+      resolutions: [resolution],
+      duration: { min: 2, max: 30, smart: false, videoAware: false },
+      notes: `模型后缀固定输出 ${resolution}；不支持参考视频，仅按输出时长计费。`,
+    },
+  })),
+  ...rollDekResolutions.map(resolution => ({
+    id: `wan3.0-image-prime-${resolution.toLowerCase()}`,
+    name: `WAN 3.0 Image Prime · ${resolution}`,
+    description: '图生视频高速版 · 图片 / 音频参考',
+    badge: '图生高速',
+    capabilities: {
+      modes: rollDekImageModes,
+      media: rollDekImageMedia,
+      resolutions: [resolution],
+      duration: { min: 2, max: 30, smart: false, videoAware: false },
+      notes: `模型后缀固定输出 ${resolution}；不支持参考视频，仅按输出时长计费。`,
+    },
+  })),
+]
 
 export const providerCapabilities: ProviderCapability[] = [
   {
@@ -524,6 +823,67 @@ export const providerCapabilities: ProviderCapability[] = [
     supportsMediaOnly: true,
     notes: 'Seedance 1.x 仅支持文生和图生；1.5 Pro 支持有声与智能时长，1.0 Pro Fast 不支持尾帧。2.0 / Fast / Mini 与 2.5 支持全模态参考和有声生成；只有 2.0 标准版支持 4K，2.5 的优势是最长 30 秒与更高参考素材上限。',
     docsUrl: 'https://docs.volcengine.com/docs/82379/1520757',
+  },
+  {
+    id: 'rolldek',
+    name: 'RollDek',
+    vendor: 'RollDek',
+    enabled: true,
+    models: rollDekModels,
+    modes: ['text', 'frames', 'reference'],
+    media: ['first_frame', 'last_frame', 'reference_image', 'reference_video', 'reference_audio'],
+    mediaLimits: {
+      first_frame: frameLimits,
+      last_frame: frameLimits,
+      reference_image: { ...imageReferenceLimit, max: 10 },
+      reference_video: { ...videoReferenceLimit, max: 5, requiresDuration: true },
+      reference_audio: { ...audioReferenceLimit, max: 5 },
+    },
+    mediaCombinationLimits: [{
+      types: ['first_frame', 'last_frame', 'reference_image'],
+      max: 10,
+      message: 'RollDek reference_images 合计最多 10 张（包含首帧、尾帧和参考图）',
+    }],
+    resolutions: rollDekResolutions,
+    ratios: ['adaptive', '16:9', '9:16', '1:1'],
+    duration: { min: 2, max: 30, smart: false, videoAware: false },
+    supportsAudio: false,
+    supportsNegativePrompt: false,
+    supportsSeed: false,
+    supportsWatermark: false,
+    supportsPromptExtend: false,
+    supportsMediaOnly: false,
+    requiresHttpsMediaUrls: true,
+    notes: 'RollDek 通过统一 WAN 3.0 视频接口异步生成；模型后缀决定 480P/720P/1080P。标准版与 Prime 支持图片、视频、音频参考，Image 系列不支持参考视频；参考视频时长会计入标准版/Prime 的计费秒数。',
+    docsUrl: 'https://rolldek.com',
+  },
+  {
+    id: 'runway',
+    name: 'Runway Dev',
+    vendor: 'Runway AI',
+    enabled: false,
+    models: runwayModels,
+    modes: ['text', 'frames', 'reference'],
+    media: runwayMultimodalMedia,
+    mediaLimits: {
+      first_frame: runwayFrameLimit,
+      last_frame: runwayFrameLimit,
+      reference_image: { ...runwayImageLimit, max: 30 },
+      reference_video: { ...runwayVideoLimit, max: 9 },
+      reference_audio: { ...runwayAudioLimit, max: 10 },
+    },
+    resolutions: ['480P', '768P', '720P', '1080P', '2K', '4K'],
+    ratios: ['adaptive', '21:9', '16:9', '4:3', '1:1', '3:4', '9:16'],
+    duration: { min: 2, max: 30, smart: true, videoAware: false },
+    supportsAudio: true,
+    supportsNegativePrompt: false,
+    supportsSeed: true,
+    supportsWatermark: false,
+    supportsPromptExtend: false,
+    supportsMediaOnly: false,
+    requiresHttpsMediaUrls: true,
+    notes: '当前接入 Gen-4.5 与多模态视频模型；适配器按输入素材选择 text_to_video、image_to_video 或 video_to_video，任务输出 URL 为临时地址并沿用统一归档流程。',
+    docsUrl: 'https://docs.dev.runwayml.com/api/',
   },
 ]
 

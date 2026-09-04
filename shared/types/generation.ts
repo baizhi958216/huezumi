@@ -7,7 +7,7 @@
  * 3. 新增供应商 = 新增一个适配器 + 在 providerCatalog 中登记能力，前端零改动。
  */
 
-export type ProviderId = 'dashscope' | 'minimax' | 'kling' | 'seedance' | (string & {})
+export type ProviderId = 'dashscope' | 'minimax' | 'kling' | 'seedance' | 'rolldek' | 'runway' | (string & {})
 
 /** 输入素材类型。与 DashScope 全能参考协议的 media.type 对齐，同时为其他供应商预留映射空间。 */
 export type MediaType
@@ -127,6 +127,8 @@ export interface ModelCapabilityOverride {
   supportsNegativePrompt?: boolean
   supportsSeed?: boolean
   supportsPromptExtend?: boolean
+  supportsWatermark?: boolean
+  supportsMediaOnly?: boolean
   /** 指定分辨率下允许的离散时长，用于表达 1080P 仅支持 6 秒等组合限制。 */
   durationByResolution?: Partial<Record<Resolution, number[]>>
   /** 模型级素材限制；仅覆盖声明过的类型，其余类型继承供应商级限制。 */
@@ -215,6 +217,8 @@ export interface ProviderCapability {
   supportsPromptExtend: boolean
   /** 是否允许 prompt 与 media 同时为空（部分供应商要求必填提示词） */
   supportsMediaOnly: boolean
+  /** 是否要求媒体 URL 使用绝对 HTTPS 地址；公网可访问性仍由供应商负责验证。 */
+  requiresHttpsMediaUrls?: boolean
   notes?: string
   docsUrl?: string
 }
@@ -266,6 +270,8 @@ export function resolveModelCapability(
     supportsNegativePrompt: override.supportsNegativePrompt ?? provider.supportsNegativePrompt,
     supportsSeed: override.supportsSeed ?? provider.supportsSeed,
     supportsPromptExtend: override.supportsPromptExtend ?? provider.supportsPromptExtend,
+    supportsWatermark: override.supportsWatermark ?? provider.supportsWatermark,
+    supportsMediaOnly: override.supportsMediaOnly ?? provider.supportsMediaOnly,
     mediaLimits: override.mediaLimits
       ? { ...provider.mediaLimits, ...override.mediaLimits }
       : provider.mediaLimits,

@@ -108,13 +108,19 @@ export function assertRequestSupported(capability: ProviderCapability, request: 
   if (!effectiveCapability.modes.includes(request.mode))
     throw fail(`${capabilityName} 不支持该生成模式`)
 
-  for (const item of request.media) {
-    if (!effectiveCapability.media.includes(item.type))
-      throw fail(`${capabilityName} 不支持素材类型「${item.type}」`)
-    const max = effectiveCapability.mediaLimits[item.type]?.max
-    const count = request.media.filter(media => media.type === item.type).length
-    if (max !== undefined && count > max)
-      throw fail(`「${item.type}」最多允许 ${max} 份`)
+  if (!request.prompt.trim() && !effectiveCapability.supportsMediaOnly)
+    throw fail(`${capabilityName} 要求填写提示词`)
+
+  if (effectiveCapability.requiresHttpsMediaUrls) {
+    for (const item of request.media) {
+      try {
+        if (new URL(item.url).protocol !== 'https:')
+          throw new Error('not https')
+      }
+      catch {
+        throw fail(`${capabilityName} 要求所有素材 URL 使用公网 HTTPS 地址`)
+      }
+    }
   }
 
   const mediaIssue = getMediaValidationIssue(effectiveCapability, request.media)
@@ -156,4 +162,6 @@ export function assertRequestSupported(capability: ProviderCapability, request: 
     throw fail(`${capabilityName} 不支持固定种子`)
   if (request.promptExtend && !effectiveCapability.supportsPromptExtend)
     throw fail(`${capabilityName} 不支持提示词智能改写`)
+  if (request.watermark && !effectiveCapability.supportsWatermark)
+    throw fail(`${capabilityName} 不支持水印参数`)
 }
