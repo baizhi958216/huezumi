@@ -340,9 +340,12 @@ onBeforeUnmount(polling.pause)
               :hint="type === 'reference_image' ? '角色 / 场景 / 构图' : type === 'reference_video' ? '运动 / 风格 / 续写' : type === 'reference_audio' ? '节奏 / 语音 / 氛围' : '上传或粘贴公网 URL'"
               :icon="type === 'reference_image' ? 'i-lucide-image' : type === 'reference_video' ? 'i-lucide-video' : type === 'reference_audio' ? 'i-lucide-audio-lines' : 'i-lucide-paperclip'"
               :type="type"
-              :value="mediaValue(type)"
+              :values="mediaValues(type)"
+              :max="mediaSlotMax(type)"
               :accept="effectiveCapability?.mediaLimits[type]?.accept"
               :max-bytes="effectiveCapability?.mediaLimits[type]?.maxBytes"
+              :duration-limit="effectiveCapability?.mediaLimits[type]?.duration"
+              :requires-duration="effectiveCapability?.mediaLimits[type]?.requiresDuration"
               @change="setMedia(type, $event)"
             />
           </div>
