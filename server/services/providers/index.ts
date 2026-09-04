@@ -5,6 +5,8 @@ import { getCapability, providerCapabilities } from './catalog'
 import { DashScopeProvider } from './dashscope'
 import { KlingProvider } from './kling'
 import { MiniMaxProvider } from './minimax'
+import { RollDekProvider } from './rolldek'
+import { RunwayProvider } from './runway'
 import { SeedanceProvider } from './seedance'
 
 export { providerCapabilities }
@@ -22,6 +24,10 @@ export function hasCredentials(id: string, config: RuntimeConfig): boolean {
       return Boolean(config.klingAccessKey && config.klingSecretKey)
     case 'seedance':
       return Boolean(config.seedanceApiKey)
+    case 'rolldek':
+      return Boolean(config.rolldekApiKey)
+    case 'runway':
+      return Boolean(config.runwayApiKey)
     default:
       return false
   }
@@ -74,6 +80,17 @@ function createProvider(id: string, config: RuntimeConfig): VideoProvider {
         apiKey: String(config.seedanceApiKey),
         baseUrl: String(config.seedanceBaseUrl || 'https://ark.cn-beijing.volces.com/api/v3').replace(/\/$/, ''),
         model: String(config.seedanceModel || 'doubao-seedance-1-5-pro-251215'),
+      })
+    case 'rolldek':
+      return new RollDekProvider({
+        apiKey: String(config.rolldekApiKey),
+        baseUrl: String(config.rolldekBaseUrl || 'https://rolldek.com').replace(/\/$/, ''),
+      })
+    case 'runway':
+      return new RunwayProvider({
+        apiKey: String(config.runwayApiKey),
+        baseUrl: String(config.runwayBaseUrl || 'https://api.dev.runwayml.com').replace(/\/$/, ''),
+        model: String(config.runwayModel || 'gen4.5'),
       })
     default:
       throw createError({ statusCode: 400, statusMessage: `供应商 ${id} 尚未接入` })

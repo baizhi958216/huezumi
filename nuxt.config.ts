@@ -46,10 +46,17 @@ export default defineNuxtConfig({
     seedanceApiKey: '',
     seedanceBaseUrl: '',
     seedanceModel: 'doubao-seedance-1-5-pro-251215',
+    // RollDek WAN 3.0
+    rolldekApiKey: '',
+    rolldekBaseUrl: '',
+    // Runway Dev
+    runwayApiKey: '',
+    runwayBaseUrl: '',
+    runwayModel: 'gen4.5',
     // MiniMax / 可灵 / Seedance 均可通过对应 *_BASE_URL 覆盖默认接入点
     minimaxBaseUrl: '',
     klingBaseUrl: '',
-    // 阿里云 OSS：配置完整后，上传素材会自动转存并返回 OSS URL
+    // 阿里云 OSS：配置完整后，输入素材和生成结果都会转存并返回 OSS URL
     ossAccessKeyId: '',
     ossAccessKeySecret: '',
     ossBucket: '',
