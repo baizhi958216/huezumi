@@ -529,34 +529,44 @@ onBeforeUnmount(polling.pause)
 
         <div class="flex flex-1 items-center justify-center py-8">
           <div
-            class="relative max-h-[720px] w-full max-w-[980px] overflow-hidden rounded-lg bg-zinc-950 shadow-cinema ring-1 ring-black/10"
+            class="relative max-h-[720px] w-full max-w-[980px] overflow-hidden rounded-lg bg-muted shadow-card ring-1 ring-default"
             :style="{ aspectRatio: previewRatio }"
           >
             <video v-if="task?.status === 'SUCCEEDED' && task.videoUrl" :src="task.videoUrl" controls autoplay loop class="h-full w-full object-contain" />
-            <div v-else class="surface-rule absolute inset-0 flex flex-col items-center justify-center bg-zinc-950 p-8 text-center text-white">
+            <div v-else class="surface-rule absolute inset-0 flex flex-col items-center justify-center bg-muted p-8 text-center text-highlighted">
               <template v-if="task">
-                <div class="h-14 w-14 flex items-center justify-center rounded-xl bg-white/8 ring-1 ring-white/10">
-                  <span :class="task.status === 'FAILED' ? 'i-lucide-circle-x text-red-400' : 'i-lucide-loader-circle animate-spin text-zinc-300'" class="text-2xl" />
+                <div class="h-14 w-14 flex items-center justify-center rounded-xl bg-elevated ring-1 ring-default">
+                  <span :class="task.status === 'FAILED' ? 'i-lucide-circle-x text-red-400' : 'i-lucide-loader-circle animate-spin text-muted'" class="text-2xl" />
                 </div>
                 <h2 class="mt-5 text-lg font-600">
-                  {{ task.status === 'FAILED' ? '任务失败' : task.status === 'PENDING' ? '等待处理' : '正在生成视频' }}
+                  {{ task.status === 'FAILED' ? '任务失败' : task.status === 'UNKNOWN' ? '状态待确认' : task.status === 'PENDING' ? '等待处理' : task.status === 'SUCCEEDED' ? '归档待重试' : '正在生成视频' }}
                 </h2>
-                <p class="mt-2 max-w-md text-base text-white/60 leading-7">
+                <p class="mt-2 max-w-md text-base text-muted leading-7">
                   {{ task.error || '通常需要 1–5 分钟。离开页面不会中断任务，结果会自动保存到作品库。' }}
                 </p>
                 <UProgress :model-value="progress" class="mt-6 w-full max-w-xs" />
-                <span class="type-mono mt-3 text-white/35">
+                <span class="type-mono mt-3 text-dimmed">
                   任务 {{ task.providerTaskId.slice(0, 8).toUpperCase() }}
                 </span>
+                <UButton
+                  v-if="task.status === 'UNKNOWN'"
+                  color="neutral"
+                  variant="soft"
+                  icon="i-lucide-refresh-cw"
+                  class="mt-4"
+                  @click="refreshTaskExplicitly"
+                >
+                  显式刷新原任务
+                </UButton>
               </template>
               <template v-else>
-                <div class="h-16 w-16 flex items-center justify-center rounded-xl bg-white/7 ring-1 ring-white/10">
-                  <span class="i-lucide-play text-2xl text-zinc-300" />
+                <div class="h-16 w-16 flex items-center justify-center rounded-xl bg-elevated ring-1 ring-default">
+                  <span class="i-lucide-play text-2xl text-muted" />
                 </div>
                 <h2 class="mt-5 text-lg font-600">
                   设置完成后开始生成
                 </h2>
-                <p class="mt-2 max-w-md text-base text-white/60 leading-7">
+                <p class="mt-2 max-w-md text-base text-muted leading-7">
                   选择一种输入方式，描述你需要的画面；生成状态和结果会在这里实时更新。
                 </p>
               </template>
