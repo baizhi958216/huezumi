@@ -1,131 +1,105 @@
-# 开发指南
+# 开发与部署指南
 
-## 环境
+## 本地环境
 
-- Node.js 20 或更高版本。
-- pnpm 10；版本以 `package.json#packageManager` 为准。
-- 真实生成需要至少一家供应商凭据。
+需要 Node.js 22、pnpm 10、PostgreSQL。使用 Redis 队列时还需要 Redis；不配置 Redis的开发环境默认采用 inline 后台执行。
 
 ```bash
 pnpm install
 cp .env.example .env
+pnpm db:migrate
+pnpm admin:create -- --email=admin@example.com --password='replace-with-a-long-password' --name=管理员
 pnpm dev
 ```
 
-访问 `http://localhost:3000`。没有供应商凭据时仍可开发页面和查看供应商目录，但无法提交真实任务。
+所有帐号和任务 API 都需要 PostgreSQL。首次管理员只能通过 `admin:create` 创建。默认注册模式是 `invite`，登录后在控制面板生成邀请码；开发时可设置 `NUXT_REGISTRATION_MODE=open`。
 
-## 配置
+## 数据库、队列与 worker
 
-Nuxt runtime config 从带 `NUXT_` 前缀的大写下划线环境变量映射。例如 `dashscopeApiKey` 对应 `NUXT_DASHSCOPE_API_KEY`。新增变量必须同步更新 `nuxt.config.ts`、`.env.example` 和部署配置。
+核心配置：
 
-未启用 OSS 时，`NUXT_PUBLIC_APP_URL` 决定上传素材返回的绝对 URL，使用远程供应商时该地址必须能被公网访问；启用 OSS 后，新上传素材返回 OSS 公网 URL。
+```dotenv
+NUXT_DATABASE_URL=postgresql://forkvdo:password@127.0.0.1:5432/forkvdo
+NUXT_REDIS_URL=redis://127.0.0.1:6379
+NUXT_QUEUE_MODE=redis
+NUXT_WORKER_ENABLED=false
+NUXT_WORKER_CONCURRENCY=4
+NUXT_USER_MAX_ACTIVE_GENERATIONS=3
+NUXT_PLATFORM_DAILY_CREDIT_BUDGET=100000
+```
 
-### 阿里云 OSS 素材与结果转存
+Web 进程设置 `NUXT_WORKER_ENABLED=false`；worker 进程使用相同构建和配置并设置为 `true`。worker 同时消费 BullMQ 和每三秒扫描 transactional outbox。开发环境 `NUXT_QUEUE_MODE=inline` 会在 Web 进程异步执行，不能作为多实例生产配置。
 
-配置以下四项后，`POST /api/files` 会在本地接收文件后自动上传到阿里云 OSS，并把 OSS 公网 URL 返回给创作台：
+修改 `server/database/schema.ts` 后运行 `pnpm db:generate`，检查生成 SQL，再运行 `pnpm db:migrate`。迁移旧 `.data` 前先建受控 owner 帐号并备份：
+
+```bash
+pnpm data:migrate -- --owner-email=legacy-owner@example.com --data-dir=.data
+```
+
+迁移脚本按现有 ID 幂等导入，不会猜测历史数据归属。
+
+## 私有 OSS
+
+生产上传和结果归档要求以下配置完整：
 
 ```dotenv
 NUXT_OSS_ACCESS_KEY_ID=
 NUXT_OSS_ACCESS_KEY_SECRET=
 NUXT_OSS_BUCKET=
 NUXT_OSS_REGION=cn-beijing
-```
-
-可选配置：
-
-```dotenv
 NUXT_OSS_ENDPOINT=
-NUXT_OSS_PUBLIC_BASE_URL=
 NUXT_OSS_PREFIX=forkvdo/uploads
 NUXT_OSS_OUTPUT_PREFIX=forkvdo/outputs
-NUXT_OSS_MAX_OUTPUT_BYTES=1073741824
-NUXT_OSS_TRANSFER_TIMEOUT_MS=300000
+NUXT_OSS_SIGNED_URL_TTL_SECONDS=86400
 ```
 
-Bucket 和对象必须允许百炼及作品库浏览器读取。默认上传对象使用 `public-read` ACL；如果上传端点是内网地址，必须通过 `NUXT_OSS_PUBLIC_BASE_URL` 指定公网 HTTPS 基地址。OSS 配置完全为空时输入素材仍使用本地存储，生成结果保留供应商临时地址并把归档标记为失败；配置不完整时素材上传接口返回 `503`。
+服务端为对象写 private ACL。数据库保存 object key，浏览器与供应商按需取得短期签名 URL。Bucket/Endpoint 必须允许供应商在签名有效期内通过公网 HTTPS 读取；应在真实供应商测试中验证 HEAD、Range、重定向和排队最长时长。`NUXT_OSS_PUBLIC_BASE_URL` 只影响上传结果展示地址，不替代签名服务。
 
-生成任务变为 `SUCCEEDED` 时，服务端会将供应商结果下载到随机临时目录，在字节数和时间限制内上传到 `NUXT_OSS_OUTPUT_PREFIX`，成功后用 OSS URL 替换记录中的临时地址。归档失败不会把生成任务改成失败，可在作品库点击“重试归档”。
+切换历史公开对象时，需要另行盘点并清除 object ACL、Bucket policy 和 CDN 缓存。仅部署新代码不会撤销旧公开 URL 已产生的副本。
 
-AccessKey 和 OSS object key 仅存在于服务端，不会下发到浏览器。大文件分片、断点续传、浏览器直传、私有对象签名 URL 和生命周期清理尚未实现。
+## 价格与额度
 
-### RollDek
+首次 migration 会写入覆盖各 provider 的内部兜底规则，来源标签明确为部署前需复核。管理员应依据供应商帐号、地域和合同价在控制面板发布更精确的 provider/model/resolution 版本。规则支持：
 
-RollDek 通过 `POST /v1/videos` 提交 WAN 3.0 异步任务，通过 `GET /v1/videos/{task_id}` 查询；默认地址为 `https://rolldek.com`。配置：
+- `fixedCredits`
+- `outputSecondCredits`
+- `inputVideoSecondCredits`
+- `referenceImageCredits`
+- `minimumCredits`
+- `durationTiers`
+
+每次提交先报价，再在事务中预留额度。平台额度是内部计量单位，不自动等同人民币或美元。上线收费前必须复核每个启用模型的官方采购方式和账单样例。
+
+## ComfyUI GPU 服务
+
+主 Dockerfile 只运行 Node 应用。生产环境必须使用独立 GPU 服务：
 
 ```dotenv
-NUXT_ROLLDEK_API_KEY=
-NUXT_ROLLDEK_BASE_URL=https://rolldek.com
+NUXT_COMFYUI_MODE=remote
+NUXT_COMFYUI_REMOTE_BASE_URL=http://comfyui:8188
 ```
 
-平台目录登记 12 个带分辨率后缀的模型。适配器发送推荐的字符串 `seconds`，并将模型后缀对应的清晰度同时写入 `size` 和 `resolution`；比例同时写入 `aspect_ratio` 和兼容别名 `ratio`。完成任务从 `metadata.url` 读取签名视频直链，随后沿用统一的 OSS 结果归档流程。RollDek 参考视频必须通过统一 `media[].duration` 传递素材自身时长；创作台本地上传自动读取，粘贴 URL 时由用户填写。
+`docker/comfyui/Dockerfile` 固定 PyTorch/CUDA 基础镜像和 `COMFYUI_REF`；`docker-compose.production.yml` 把模型目录只读挂载，并让 8188 只在 Compose 网络暴露。启动：
 
-### Runway Dev
-
-Runway 当前接入 Gen-4.5、WAN 3.0、Seedance 2/2.5、Hailuo 3 和 Gemini Omni Flash。配置：
-
-```dotenv
-NUXT_RUNWAY_API_KEY=
-NUXT_RUNWAY_BASE_URL=https://api.dev.runwayml.com
-NUXT_RUNWAY_MODEL=gen4.5
+```bash
+POSTGRES_PASSWORD='replace-me' \
+COMFYUI_MODELS_DIR='/absolute/path/to/models' \
+docker compose -f docker-compose.production.yml up -d --build
 ```
 
-服务端根据请求素材选择 `POST /v1/text_to_video`、`/v1/image_to_video` 或 `POST /v1/video_to_video`。Runway 的 `references`、`referenceVideos`、`referenceAudio` 和 `promptVideo` 分别承载平台的参考图、参考视频、参考音频和主视频输入；Seedance 系列的智能时长会映射为官方 `auto`。平台按模型官方 ratio / resolution 约束请求，Runway 要求素材 URL 使用公网 HTTPS，完成输出地址会在 24–48 小时内失效，因此生产环境应配置 OSS 以归档结果。
+目标机器必须安装 NVIDIA Container Toolkit，并在上线前实测 GPU、驱动、PyTorch、ComfyUI 版本和所需模型。主应用生产环境若使用 local/auto 或 remote URL 为空，会拒绝初始化 ComfyUI 配置。开发环境仍可使用 local/auto 安装与启动流程。
 
-### ComfyUI 工作流模块
+## 供应商配置
 
-`/workflow` 是一个独立模块：ComfyUI 在本地由 Nuxt 后端托管（或连接其他机器上已运行的实例），浏览器只与本模块的 `/api/comfyui/**` 通信。配置：
+各供应商 API Key 仍从私有 Nuxt runtime config 读取，详见 `.env.example`。素材先写个人空间，worker 提交前将 `/api/files/:id` 换成有时效的 OSS 签名地址。供应商输出由 worker 归档后才作为平台长期结果。
 
-```dotenv
-# 接入模式：auto / local / remote。auto 下若设置了 REMOTE_BASE_URL 则走 remote，否则 local
-NUXT_COMFYUI_MODE=auto
-# 本地模式：仓库目录，默认 ./vendor/ComfyUI
-NUXT_COMFYUI_DIR=
-# 本地模式：python 解释器；默认优先仓库内 .venv/bin/python，其次 uv，最后 python3
-NUXT_COMFYUI_PYTHON=
-NUXT_COMFYUI_HOST=127.0.0.1
-NUXT_COMFYUI_PORT=8188
-# 追加到 `python main.py` 之后的额外参数
-NUXT_COMFYUI_ARGS=
-# 远程模式基地址，例如 http://192.168.1.20:8188
-NUXT_COMFYUI_REMOTE_BASE_URL=
-NUXT_COMFYUI_START_TIMEOUT_MS=180000
-NUXT_COMFYUI_PROBE_TIMEOUT_MS=1500
-```
-
-首次进入 `/workflow` 时：
-
-- **local + 未安装**：页面展示「安装 ComfyUI」按钮；点击后后端异步执行 `git clone --depth 1 https://github.com/comfyanonymous/ComfyUI.git`（必要时建虚拟环境并安装 `requirements.txt`），页面轮询状态显示日志。
-- **local + 已安装未运行**：页面展示「启动」按钮；点击后 `python main.py --listen <host> --port <port> --disable-auto-launch` 拉起，轮询 `/system_stats` 直至就绪（默认 3 分钟）。
-- **remote**：按钮组隐藏本地启停，状态接口直接报告上游连通性。
-
-工作流保存到 Nitro storage（`comfyui:workflows:*`），与 `GenerationRecord` 完全独立；删除走显式接口。`/workflow` 本身不需要供应商凭据，但只有运行 ComfyUI 进程且加载完模型后才能真正跑图。
-
-常见排障：
-
-- 端口占用：8188 已被占用时本地启动失败，日志显示端口冲突；通过 `NUXT_COMFYUI_PORT` 换端口。
-- Python 找不到：系统未装 `python3` 或 `uv` 时安装会失败；优先安装 uv（`pip install uv` 或 https://docs.astral.sh/uv/）。
-- 启动超时：首次加载模型较慢，按需把 `NUXT_COMFYUI_START_TIMEOUT_MS` 调到 600000 之类。
-- WS 不可达：浏览器与 `/api/comfyui/ws` 连不上时页面退化为轮询历史，功能不缺失，只是没有逐节点进度。
-- 安装目录被 `.gitignore` 排除：本地克隆落在 `./vendor/ComfyUI`，不要把它提交到仓库。
-
-## 质量入口
+## 验证
 
 ```bash
 pnpm check
 pnpm check:full
 ```
 
-`check` 先验证仓库契约（必需工程文件、规格状态、内部 Markdown 链接、忽略规则和敏感运行时文件），再运行 ESLint 和 TypeScript；`check:full` 额外执行生产构建。两者均由 `harness/run.mjs` 编排，任一步失败都会返回非零退出码。
+`check` 执行仓库文档约束、计费/幂等纯函数测试、ESLint 和 TypeScript；`check:full` 再执行 production build。真实数据库并发、Redis 故障恢复、OSS 私有访问、供应商账单和 GPU 作业需要在对应环境单独验收，并记录结果。
 
-真实供应商调用不属于默认检查，以免产生费用或依赖网络。需要验证时使用专门的测试账号和非敏感素材，并在交付说明中记录供应商、模型和结果。
-
-## 常见排障
-
-- 供应商显示未启用：检查服务端凭据，重启 dev server。
-- 上传 URL 无法被供应商读取：检查 `NUXT_PUBLIC_APP_URL`、HTTPS 和防火墙。
-- `.nuxt` 类型不存在：执行 `pnpm postinstall` 后重试。
-- 本地状态异常：检查 `.data/`；不要在未确认数据可丢弃前删除它。
-
-## 提交前
-
-检查 `git diff --check` 和 `git status --short`，确认没有 `.env`、`.data`、构建产物、用户素材或临时文件。行为变化需要同步规格和对应文档。
+提交前执行 `git diff --check` 和 `git status --short`，确认没有 `.env`、`.data`、构建产物、用户素材或密钥。
