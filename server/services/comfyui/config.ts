@@ -55,6 +55,12 @@ export function getComfyConfig(): ComfyServiceConfig {
   const config = useRuntimeConfig()
   const remoteBaseUrl = String(config.comfyuiRemoteBaseUrl || '').trim().replace(/\/+$/, '')
   const mode = resolveMode(config.comfyuiMode, remoteBaseUrl)
+  if (process.env.NODE_ENV === 'production' && (mode !== 'remote' || !remoteBaseUrl)) {
+    throw createError({
+      statusCode: 503,
+      statusMessage: '生产环境的 ComfyUI 必须配置为 remote 模式并提供远程地址',
+    })
+  }
   const configuredDir = String(config.comfyuiDir || '').trim()
   const dir = configuredDir
     ? resolve(expandHome(configuredDir))
