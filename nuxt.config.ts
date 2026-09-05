@@ -30,6 +30,15 @@ export default defineNuxtConfig({
     },
   },
   runtimeConfig: {
+    databaseUrl: '',
+    redisUrl: '',
+    queueMode: '',
+    workerEnabled: false,
+    workerConcurrency: 4,
+    registrationMode: 'invite',
+    signupCredits: 0,
+    userMaxActiveGenerations: 3,
+    platformDailyCreditBudget: 100000,
     // 阿里云百炼 DashScope
     dashscopeApiKey: '',
     dashscopeWorkspaceId: '',
@@ -67,6 +76,7 @@ export default defineNuxtConfig({
     ossOutputPrefix: 'forkvdo/outputs',
     ossMaxOutputBytes: 1073741824,
     ossTransferTimeoutMs: 300000,
+    ossSignedUrlTtlSeconds: 86400,
     // ComfyUI 工作流：本地托管或连接其他机器上已运行的服务
     comfyuiMode: 'auto',
     comfyuiDir: '',
@@ -91,9 +101,6 @@ export default defineNuxtConfig({
         driver: 'fs',
         base: './.data',
       },
-    },
-    routeRules: {
-      '/api/**': { cors: true },
     },
   },
   typescript: {

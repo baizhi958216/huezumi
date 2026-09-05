@@ -5,6 +5,10 @@
   "packageManager": "pnpm@10.15.1",
   "scripts": {
     "build": "nuxt build",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx scripts/db-migrate.ts",
+    "admin:create": "tsx scripts/admin-create.ts",
+    "data:migrate": "tsx scripts/migrate-legacy.ts",
     "check": "node harness/run.mjs",
     "check:full": "node harness/run.mjs --full",
     "dev": "nuxt dev",
@@ -13,6 +17,7 @@
     "lint:fix": "eslint . --fix",
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
+    "test": "vitest run",
     "typecheck": "nuxt typecheck"
   },
   "dependencies": {
@@ -21,9 +26,13 @@
     "@vue-flow/core": "^1.48.2",
     "@vueuse/core": "^13.7.0",
     "ali-oss": "^6.23.0",
+    "bullmq": "^6.3.4",
+    "drizzle-orm": "^0.45.2",
     "gsap": "^3.15.0",
+    "ioredis": "^6.0.0",
     "nuxt": "^4.1.0",
     "ogl": "^1.0.11",
+    "pg": "^8.23.0",
     "vue": "^3.5.20",
     "vue-router": "^5.3.0",
     "zod": "^4.1.5"
@@ -33,13 +42,17 @@
     "@iconify-json/lucide": "^1.2.63",
     "@tailwindcss/vite": "^4.3.3",
     "@types/ali-oss": "^6.23.3",
+    "@types/pg": "^8.23.1",
     "@unocss/eslint-plugin": "^66.8.1",
+    "drizzle-kit": "^0.31.10",
     "eslint": "^9.34.0",
     "eslint-plugin-format": "^2.0.1",
     "jsrepo": "^3.8.1",
     "tailwindcss": "^4.3.3",
+    "tsx": "^4.23.13",
     "typescript": "^5.9.2",
     "unocss": "^66.5.0",
+    "vitest": "^5.0.0",
     "vue-tsc": "^3.0.6"
   }
 }
