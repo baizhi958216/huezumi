@@ -9,6 +9,8 @@ interface OssUploadResult {
 export interface OssUploader {
   upload: (key: string, data: Uint8Array, contentType: string) => Promise<OssUploadResult>
   uploadFile: (key: string, path: string, contentType: string, timeoutMs: number) => Promise<OssUploadResult>
+  sign: (key: string, expiresSeconds: number) => string
+  delete: (key: string) => Promise<void>
 }
 
 function trimSlashes(value: string) {
@@ -75,12 +77,18 @@ export function createOssUploader(): OssUploader | undefined {
   }
 
   return {
+    async delete(key) {
+      await client.delete(key)
+    },
+    sign(key, expiresSeconds) {
+      return client.signatureUrl(key, { expires: expiresSeconds })
+    },
     async upload(key, data, contentType) {
       const result = await client.put(key, Buffer.from(data), {
         mime: contentType,
         headers: {
           'Content-Type': contentType,
-          'x-oss-object-acl': 'public-read',
+          'x-oss-object-acl': 'private',
         },
       })
       const url = publicBaseUrl
@@ -93,9 +101,9 @@ export function createOssUploader(): OssUploader | undefined {
         timeout: timeoutMs,
         mime: contentType,
         headers: {
-          'Cache-Control': 'public, max-age=31536000, immutable',
+          'Cache-Control': 'private, no-store',
           'Content-Type': contentType,
-          'x-oss-object-acl': 'public-read',
+          'x-oss-object-acl': 'private',
         },
       })
       const url = publicBaseUrl

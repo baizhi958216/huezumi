@@ -72,6 +72,7 @@ export interface OutputArchiveRecord {
 }
 
 export interface GenerationRecord extends GenerationRequest {
+  schemaVersion?: number
   id: string
   providerTaskId: string
   status: GenerationStatus
@@ -89,6 +90,11 @@ export interface GenerationRecord extends GenerationRequest {
     fps?: number
     sr?: number
     ratio?: string
+  }
+  billing?: {
+    estimatedCredits: number
+    chargedCredits?: number
+    settlementStatus: 'reserved' | 'settled' | 'released' | 'review'
   }
   createdAt: string
   updatedAt: string
