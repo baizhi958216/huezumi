@@ -8,7 +8,12 @@
  * 前端会退化成轮询 `/api/comfyui/history`，功能不受影响，只是没有逐节点进度。
  */
 
+import process from 'node:process'
+import { and, eq, gt } from 'drizzle-orm'
+import { useDatabase } from '../../../database/client'
+import { sessions, users } from '../../../database/schema'
 import { getComfyBaseUrl, getComfyConfig } from '../../../services/comfyui/config'
+import { hashToken } from '../../../utils/auth'
 
 interface UpstreamSocket {
   send: (data: string) => void
@@ -28,6 +33,24 @@ interface UpstreamHandlers {
 }
 
 const upstreams = new Map<string, UpstreamSocket>()
+
+async function isAuthorized(request: { url: string, headers: Headers }) {
+  const origin = request.headers.get('origin')
+  const host = request.headers.get('x-forwarded-host') || request.headers.get('host')
+  const protocol = request.headers.get('x-forwarded-proto') || (process.env.NODE_ENV === 'production' ? 'https' : 'http')
+  if (origin && host && origin !== `${protocol}://${host}`)
+    return false
+  const token = request.headers.get('cookie')?.split(';').map(item => item.trim()).find(item => item.startsWith('forkvdo_session='))?.slice('forkvdo_session='.length)
+  if (!token)
+    return false
+  const [admin] = await useDatabase().select({ id: users.id }).from(sessions).innerJoin(users, eq(users.id, sessions.userId)).where(and(
+    eq(sessions.tokenHash, hashToken(decodeURIComponent(token))),
+    gt(sessions.expiresAt, new Date()),
+    eq(users.status, 'active'),
+    eq(users.role, 'admin'),
+  )).limit(1)
+  return Boolean(admin)
+}
 
 function createGlobalSocket(url: string): WebSocketLike | undefined {
   const factory = (globalThis as { WebSocket?: new (url: string) => WebSocketLike }).WebSocket
@@ -58,7 +81,11 @@ function connectUpstream(url: string, handlers: UpstreamHandlers): UpstreamSocke
 }
 
 export default defineWebSocketHandler({
-  open(peer) {
+  async open(peer) {
+    if (!await isAuthorized(peer.request)) {
+      peer.close(1008, 'Unauthorized')
+      return
+    }
     const config = getComfyConfig()
     const baseUrl = getComfyBaseUrl(config)
     const target = `${baseUrl.replace(/^http/, 'ws')}/ws`

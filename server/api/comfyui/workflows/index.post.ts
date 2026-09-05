@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { saveWorkflow } from '../../../services/comfyui/workflows'
+import { requireUser } from '../../../utils/auth'
 
 const graphSchema = z.object({
   last_node_id: z.number().int().min(0),
@@ -36,6 +37,7 @@ const bodySchema = z.object({
 })
 
 export default defineEventHandler(async (event) => {
+  const user = await requireUser(event)
   const parsed = bodySchema.safeParse(await readBody(event))
   if (!parsed.success) {
     throw createError({
@@ -46,5 +48,5 @@ export default defineEventHandler(async (event) => {
   }
 
   const body = parsed.data
-  return await saveWorkflow({ id: body.id, name: body.name, graph: body.graph })
+  return await saveWorkflow(user.id, { id: body.id, name: body.name, graph: body.graph })
 })
