@@ -76,5 +76,20 @@ export default defineAppConfig({
         content: 'rounded-md px-3 py-1.5 text-xs shadow-card',
       },
     },
+
+    modal: {
+      slots: {
+        overlay: 'fixed inset-0 bg-black/60 dark:bg-black/80 backdrop-blur-md',
+        content: 'rounded-2xl border border-default/70 dark:border-white/10 bg-elevated/95 dark:bg-[#0c0d10]/95 shadow-cinema backdrop-blur-2xl divide-y-0',
+      },
+      variants: {
+        transition: {
+          true: {
+            overlay: 'data-[state=open]:animate-[fade-in_250ms_ease-out] data-[state=closed]:animate-[fade-out_180ms_ease-in]',
+            content: 'data-[state=open]:animate-[scale-in_280ms_cubic-bezier(0.16,1,0.3,1)] data-[state=closed]:animate-[scale-out_180ms_ease-in]',
+          },
+        },
+      },
+    },
   },
 })

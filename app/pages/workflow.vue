@@ -18,6 +18,10 @@ import '@vue-flow/core/dist/theme-default.css'
 
 definePageMeta({ title: '工作流 · forkvdo' })
 
+const { data: workflowSession } = await useFetch<{ user: { role: string } | null }>('/api/auth/session')
+if (workflowSession.value?.user?.role !== 'admin')
+  await navigateTo('/')
+
 const {
   status,
   objectInfo,

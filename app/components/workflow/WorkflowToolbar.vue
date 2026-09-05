@@ -76,11 +76,7 @@ function formatTime(isoStr: string) {
   }
 }
 
-const colorMode = useColorMode()
-const isDark = computed(() => colorMode.value === 'dark')
-function toggleColorMode() {
-  colorMode.preference = isDark.value ? 'light' : 'dark'
-}
+const { isDark, toggleTheme } = useThemeTransition()
 </script>
 
 <template>
@@ -225,7 +221,7 @@ function toggleColorMode() {
           :icon="isDark ? 'i-lucide-sun' : 'i-lucide-moon'"
           :title="isDark ? '切换到浅色模式' : '切换到深色模式'"
           class="comfy-toolbar__icon-btn"
-          @click="toggleColorMode"
+          @click="toggleTheme"
         />
       </ClientOnly>
 

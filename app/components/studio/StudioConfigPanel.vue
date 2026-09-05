@@ -16,6 +16,7 @@ defineProps<{
   selectedModelName: string
   submitting: boolean
   errorMessage: string
+  quote?: { estimatedCredits: number, sourceLabel: string }
   mediaValues: (type: MediaType) => MediaInput[]
   mediaSlotMax: (type: MediaType) => number | undefined
   setMedia: (type: MediaType, values: MediaInput[]) => void
@@ -307,10 +308,10 @@ function updateDurationSlider(value: number | number[] | undefined) {
         class="h-10 text-sm font-600 shadow-sm"
         @click="emit('generate')"
       >
-        {{ submitting ? '正在提交…' : '生成视频' }}
+        {{ submitting ? '正在处理…' : quote ? `确认消耗 ${quote.estimatedCredits} 额度并生成` : '获取额度报价' }}
       </UButton>
       <p class="type-caption text-center text-[11px] text-dimmed leading-4">
-        按实际生成参数消耗 {{ capability?.name }} 额度
+        {{ quote ? `${quote.sourceLabel} · 报价 10 分钟内有效` : `按当前参数计算 ${capability?.name || ''} 额度` }}
       </p>
     </div>
   </UCard>

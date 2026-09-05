@@ -3,9 +3,9 @@ import { gsap } from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import GlassSurface from '~/components/vuebits/GlassSurface.vue'
 
-const colorMode = useColorMode()
+const { isDark, toggleTheme } = useThemeTransition()
+const { user } = useAuth()
 const route = useRoute()
-const isDark = computed(() => colorMode.value === 'dark')
 const isHome = computed(() => route.path === '/')
 const isWorkspace = computed(() => route.path.startsWith('/studio'))
 const isWorkflow = computed(() => route.path.startsWith('/workflow'))
@@ -19,15 +19,11 @@ const mainClass = computed(() => {
   return 'pt-[86px] md:pt-[92px]'
 })
 
-function toggleColorMode() {
-  colorMode.preference = isDark.value ? 'light' : 'dark'
-}
-
-const navigation = [
+const navigation = computed(() => [
   { label: '创作台', to: '/studio' },
   { label: '作品库', to: '/projects' },
-  { label: '工作流', to: '/workflow' },
-]
+  ...(user.value?.role === 'admin' ? [{ label: '工作流', to: '/workflow' }, { label: '控制面板', to: '/admin' }] : []),
+])
 
 function isActive(to: string) {
   const [path, hash] = to.split('#')
@@ -108,7 +104,7 @@ onBeforeUnmount(() => animationCleanup?.())
               <UButton to="/projects" color="neutral" variant="ghost" size="sm" icon="i-lucide-library" class="liquid-nav__workspace-button">
                 作品库
               </UButton>
-              <UButton to="/workflow" color="neutral" variant="ghost" size="sm" icon="i-lucide-workflow" class="liquid-nav__workspace-button">
+              <UButton v-if="user?.role === 'admin'" to="/workflow" color="neutral" variant="ghost" size="sm" icon="i-lucide-workflow" class="liquid-nav__workspace-button">
                 工作流
               </UButton>
               <ClientOnly>
@@ -119,9 +115,10 @@ onBeforeUnmount(() => animationCleanup?.())
                   :icon="isDark ? 'i-lucide-sun' : 'i-lucide-moon'"
                   :aria-label="isDark ? '切换到浅色模式' : '切换到深色模式'"
                   class="liquid-nav__icon-button"
-                  @click="toggleColorMode"
+                  @click="toggleTheme"
                 />
               </ClientOnly>
+              <UserAccountMenu />
             </div>
           </template>
 
@@ -157,13 +154,15 @@ onBeforeUnmount(() => animationCleanup?.())
                     :icon="isDark ? 'i-lucide-sun' : 'i-lucide-moon'"
                     :aria-label="isDark ? '切换到浅色模式' : '切换到深色模式'"
                     class="liquid-nav__icon-button"
-                    @click="toggleColorMode"
+                    @click="toggleTheme"
                   />
                 </UTooltip>
                 <template #fallback>
                   <UButton color="neutral" variant="ghost" size="sm" icon="i-lucide-moon" aria-label="切换颜色模式" disabled class="liquid-nav__icon-button" />
                 </template>
               </ClientOnly>
+
+              <UserAccountMenu />
 
               <UButton to="/studio" color="primary" size="sm" trailing-icon="i-lucide-arrow-up-right" class="liquid-nav__cta">
                 开始创作
