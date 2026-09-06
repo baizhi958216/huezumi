@@ -4,14 +4,26 @@
 
 ## 帐号
 
-| 方法      | 路径                  | 说明                                                                        |
-| --------- | --------------------- | --------------------------------------------------------------------------- |
-| GET       | `/api/auth/session`   | 当前会话与公开用户资料；未登录返回 `{ user: null }`                         |
-| POST      | `/api/auth/register`  | `{ email, password, displayName, invitationCode? }`；注册模式由环境变量控制 |
-| POST      | `/api/auth/login`     | 邮箱密码登录并设置安全 Cookie                                               |
-| POST      | `/api/auth/logout`    | 删除当前 session 与 Cookie                                                  |
-| GET/PATCH | `/api/auth/profile`   | 查询或修改昵称、头像 URL                                                    |
-| GET       | `/api/billing/ledger` | 当前用户额度流水                                                            |
+| 方法      | 路径                    | 说明                                                                        |
+| --------- | ----------------------- | --------------------------------------------------------------------------- |
+| GET       | `/api/auth/session`     | 当前会话与公开用户资料；未登录返回 `{ user: null }`                         |
+| POST      | `/api/auth/register`    | `{ email, password, displayName, invitationCode? }`；注册模式由环境变量控制 |
+| POST      | `/api/auth/login`       | 邮箱密码登录并设置安全 Cookie                                               |
+| POST      | `/api/auth/logout`      | 删除当前 session 与 Cookie                                                  |
+| GET/PATCH | `/api/auth/profile`     | 查询或修改昵称；头像仅接受当前用户上传的 `/api/files/:id` 图片路径          |
+| POST      | `/api/auth/password`    | `{ currentPassword, newPassword }` 修改密码并撤销旧会话                     |
+| GET       | `/api/billing/ledger`   | 当前用户额度流水                                                            |
+| GET       | `/api/account/overview` | 当前用户额度、存储、作品和模型资产概览                                      |
+
+`/api/account/overview` 的消耗统计只累计实际结算的 `charge` 流水；`available` 为余额减去预留额度。模型资产统计只包含当前用户未软删除的资产。
+
+## 用户模型资产
+
+| 方法 | 路径          | 说明                                                               |
+| ---- | ------------- | ------------------------------------------------------------------ |
+| GET  | `/api/models` | 当前用户自己的模型资产元数据列表；不返回 OSS key、密钥或运行时路径 |
+
+模型资产的上传、Civitai 下载、OSS 存储和 ComfyUI 部署尚未在当前阶段开放；页面空状态不会触发外部模型流量。
 
 ## 报价与生成
 
@@ -28,6 +40,8 @@
 `POST /api/files` 接收字段名为 `file` 的 multipart 上传。视频最大 100 MiB，其他素材最大 20 MiB，同时受用户存储上限约束。生产环境未配置 OSS 时返回 503；开发环境可回退到 `.data`。
 
 `GET /api/files/:id` 验证 owner 或管理员。OSS 资产返回短期签名地址的 302；本地开发资产直接返回字节。私有响应使用 `no-store`。生成结果通过 `GET /api/generations/:id/video` 使用相同所有权和签名流程。
+
+个人资料页的头像通过 `POST /api/files` 上传图片后再保存资料；资料接口会再次验证素材属于当前用户、未删除且为图片。头像不接受外部在线 URL。密码修改要求当前密码和至少 10 个字符的新密码，成功后当前请求会建立新 session，原有 session 全部失效。
 
 ## 供应商目录
 
@@ -53,7 +67,11 @@
 
 当前所有 `/api/comfyui/**` 端点和 `/api/comfyui/ws` 仅管理员可用。HTTP 覆盖 status、object-info、prompt、history、queue、interrupt、free、upload、view 和工作流 CRUD；WebSocket 转发实时事件。生产 local/auto 配置返回服务配置错误，本地 install/start/stop 只服务开发环境。
 
+`POST /api/comfyui/upload` 接收 multipart 字段 `file` 与 `kind`（`image`、`audio` 或 `video`），上传到 ComfyUI input 目录后失效节点定义缓存；工作流右侧检查器会根据选中加载节点的上传标记选择文件类型，并把返回文件名写回节点参数。
+
 工作流保存到 PostgreSQL并绑定 owner；prompt ID 同步记录到 `comfy_executions`。共享实例的任意工作流尚未对普通用户开放。
+
+工作流 CRUD 的列表会返回当前用户自己的记录和 `visibility=public` 的公开记录。摘要和详情额外返回 `visibility`（`private` / `public`）以及 `scope`（`mine` / `public`）；左侧“公开工作流”按 `visibility=public` 筛选，因此拥有者自己的公开工作流会同时出现在“我的工作流”和“公开工作流”中。公开工作流允许读取和载入，保存公开工作流时只能更新自己的记录，载入他人的公开工作流会在页面中按副本保存。`POST /api/comfyui/workflows` 可传 `visibility`，默认是私有；删除仍只允许工作流拥有者。
 
 ## 契约演进
 

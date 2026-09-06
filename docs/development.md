@@ -7,12 +7,68 @@
 ```bash
 pnpm install
 cp .env.example .env
+set -a; source .env; set +a
 pnpm db:migrate
 pnpm admin:create -- --email=admin@example.com --password='replace-with-a-long-password' --name=管理员
 pnpm dev
 ```
 
 所有帐号和任务 API 都需要 PostgreSQL。首次管理员只能通过 `admin:create` 创建。默认注册模式是 `invite`，登录后在控制面板生成邀请码；开发时可设置 `NUXT_REGISTRATION_MODE=open`。
+
+### 本机热更新开发
+
+本机开发把 PostgreSQL 和可选的 MinIO 放进 Docker；Nuxt 和 ComfyUI 使用宿主机进程，因此 Vue/Nitro 修改可以由 `pnpm dev` 实时重载。仓库若已包含 `vendor/ComfyUI`，ComfyUI 会复用其中的 Python 虚拟环境；Apple Silicon 可由 PyTorch 使用 MPS。
+
+```bash
+docker compose -f docker-compose.dev.yml up -d postgres
+set -a; source .env; set +a
+pnpm db:migrate
+pnpm dev
+```
+
+`.env` 至少需要对应本机连接配置：
+
+```dotenv
+POSTGRES_PASSWORD=change-me-local-only
+POSTGRES_HOST_PORT=55432
+NUXT_DATABASE_URL=postgresql://forkvdo:change-me-local-only@127.0.0.1:55432/forkvdo
+NUXT_QUEUE_MODE=inline
+NUXT_WORKER_ENABLED=false
+NUXT_COMFYUI_MODE=local
+NUXT_COMFYUI_DIR=./vendor/ComfyUI
+NUXT_COMFYUI_PYTHON=./vendor/ComfyUI/.venv/bin/python
+```
+
+启动 Nuxt 后，工作流页面的“启动 ComfyUI”会通过项目后端拉起 `vendor/ComfyUI`；也可以手动执行同等命令：
+
+```bash
+vendor/ComfyUI/.venv/bin/python vendor/ComfyUI/main.py \
+  --listen 127.0.0.1 --port 8188 --disable-auto-launch
+```
+
+本机已有其他 PostgreSQL 服务时，开发 Compose 默认使用 `55432`，不会占用 `5432`。
+
+### 本地对象存储（MinIO）
+
+开发环境可以用 Compose 中的 MinIO 代替阿里云 OSS，上传素材和结果只保存在本机 Docker volume，不产生云端流量。先启动服务：
+
+```bash
+docker compose -f docker-compose.dev.yml up -d minio minio-init
+```
+
+在 `.env` 中加入以下配置（账号需要与 Compose 中的 `LOCAL_OSS_*` 一致）：
+
+```dotenv
+NUXT_OSS_ACCESS_KEY_ID=forkvdo-local
+NUXT_OSS_ACCESS_KEY_SECRET=forkvdo-local-secret-change-me
+NUXT_OSS_BUCKET=forkvdo
+NUXT_OSS_REGION=us-east-1
+NUXT_OSS_ENDPOINT=http://127.0.0.1:9100
+NUXT_OSS_SECURE=false
+NUXT_OSS_PUBLIC_BASE_URL=
+```
+
+MinIO 管理控制台是 <http://127.0.0.1:9101>。Nuxt 在宿主机运行时必须使用 `127.0.0.1:9100`；只有把 Nuxt 也放进 Compose，才改用服务名 `http://minio:9000`。本地配置不会覆盖生产环境的阿里云 OSS 配置，后者仍使用 HTTPS 和阿里云地域名。
 
 ## 数据库、队列与 worker
 
@@ -48,6 +104,7 @@ NUXT_OSS_ACCESS_KEY_SECRET=
 NUXT_OSS_BUCKET=
 NUXT_OSS_REGION=cn-beijing
 NUXT_OSS_ENDPOINT=
+NUXT_OSS_SECURE=true
 NUXT_OSS_PREFIX=forkvdo/uploads
 NUXT_OSS_OUTPUT_PREFIX=forkvdo/outputs
 NUXT_OSS_SIGNED_URL_TTL_SECONDS=86400

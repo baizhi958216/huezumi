@@ -26,7 +26,7 @@ PostgreSQL 是业务状态和账目的事实源。OSS 只保存媒体字节；Re
 
 帐号支持 `user`、`admin` 角色和 `active`、`disabled` 等状态。密码使用带随机盐的 scrypt 哈希；随机 session token 仅通过 HttpOnly、SameSite Cookie 下发，数据库只保存 token 摘要。管理员由部署命令创建，注册请求不能指定角色。
 
-`generations`、`assets`、`workflows`、`comfy_executions` 均保存 `owner_id`。普通列表、详情、文件读取和工作流操作在服务端验证 owner；管理 API 验证 admin。停用帐号时撤销其现有 session。修改请求执行同源检查，认证和生成入口另有 Redis/进程内限流。
+`generations`、`assets`、`workflows`、`comfy_executions` 均保存 `owner_id`。普通列表、详情和文件读取在服务端验证 owner；工作流读取允许 owner 或 `visibility=public`，公开工作流的更新和删除仍只允许 owner；管理 API 验证 admin。停用帐号时撤销其现有 session。修改请求执行同源检查，认证和生成入口另有 Redis/进程内限流。
 
 OSS 对象使用 private ACL，数据库保存 object key。浏览器经平台鉴权后获得短期 302 签名地址；供应商提交前也由服务端把平台资产 URL 换成短期签名 URL。开发环境可用 `.data` 保存新上传字节，生产环境拒绝该回退。
 
@@ -63,6 +63,8 @@ Drizzle schema 位于 `server/database/schema.ts`，SQL migration 位于 `drizzl
 `docker-compose.production.yml` 定义 PostgreSQL、Redis、migration、Web、worker 与 ComfyUI。Web 与 worker 使用同一应用镜像，通过 `NUXT_WORKER_ENABLED` 分工。worker 正常关闭时停止 BullMQ consumer；outbox 定时补发数据库中未发布事件。
 
 仍需由实际部署环境完成的运维项目包括 PostgreSQL 备份恢复演练、OSS 生命周期和旧 public-read 对象清单、告警接入、供应商账单对账、目标 GPU 上的镜像与模型验证。这些属于上线验收，不能只凭本地构建视为通过。
+
+普通用户的“我的空间”位于 `/dashboard`，展示额度汇总、额度流水、作品概览和模型资产元数据。个人资料与密码仍由 `/account` 管理，完整作品列表仍由 `/projects` 管理。模型资产元数据独立于普通媒体 `assets`，支持用户归属、来源、类型、状态和多文件模型包；当前阶段尚未启用模型上传、Civitai 下载或 ComfyUI 部署。
 
 ## 7. 工程事实源
 
