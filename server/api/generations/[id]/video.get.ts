@@ -15,5 +15,5 @@ export default defineEventHandler(async (event) => {
   const uploader = createOssUploader()
   if (!uploader)
     throw createError({ statusCode: 503, statusMessage: '对象存储尚未配置' })
-  return sendRedirect(event, uploader.sign(objectKey, 900), 302)
+  return sendRedirect(event, await uploader.sign(objectKey, 900), 302)
 })

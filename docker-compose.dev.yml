@@ -1,0 +1,51 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-forkvdo}
+      POSTGRES_USER: ${POSTGRES_USER:-forkvdo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    ports:
+      - '127.0.0.1:${POSTGRES_HOST_PORT:-55432}:5432'
+    volumes:
+      - forkvdo-postgres-dev:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U ${POSTGRES_USER:-forkvdo} -d ${POSTGRES_DB:-forkvdo}
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${LOCAL_OSS_ACCESS_KEY_ID:-forkvdo-local}
+      MINIO_ROOT_PASSWORD: ${LOCAL_OSS_ACCESS_KEY_SECRET:-forkvdo-local-secret-change-me}
+    ports:
+      - '127.0.0.1:${LOCAL_OSS_API_PORT:-9100}:9000'
+      - '127.0.0.1:${LOCAL_OSS_CONSOLE_PORT:-9101}:9001'
+    volumes:
+      - forkvdo-minio-dev:/data
+
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      - minio
+    environment:
+      MINIO_ROOT_USER: ${LOCAL_OSS_ACCESS_KEY_ID:-forkvdo-local}
+      MINIO_ROOT_PASSWORD: ${LOCAL_OSS_ACCESS_KEY_SECRET:-forkvdo-local-secret-change-me}
+      LOCAL_OSS_BUCKET: ${LOCAL_OSS_BUCKET:-forkvdo}
+    entrypoint:
+      - /bin/sh
+      - -c
+    command:
+      - >-
+        until mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD"; do sleep 1; done;
+        mc mb --ignore-existing "local/$$LOCAL_OSS_BUCKET";
+        mc anonymous set private "local/$$LOCAL_OSS_BUCKET";
+
+volumes:
+  forkvdo-postgres-dev:
+  forkvdo-minio-dev:

@@ -65,12 +65,13 @@ export default defineNuxtConfig({
     // MiniMax / 可灵 / Seedance 均可通过对应 *_BASE_URL 覆盖默认接入点
     minimaxBaseUrl: '',
     klingBaseUrl: '',
-    // 阿里云 OSS：配置完整后，输入素材和生成结果都会转存并返回 OSS URL
+    // OSS 兼容对象存储：可接阿里云 OSS 或本地 MinIO
     ossAccessKeyId: '',
     ossAccessKeySecret: '',
     ossBucket: '',
     ossRegion: 'cn-beijing',
     ossEndpoint: '',
+    ossSecure: '',
     ossPublicBaseUrl: '',
     ossPrefix: 'forkvdo/uploads',
     ossOutputPrefix: 'forkvdo/outputs',
