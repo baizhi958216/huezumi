@@ -5,9 +5,11 @@ import type {
   ComfyPromptResponse,
   ComfyQueueState,
   ComfyUIStatus,
+  ComfyUploadType,
   ComfyWorkflowJSON,
   ComfyWorkflowRecord,
   ComfyWorkflowSummary,
+  ComfyWorkflowVisibility,
   ComfyWsMessage,
 } from '#shared/types/comfyui'
 import { buildViewUrl, collectOutputFiles } from '~/utils/comfy-graph'
@@ -88,12 +90,14 @@ export function useComfyServer() {
     await $fetch('/api/comfyui/free', { method: 'POST', body: { unloadModels: true, freeMemory: true } })
   }
 
-  async function uploadImage(file: File) {
+  async function uploadAsset(file: File, kind: ComfyUploadType) {
     const form = new FormData()
-    form.append('image', file)
-    await $fetch('/api/comfyui/upload', { method: 'POST', body: form })
-    // 上传后 LoadImage 等 COMBO 需要新文件，必须回源刷新节点定义
+    form.append('file', file)
+    form.append('kind', kind)
+    const uploaded = await $fetch<{ name: string, subfolder: string, type: string }>('/api/comfyui/upload', { method: 'POST', body: form })
+    // 上传后加载节点的 COMBO 需要新文件，必须回源刷新节点定义。
     await loadObjectInfo(true)
+    return uploaded
   }
 
   async function refreshWorkflows() {
@@ -105,7 +109,7 @@ export function useComfyServer() {
     return await $fetch<ComfyWorkflowRecord>(`/api/comfyui/workflows/${id}`)
   }
 
-  async function saveWorkflow(payload: { id?: string, name: string, graph: ComfyWorkflowJSON }) {
+  async function saveWorkflow(payload: { id?: string, name: string, graph: ComfyWorkflowJSON, visibility?: ComfyWorkflowVisibility }) {
     const record = await $fetch<ComfyWorkflowRecord>('/api/comfyui/workflows', {
       method: 'POST',
       body: payload,
@@ -135,7 +139,7 @@ export function useComfyServer() {
     deleteQueueItems,
     interrupt,
     freeMemory,
-    uploadImage,
+    uploadAsset,
     refreshWorkflows,
     loadWorkflow,
     saveWorkflow,

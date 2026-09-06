@@ -74,6 +74,13 @@ export interface ComfyInputOptions {
   dynamic_prompts?: boolean
   round?: number | boolean
   display?: string
+  /** ComfyUI 官方加载节点的文件上传标记。 */
+  image_upload?: boolean
+  audio_upload?: boolean
+  video_upload?: boolean
+  /** 新版 ComfyUI 对 COMBO 使用 options 数组承载候选值。 */
+  options?: string[]
+  multiselect?: boolean
   /** 任意额外键：ComfyUI 允许节点作者自定义提示信息 */
   [key: string]: unknown
 }
@@ -106,12 +113,16 @@ export type ComfyObjectInfo = Record<string, ComfyNodeDef>
 
 export type ComfyWidgetKind = 'INT' | 'FLOAT' | 'STRING' | 'BOOLEAN' | 'COMBO' | 'CONTROL_AFTER_GENERATE'
 
+export type ComfyUploadType = 'image' | 'audio' | 'video'
+
 export interface ComfyWidgetSpec {
   name: string
   kind: ComfyWidgetKind
   options: ComfyInputOptions
   /** COMBO 的可选项 */
   choices?: string[]
+  /** 该 COMBO 是否由 ComfyUI 的文件上传控件驱动。 */
+  uploadType?: ComfyUploadType
   /**
    * 是否参与 API prompt 序列化。
    * 官方前端用 `widget.options.serialize === false` 排除 control_after_generate 等纯前端控件。
@@ -144,10 +155,20 @@ export const CONTROL_AFTER_GENERATE_OPTIONS = ['randomize', 'fixed', 'increment'
 
 const WIDGET_TYPES = new Set(['INT', 'FLOAT', 'STRING', 'BOOLEAN'])
 
+function getUploadType(options: ComfyInputOptions): ComfyUploadType | undefined {
+  if (options.image_upload)
+    return 'image'
+  if (options.audio_upload)
+    return 'audio'
+  if (options.video_upload)
+    return 'video'
+  return undefined
+}
+
 /**
  * 把 `/object_info` 的一条节点定义拆成「控件」与「连线插槽」。
  *
- * 规则与 ComfyUI 官方前端一致：类型名是数组 → COMBO；类型是 INT/FLOAT/STRING/BOOLEAN → 控件；
+ * 规则与 ComfyUI 官方前端一致：类型名是数组或 COMBO → 下拉控件；类型是 INT/FLOAT/STRING/BOOLEAN → 控件；
  * 其余（MODEL / CLIP / VAE / IMAGE / LATENT / CONDITIONING …）→ 连线输入插槽。
  * 必填项先于可选项，各自保持声明顺序。
  */
@@ -163,7 +184,28 @@ export function buildNodeTypeInfo(name: string, def: ComfyNodeDef): ComfyNodeTyp
     for (const [inputName, entry] of Object.entries(spec ?? {})) {
       const [type, options = {}] = entry ?? []
       if (Array.isArray(type)) {
-        widgets.push({ name: inputName, kind: 'COMBO', options, choices: type, serialize: true, group })
+        widgets.push({
+          name: inputName,
+          kind: 'COMBO',
+          options,
+          choices: type,
+          uploadType: getUploadType(options),
+          serialize: true,
+          group,
+        })
+        continue
+      }
+      // 新版 ComfyUI 的 LoadAudio/LoadVideo 使用字符串 COMBO，并把候选项放在 options.options。
+      if (type === 'COMBO') {
+        widgets.push({
+          name: inputName,
+          kind: 'COMBO',
+          options,
+          choices: Array.isArray(options.options) ? options.options.map(String) : [],
+          uploadType: getUploadType(options),
+          serialize: true,
+          group,
+        })
         continue
       }
       if (WIDGET_TYPES.has(type)) {
@@ -316,7 +358,7 @@ export type ComfyApiWorkflow = Record<string, ComfyApiNode>
 
 export interface ComfySerializeResult {
   prompt: ComfyApiWorkflow
-  /** 不阻断提交但需要在 UI 上提示的问题 */
+  /** 需要在提交前向 UI 展示并处理的问题 */
   issues: string[]
   /** 引用了当前环境不存在节点类型的节点 id */
   missingNodes: number[]
@@ -366,6 +408,15 @@ export function serializeGraphToApiPrompt(
       if (!widget.serialize)
         return
       const value = index < values.length ? values[index] : getWidgetDefault(widget)
+      if (widget.kind === 'COMBO') {
+        const choices = widget.choices ?? []
+        if (!choices.length) {
+          issues.push(`节点「${node.title || info.displayName}」的输入「${widget.name}」没有可用选项，请先在 ComfyUI 配置对应资源`)
+        }
+        else if (!choices.includes(String(value))) {
+          issues.push(`节点「${node.title || info.displayName}」的输入「${widget.name}」当前值无效，请重新选择`)
+        }
+      }
       // 数组在 API 里表示连线，字面数组必须包一层，后端执行时会自动解包。
       inputs[widget.name] = Array.isArray(value) ? { __value__: value } : value
     })
@@ -470,9 +521,15 @@ export interface ComfyWorkflowSummary {
   id: string
   name: string
   nodeCount: number
+  visibility: ComfyWorkflowVisibility
+  scope: ComfyWorkflowScope
   createdAt: string
   updatedAt: string
 }
+
+export type ComfyWorkflowVisibility = 'private' | 'public'
+
+export type ComfyWorkflowScope = 'mine' | 'public'
 
 export interface ComfyWorkflowRecord extends ComfyWorkflowSummary {
   graph: ComfyWorkflowJSON

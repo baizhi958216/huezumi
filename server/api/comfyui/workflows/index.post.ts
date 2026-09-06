@@ -33,6 +33,7 @@ const graphSchema = z.object({
 const bodySchema = z.object({
   id: z.string().max(64).optional(),
   name: z.string().min(1).max(120),
+  visibility: z.enum(['private', 'public']).optional(),
   graph: graphSchema,
 })
 
@@ -48,5 +49,5 @@ export default defineEventHandler(async (event) => {
   }
 
   const body = parsed.data
-  return await saveWorkflow(user.id, { id: body.id, name: body.name, graph: body.graph })
+  return await saveWorkflow(user.id, { id: body.id, name: body.name, visibility: body.visibility, graph: body.graph })
 })

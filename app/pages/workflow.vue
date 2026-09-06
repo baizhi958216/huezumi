@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ComfyObjectInfo, ComfyWorkflowJSON } from '#shared/types/comfyui'
+import type { ComfyObjectInfo, ComfyUploadType, ComfyWorkflowJSON, ComfyWorkflowVisibility } from '#shared/types/comfyui'
 import type { Connection } from '@vue-flow/core'
 import type { ComfyFlowEdge, ComfyFlowNode, ComfyNodeData } from '~/utils/comfy-graph'
 import { canConnectTypes, serializeGraphToApiPrompt } from '#shared/types/comfyui'
@@ -36,7 +36,7 @@ const {
   clearQueue,
   interrupt,
   freeMemory,
-  uploadImage,
+  uploadAsset,
   refreshWorkflows,
   loadWorkflow,
   saveWorkflow,
@@ -57,6 +57,7 @@ const {
   setNodes,
   setEdges,
   updateNodeInternals,
+  updateNodeData,
   fitView,
   screenToFlowCoordinate,
   findNode,
@@ -75,6 +76,7 @@ const typeIndex = computed(() => buildTypeIndex(objectInfo.value ?? {}))
 const typeList = computed(() => Object.values(typeIndex.value))
 
 const workflowName = ref('未命名工作流')
+const workflowVisibility = ref<ComfyWorkflowVisibility>('private')
 const currentWorkflowId = ref<string | undefined>()
 const saving = ref(false)
 const issues = ref<string[]>([])
@@ -83,6 +85,8 @@ const clientId = ref<string>('')
 const isMobile = ref(false)
 const showLibrary = ref(true)
 const showInspector = ref(true)
+const libraryMode = ref<'workflows' | 'nodes'>('workflows')
+const workflowLoading = ref(false)
 const importInputRef = ref<HTMLInputElement | null>(null)
 
 const runningPromptId = ref<string | null>(null)
@@ -217,6 +221,10 @@ async function runWorkflow() {
     const graph = buildGraph()
     const { prompt, issues: serializeIssues } = serializeGraphToApiPrompt(graph, info)
     issues.value = serializeIssues
+    if (serializeIssues.length) {
+      runError.value = '工作流还有未解决的输入问题，请先按右侧提示修正'
+      return
+    }
     if (Object.keys(prompt).length === 0) {
       runError.value = '当前工作流没有可执行的节点（所有节点都已被静音或绕过）'
       return
@@ -246,6 +254,7 @@ function resetGraph(name = '未命名工作流') {
   setNodes([])
   setEdges([])
   workflowName.value = name
+  workflowVisibility.value = 'private'
   currentWorkflowId.value = undefined
   issues.value = []
   runError.value = null
@@ -259,9 +268,11 @@ async function saveCurrent() {
     const record = await saveWorkflow({
       id: currentWorkflowId.value,
       name: workflowName.value,
+      visibility: workflowVisibility.value,
       graph,
     })
     currentWorkflowId.value = record.id
+    workflowVisibility.value = record.visibility
   }
   catch (error) {
     runError.value = messageOf(error)
@@ -274,8 +285,16 @@ async function saveCurrent() {
 async function openSaved(id: string) {
   try {
     const record = await loadWorkflow(id)
-    currentWorkflowId.value = record.id
-    workflowName.value = record.name
+    if (record.scope === 'public') {
+      currentWorkflowId.value = undefined
+      workflowName.value = `${record.name}（副本）`
+      workflowVisibility.value = 'private'
+    }
+    else {
+      currentWorkflowId.value = record.id
+      workflowName.value = record.name
+      workflowVisibility.value = record.visibility
+    }
     const { nodes: nextNodes, edges: nextEdges } = importWorkflow(record.graph, typeIndex.value)
     setNodes(nextNodes)
     setEdges(nextEdges)
@@ -327,6 +346,7 @@ function onImportChange(event: Event) {
       setEdges(result.edges)
       issues.value = result.missing.map(type => `工作流使用了当前环境没有的节点类型：${type}`)
       workflowName.value = graph.name || '导入的工作流'
+      workflowVisibility.value = 'private'
       currentWorkflowId.value = undefined
       nextTick(() => fitView({ padding: 0.2, duration: 300, maxZoom: 1 }))
     }
@@ -340,9 +360,44 @@ function onImportChange(event: Event) {
   reader.readAsText(file)
 }
 
-async function onUpload(file: File) {
+function updateNodeWidget(payload: { nodeId: string, widgetName: string, value: unknown }) {
+  const node = findNode(payload.nodeId)
+  if (!node)
+    return
+
+  const data = node.data as ComfyNodeData
+  updateNodeData<ComfyNodeData>(payload.nodeId, {
+    widgets: { ...data.widgets, [payload.widgetName]: payload.value },
+  })
+}
+
+async function onUpload(payload: { file: File, kind: ComfyUploadType, nodeId: string, widgetName: string }) {
   try {
-    await uploadImage(file)
+    const uploaded = await uploadAsset(payload.file, payload.kind)
+    const value = [uploaded.subfolder, uploaded.name].filter(Boolean).join('/')
+    if (!value)
+      throw new Error('ComfyUI 没有返回上传文件名')
+
+    const node = findNode(payload.nodeId)
+    if (!node)
+      return
+
+    const data = node.data as ComfyNodeData
+    const info = typeIndex.value[data.type]
+    if (info) {
+      updateNodeData<ComfyNodeData>(payload.nodeId, {
+        widgetSpecs: info.widgets,
+        inputSlots: info.inputs,
+        outputSlots: info.outputs,
+      })
+    }
+    updateNodeData<ComfyNodeData>(payload.nodeId, {
+      widgets: { ...data.widgets, [payload.widgetName]: value },
+    })
+    await nextTick()
+    updateNodeInternals([payload.nodeId])
+    runError.value = null
+    issues.value = []
   }
   catch (error) {
     runError.value = messageOf(error)
@@ -406,6 +461,19 @@ async function doRefresh() {
   }
   catch (error) {
     runError.value = messageOf(error)
+  }
+}
+
+async function loadWorkflowLibrary() {
+  workflowLoading.value = true
+  try {
+    await refreshWorkflows()
+  }
+  catch (error) {
+    runError.value = messageOf(error)
+  }
+  finally {
+    workflowLoading.value = false
   }
 }
 
@@ -475,7 +543,7 @@ onMounted(async () => {
   events.connect(clientId.value)
 
   await refreshStatus()
-  await refreshWorkflows()
+  await loadWorkflowLibrary()
 
   if (status.value?.state === 'running')
     await loadObjectInfo()
@@ -495,6 +563,7 @@ onBeforeUnmount(() => {
   <div class="comfy-shell">
     <WorkflowToolbar
       v-model:name="workflowName"
+      v-model:visibility="workflowVisibility"
       :status="status"
       :busy="status?.install.phase === 'running' || status?.state === 'starting'"
       :running="isRunning"
@@ -522,10 +591,14 @@ onBeforeUnmount(() => {
     <div class="comfy-shell__grid" :class="{ 'comfy-shell__grid--collapsed': !showLibrary && !showInspector }">
       <WorkflowLibrary
         v-if="showLibrary"
+        v-model:mode="libraryMode"
         :types="typeList"
+        :workflows="workflows"
         :disabled="!typeList.length"
+        :loading="workflowLoading"
         class="comfy-shell__library"
         @add="addNode"
+        @load="openSaved"
       />
 
       <section
@@ -595,6 +668,7 @@ onBeforeUnmount(() => {
         @clear-queue="doClearQueue"
         @free-memory="doFreeMemory"
         @upload="onUpload"
+        @update-node-widget="updateNodeWidget"
         @delete-node="removeNodes"
         @delete-edge="deleteEdge"
       />
