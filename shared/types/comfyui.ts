@@ -72,6 +72,11 @@ export interface ComfyInputOptions {
   step?: number
   multiline?: boolean
   dynamic_prompts?: boolean
+  /** ComfyUI v3 uses camelCase for these two flags. */
+  dynamicPrompts?: boolean
+  forceInput?: boolean
+  force_input?: boolean
+  socketless?: boolean
   round?: number | boolean
   display?: string
   /** ComfyUI 官方加载节点的文件上传标记。 */
@@ -166,6 +171,23 @@ function getUploadType(options: ComfyInputOptions): ComfyUploadType | undefined 
 }
 
 /**
+ * STRING inputs in ComfyUI can be both a visible widget and a socket. The
+ * built-in CLIPTextEncode uses multiline/dynamicPrompts without forceInput,
+ * so the editor must retain the widget while exposing its text socket.
+ */
+function isConnectableString(options: ComfyInputOptions): boolean {
+  if (options.socketless)
+    return false
+  return Boolean(
+    options.forceInput
+    || options.force_input
+    || options.multiline
+    || options.dynamicPrompts
+    || options.dynamic_prompts,
+  )
+}
+
+/**
  * 把 `/object_info` 的一条节点定义拆成「控件」与「连线插槽」。
  *
  * 规则与 ComfyUI 官方前端一致：类型名是数组或 COMBO → 下拉控件；类型是 INT/FLOAT/STRING/BOOLEAN → 控件；
@@ -210,6 +232,8 @@ export function buildNodeTypeInfo(name: string, def: ComfyNodeDef): ComfyNodeTyp
       }
       if (WIDGET_TYPES.has(type)) {
         widgets.push({ name: inputName, kind: type as ComfyWidgetKind, options, serialize: true, group })
+        if (type === 'STRING' && isConnectableString(options))
+          inputs.push({ name: inputName, type, group })
         if ((inputName === 'seed' || inputName === 'noise_seed')
           && (CONTROL_AFTER_GENERATE_NODES as readonly string[]).includes(name)) {
           widgets.push({

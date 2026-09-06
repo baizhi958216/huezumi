@@ -6,6 +6,7 @@ import { spawn } from 'node:child_process'
 import process from 'node:process'
 import { fetchSystemStats } from './client'
 import { getComfyConfig, resolvePythonBin } from './config'
+import { ensureForkvdoCustomNode } from './custom-nodes'
 import { isComfyInstalled } from './installer'
 import {
   appendRuntimeLog,
@@ -120,6 +121,8 @@ export async function startComfy(): Promise<ComfyUIStatus> {
     throw createError({ statusCode: 500, statusMessage: '未找到可用的 Python 解释器，请配置 NUXT_COMFYUI_PYTHON' })
   }
 
+  ensureForkvdoCustomNode(config)
+
   runtime.error = undefined
   appendRuntimeLog(`[comfyui] 启动：${python} main.py --listen ${config.host} --port ${config.port}`)
 
@@ -134,7 +137,13 @@ export async function startComfy(): Promise<ComfyUIStatus> {
   ], {
     cwd: config.dir,
     stdio: ['ignore', 'pipe', 'pipe'],
-    env: { ...process.env, PYTHONUNBUFFERED: '1' },
+    // Secrets are inherited by the local execution process only. They never enter
+    // the graph, object-info response, log buffer, or browser-facing error.
+    env: {
+      ...process.env,
+      PYTHONUNBUFFERED: '1',
+      FORKVDO_LLM_CONNECTIONS_JSON: config.llmConnectionsJson || process.env.FORKVDO_LLM_CONNECTIONS_JSON || '',
+    },
   })
 
   runtime.child = child

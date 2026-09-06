@@ -12,6 +12,7 @@ const graphSchema = z.object({
     size: z.tuple([z.number(), z.number()]),
     order: z.number().int(),
     mode: z.union([z.literal(0), z.literal(2), z.literal(4)]),
+    flags: z.record(z.string(), z.unknown()).optional(),
     inputs: z.array(z.object({
       name: z.string().max(255),
       type: z.string().max(255),
@@ -21,13 +22,19 @@ const graphSchema = z.object({
       name: z.string().max(255),
       type: z.string().max(255),
       links: z.array(z.number().int()).nullable().optional(),
+      slot_index: z.number().int().optional(),
     })).optional(),
     title: z.string().max(255).optional(),
     properties: z.record(z.string(), z.unknown()).optional(),
     widgets_values: z.array(z.unknown()).optional(),
   })),
   links: z.array(z.tuple([z.number().int(), z.number().int(), z.number().int(), z.number().int(), z.number().int(), z.string().max(255)])),
-  version: z.number().int().optional(),
+    version: z.number().int().optional(),
+  id: z.string().max(64).optional(),
+  name: z.string().max(120).optional(),
+  groups: z.array(z.unknown()).optional(),
+  config: z.record(z.string(), z.unknown()).optional(),
+  extra: z.record(z.string(), z.unknown()).optional(),
 })
 
 const bodySchema = z.object({

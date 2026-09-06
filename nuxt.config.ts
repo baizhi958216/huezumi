@@ -86,6 +86,9 @@ export default defineNuxtConfig({
     comfyuiPort: 8188,
     comfyuiArgs: '',
     comfyuiRemoteBaseUrl: '',
+    comfyuiCustomNodeSourceDir: '',
+    // JSON remains private and is passed only to a local ComfyUI child process.
+    comfyuiLlmConnectionsJson: '',
     comfyuiStartTimeoutMs: 180000,
     comfyuiProbeTimeoutMs: 1500,
     public: {

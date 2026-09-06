@@ -12,6 +12,10 @@ export interface ComfyServiceConfig {
   port: number
   extraArgs: string[]
   remoteBaseUrl: string
+  /** 仓库维护的 forkvdo 自定义节点包源目录，不是 ComfyUI 运行时目录。 */
+  customNodeSourceDir: string
+  /** 私有连接配置，只传给本地 ComfyUI 子进程，不返回给浏览器。 */
+  llmConnectionsJson: string
   startTimeoutMs: number
   /** 就绪探测的单次超时 */
   probeTimeoutMs: number
@@ -67,6 +71,9 @@ export function getComfyConfig(): ComfyServiceConfig {
     : resolve(process.cwd(), 'vendor', 'ComfyUI')
   const host = String(config.comfyuiHost || '127.0.0.1').trim() || '127.0.0.1'
   const port = toNumber(config.comfyuiPort, 8188)
+  const customNodeSourceDir = String(config.comfyuiCustomNodeSourceDir || '').trim()
+    ? resolve(expandHome(String(config.comfyuiCustomNodeSourceDir)))
+    : resolve(process.cwd(), 'comfyui', 'custom_nodes', 'forkvdo_prompt')
 
   return {
     mode,
@@ -75,6 +82,8 @@ export function getComfyConfig(): ComfyServiceConfig {
     port,
     extraArgs: splitArgs(config.comfyuiArgs),
     remoteBaseUrl,
+    customNodeSourceDir,
+    llmConnectionsJson: String(config.comfyuiLlmConnectionsJson || '').trim(),
     startTimeoutMs: toNumber(config.comfyuiStartTimeoutMs, 180000),
     probeTimeoutMs: toNumber(config.comfyuiProbeTimeoutMs, 1500),
   }
