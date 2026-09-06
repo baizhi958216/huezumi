@@ -9,6 +9,7 @@ onMounted(() => {
 const initials = computed(() => user.value?.displayName.trim().slice(0, 1).toUpperCase() || 'U')
 const menuItems = computed(() => [[
   { label: `${user.value?.availableCredits ?? 0} 可用额度`, icon: 'i-lucide-coins', disabled: true },
+  { label: '我的空间', icon: 'i-lucide-layout-dashboard', to: '/dashboard' },
   ...(user.value?.role === 'admin' ? [{ label: '控制面板', icon: 'i-lucide-layout-dashboard', to: '/admin' }] : []),
   { label: '个人设置', icon: 'i-lucide-user-round-cog', to: '/account' },
 ], [

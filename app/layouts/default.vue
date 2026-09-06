@@ -22,6 +22,7 @@ const mainClass = computed(() => {
 const navigation = computed(() => [
   { label: '创作台', to: '/studio' },
   { label: '作品库', to: '/projects' },
+  ...(user.value ? [{ label: '我的空间', to: '/dashboard' }] : []),
   ...(user.value?.role === 'admin' ? [{ label: '工作流', to: '/workflow' }, { label: '控制面板', to: '/admin' }] : []),
 ])
 
