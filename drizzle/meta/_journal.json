@@ -22,6 +22,20 @@
       "when": 1788584284918,
       "tag": "0002_ancient_quicksilver",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1788666894768,
+      "tag": "0003_strong_impossible_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1788694163627,
+      "tag": "0004_medical_otto_octavius",
+      "breakpoints": true
     }
   ]
 }

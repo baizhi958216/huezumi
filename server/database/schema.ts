@@ -9,6 +9,10 @@ export const userRole = pgEnum('user_role', ['user', 'admin'])
 export const userStatus = pgEnum('user_status', ['pending', 'active', 'disabled'])
 export const dispatchStatus = pgEnum('dispatch_status', ['queued', 'submitting', 'submitted', 'reconciling', 'complete', 'failed'])
 export const settlementStatus = pgEnum('settlement_status', ['reserved', 'settled', 'released', 'review'])
+export const modelAssetSource = pgEnum('model_asset_source', ['upload', 'civitai', 'training', 'platform'])
+export const modelAssetKind = pgEnum('model_asset_kind', ['checkpoint', 'lora', 'vae', 'clip', 'unet', 'controlnet', 'embedding', 'upscale', 'other'])
+export const modelAssetStatus = pgEnum('model_asset_status', ['pending', 'ready', 'failed', 'quarantined'])
+export const modelAssetVisibility = pgEnum('model_asset_visibility', ['private', 'shared', 'platform'])
 
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -129,6 +133,47 @@ export const assets = pgTable('assets', {
   deletedAt: timestamp('deleted_at', { withTimezone: true }),
 }, table => [index('assets_owner_idx').on(table.ownerId, table.createdAt)])
 
+/**
+ * 用户模型资产的元数据。模型原文件和部署状态后续由 model_asset_files / agent 管理，
+ * 这里先把所有权、来源和用户可见信息独立出来，避免把模型当作普通图片素材处理。
+ */
+export const modelAssets = pgTable('model_assets', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  schemaVersion: integer('schema_version').notNull().default(1),
+  ownerId: uuid('owner_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  kind: modelAssetKind('kind').notNull().default('other'),
+  source: modelAssetSource('source').notNull(),
+  sourceRef: text('source_ref'),
+  baseModel: text('base_model'),
+  description: text('description'),
+  triggerWords: jsonb('trigger_words').$type<string[]>().notNull().default([]),
+  visibility: modelAssetVisibility('visibility').notNull().default('private'),
+  status: modelAssetStatus('status').notNull().default('pending'),
+  sizeBytes: bigint('size_bytes', { mode: 'number' }).notNull().default(0),
+  sha256: text('sha256'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  deletedAt: timestamp('deleted_at', { withTimezone: true }),
+}, table => [index('model_assets_owner_idx').on(table.ownerId, table.createdAt), index('model_assets_status_idx').on(table.status, table.updatedAt)])
+
+/**
+ * 一个模型资产可以由多个文件组成，兼容视频模型的 diffusion model、VAE、文本编码器等组合。
+ * 当前只读管理页使用汇总字段，真实上传/部署任务后续再填充对象存储 key。
+ */
+export const modelAssetFiles = pgTable('model_asset_files', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  modelAssetId: uuid('model_asset_id').notNull().references(() => modelAssets.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  contentType: text('content_type').notNull().default('application/octet-stream'),
+  targetDirectory: text('target_directory').notNull(),
+  sizeBytes: bigint('size_bytes', { mode: 'number' }).notNull().default(0),
+  sha256: text('sha256'),
+  objectKey: text('object_key'),
+  localStorageKey: text('local_storage_key'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, table => [index('model_asset_files_asset_idx').on(table.modelAssetId)])
+
 export const assetReservations = pgTable('asset_reservations', {
   id: uuid('id').primaryKey().defaultRandom(),
   ownerId: uuid('owner_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
@@ -142,10 +187,11 @@ export const workflows = pgTable('workflows', {
   schemaVersion: integer('schema_version').notNull().default(1),
   ownerId: uuid('owner_id').notNull().references(() => users.id),
   name: text('name').notNull(),
+  visibility: text('visibility').notNull().default('private'),
   graph: jsonb('graph').$type<ComfyWorkflowJSON>().notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-}, table => [index('workflows_owner_idx').on(table.ownerId, table.updatedAt)])
+}, table => [index('workflows_owner_idx').on(table.ownerId, table.updatedAt), index('workflows_visibility_idx').on(table.visibility, table.updatedAt)])
 
 export const comfyExecutions = pgTable('comfy_executions', {
   id: uuid('id').primaryKey().defaultRandom(),
