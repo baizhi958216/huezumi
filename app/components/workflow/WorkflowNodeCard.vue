@@ -9,7 +9,7 @@ import { buildInputViewUrl } from '~/utils/comfy-graph'
 const props = defineProps<NodeProps<ComfyNodeData>>()
 
 const { edges, updateNodeInternals } = useVueFlow()
-const { executingNodeId, progress, cachedNodeIds, lastErrorNodeId, llmPromptOutputs } = useComfyEvents()
+const { executingNodeId, progress, cachedNodeIds, lastErrorNodeId } = useComfyEvents()
 
 const isExecuting = computed(() => executingNodeId.value === props.id || Boolean(props.data.executing))
 const isCached = computed(() => cachedNodeIds.value.includes(props.id))
@@ -18,39 +18,13 @@ const currentProgress = computed(() => isExecuting.value ? (progress.value ?? pr
 
 const data = computed(() => props.data)
 
-const isImageCollection = computed(() => data.value.type === 'ForkVdoImageCollection')
-const isPromptNode = computed(() => data.value.type === 'ForkVdoPrompt')
-
-const promptOutput = computed(() => llmPromptOutputs.value[props.id] ?? null)
-
 function isSlotConnected(slotName: string): boolean {
   return edges.value.some(e => e.target === props.id && e.targetHandle === slotName)
 }
 
-function regeneratePrompt() {
-  const currentToken = Number(data.value.widgets.refresh_token) || 0
-  data.value.widgets.refresh_token = currentToken + 1
-  nextTick(() => updateNodeInternals([props.id]))
-}
-
-const activeCollectionImages = computed(() => {
-  if (!isImageCollection.value)
-    return []
-  const result: Array<{ slot: number, label: string, filename: string, isTensor: boolean }> = []
-  for (let i = 1; i <= 8; i++) {
-    const isLinked = isSlotConnected(`image_${i}_input`)
-    const file = String(data.value.widgets[`image_${i}`] ?? '').trim()
-    if (isLinked) {
-      result.push({ slot: i, label: `图${i}`, filename: '', isTensor: true })
-    }
-    else if (file) {
-      result.push({ slot: i, label: `图${i}`, filename: file, isTensor: false })
-    }
-  }
-  return result
-})
-
-const hasPreviousCollection = computed(() => isImageCollection.value && isSlotConnected('previous'))
+const uploadedImages = computed(() => data.value.widgetSpecs
+  .filter(widget => widget.uploadType === 'image' && data.value.widgets[widget.name])
+  .map(widget => ({ name: widget.name, filename: String(data.value.widgets[widget.name]) })))
 
 const COMBO_EMPTY_VALUE = '__COMBO_EMPTY__'
 
@@ -202,33 +176,7 @@ onMounted(() => {
         已复用
       </span>
 
-      <!-- 提示词节点状态徽章 -->
-      <template v-if="isPromptNode && promptOutput && !isExecuting && !isFailed">
-        <span
-          class="comfy-node__status-badge"
-          :class="{
-            'comfy-node__status-badge--fresh': promptOutput.status === 'fresh',
-            'comfy-node__status-badge--cached': promptOutput.status === 'cached',
-            'comfy-node__status-badge--error': promptOutput.status === 'error',
-          }"
-        >
-          {{ promptOutput.status === 'fresh' ? '本次生成' : promptOutput.status === 'cached' ? '复用缓存' : '生成失败' }}
-        </span>
-      </template>
-
       <div class="comfy-node__actions nodrag">
-        <!-- 提示词节点：一键重新生成提示词 -->
-        <UTooltip v-if="isPromptNode" text="重新生成提示词（使本次 ComfyUI 缓存失效）">
-          <button
-            type="button"
-            class="comfy-node__action nodrag"
-            aria-label="重新生成提示词"
-            @click.stop="regeneratePrompt"
-          >
-            <UIcon name="i-lucide-refresh-cw" class="size-3.5 text-signal-500" aria-hidden="true" />
-          </button>
-        </UTooltip>
-
         <UTooltip :text="isCollapsed ? '展开节点参数（也可双击标题）' : '折叠节点参数（也可双击标题）'">
           <button
             type="button"
@@ -307,17 +255,10 @@ onMounted(() => {
       </div>
     </div>
 
-    <!-- 图片集合节点：有序缩略图画廊 -->
-    <div v-if="!isCollapsed && isImageCollection && (activeCollectionImages.length || hasPreviousCollection)" class="comfy-node__gallery nodrag">
-      <div v-if="hasPreviousCollection" class="comfy-node__gallery-badge">
-        <UIcon name="i-lucide-arrow-left-right" class="size-3 mr-1" /> 已串联前序图片集合
-      </div>
-      <div v-for="img in activeCollectionImages" :key="img.slot" class="comfy-node__gallery-item">
-        <span class="comfy-node__gallery-label">{{ img.label }}</span>
-        <div v-if="img.isTensor" class="comfy-node__gallery-tensor" title="连线图片张量">
-          <UIcon name="i-lucide-image" class="size-4" />
-        </div>
-        <img v-else :src="buildInputViewUrl(img.filename)" :alt="img.filename" class="comfy-node__gallery-thumb" loading="lazy">
+    <div v-if="!isCollapsed && uploadedImages.length" class="comfy-node__gallery nodrag">
+      <div v-for="img in uploadedImages" :key="img.name" class="comfy-node__gallery-item">
+        <span class="comfy-node__gallery-label">{{ img.name }}</span>
+        <img :src="buildInputViewUrl(img.filename)" :alt="img.name" class="comfy-node__gallery-thumb" loading="lazy">
       </div>
     </div>
 
@@ -386,13 +327,8 @@ onMounted(() => {
           @click.stop
         />
 
-        <div v-if="isSlotConnected(widget.name)" class="comfy-slot__wired nodrag">
-          <UIcon name="i-lucide-link" class="size-3 mr-1" />
-          <span>已接入连线输入（优先由连线提供数据）</span>
-        </div>
-
         <UTextarea
-          v-if="widget.kind === 'STRING' && (widget.options.multiline || widget.options.dynamic_prompts)"
+          v-else-if="widget.kind === 'STRING' && !widget.options.secret && (widget.options.multiline || widget.options.dynamic_prompts || widget.options.dynamicPrompts)"
           :id="`${props.id}-${widget.name}`"
           :model-value="String(data.widgets[widget.name] ?? '')"
           :rows="2"
@@ -421,38 +357,28 @@ onMounted(() => {
           v-else
           :id="`${props.id}-${widget.name}`"
           :model-value="String(data.widgets[widget.name] ?? '')"
+          :type="widget.options.secret ? 'password' : 'text'"
           size="xs"
           class="comfy-widget__control nodrag"
           @update:model-value="onValueChange(widget.name, $event)"
           @click.stop
         />
 
+        <div v-if="isSlotConnected(widget.name)" class="comfy-slot__wired nodrag">
+          <UIcon name="i-lucide-link" class="size-3 mr-1" />
+          <span>已接入连线输入（优先由连线提供数据）</span>
+        </div>
+
+        <p v-if="widget.options.tooltip" class="comfy-widget__hint">
+          {{ widget.options.tooltip }}
+        </p>
+
         <p v-if="hasMinMax(widget)" class="comfy-widget__hint">
           {{ widget.options.min }} – {{ widget.options.max }}
         </p>
       </div>
 
-      <!-- 大模型提示词输出预览 -->
-      <div v-if="isPromptNode && promptOutput && (promptOutput.positivePrompt || promptOutput.negativePrompt)" class="comfy-node__prompt-preview nodrag">
-        <div class="comfy-node__prompt-section">
-          <div class="comfy-node__prompt-label">
-            <span>正向提示词</span>
-            <span v-if="promptOutput.status === 'fresh'" class="text-emerald-500 font-normal">本次新生成</span>
-            <span v-else-if="promptOutput.status === 'cached'" class="text-sky-500 font-normal">复用上次结果</span>
-          </div>
-          <p class="comfy-node__prompt-text">
-            {{ promptOutput.positivePrompt }}
-          </p>
-        </div>
-        <div v-if="promptOutput.negativePrompt" class="comfy-node__prompt-section">
-          <div class="comfy-node__prompt-label">
-            <span>反向提示词</span>
-          </div>
-          <p class="comfy-node__prompt-text text-neutral-400">
-            {{ promptOutput.negativePrompt }}
-          </p>
-        </div>
-      </div>
+      <WorkflowTextOutput :node-id="props.id" />
 
       <!-- 展开/收起参数按钮 -->
       <button

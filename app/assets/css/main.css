@@ -909,6 +909,12 @@
   font-weight: 500;
 }
 
+.comfy-toolbar__status-feedback {
+  color: var(--color-signal-600);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
 .comfy-toolbar__status-device {
   color: var(--ui-text-dimmed);
   max-width: 120px;

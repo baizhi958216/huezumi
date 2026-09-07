@@ -5,6 +5,10 @@ import type { ComfyFlowNode } from '~/utils/comfy-graph'
 const props = defineProps<{
   status: ComfyUIStatus | null
   busy: boolean
+  stopping?: boolean
+  onStop: () => void | Promise<void>
+  serviceAction?: 'starting' | 'stopping' | 'refreshing' | 'installing' | null
+  serviceFeedback?: string | null
   running: boolean
   queueRemaining: number
   connected: boolean
@@ -17,7 +21,6 @@ const props = defineProps<{
 const emit = defineEmits<{
   refresh: []
   start: []
-  stop: []
   install: []
   run: []
   interrupt: []
@@ -33,6 +36,14 @@ const name = defineModel<string>('name', { required: true })
 const visibility = defineModel<ComfyWorkflowVisibility>('visibility', { required: true })
 
 const stateMeta = computed(() => {
+  if (props.serviceAction === 'starting')
+    return { label: '启动中', color: 'warning' as const, icon: 'i-lucide-loader-circle' }
+  if (props.serviceAction === 'stopping' || props.stopping)
+    return { label: '停止中', color: 'warning' as const, icon: 'i-lucide-loader-circle' }
+  if (props.serviceAction === 'refreshing')
+    return { label: '刷新中', color: 'warning' as const, icon: 'i-lucide-loader-circle' }
+  if (props.serviceAction === 'installing')
+    return { label: '安装中', color: 'warning' as const, icon: 'i-lucide-loader-circle' }
   const state = props.status?.state
   if (state === 'running')
     return { label: '运行中', color: 'success' as const, icon: 'i-lucide-circle-check' }
@@ -59,6 +70,7 @@ const canStop = computed(() => props.status?.mode === 'local' && props.status?.s
 const canStart = computed(() =>
   props.status?.mode === 'local'
   && props.status?.installed
+  && !props.serviceAction
   && !['running', 'starting'].includes(props.status.state),
 )
 
@@ -117,7 +129,7 @@ const { isDark, toggleTheme } = useThemeTransition()
         class="comfy-toolbar__name"
       />
 
-      <div class="comfy-toolbar__status-pill">
+      <div class="comfy-toolbar__status-pill" aria-live="polite">
         <span
           class="comfy-toolbar__status-dot"
           :class="{
@@ -128,6 +140,7 @@ const { isDark, toggleTheme } = useThemeTransition()
           }"
         />
         <span class="comfy-toolbar__status-label">{{ stateMeta.label }}</span>
+        <span v-if="serviceFeedback" class="comfy-toolbar__status-feedback">{{ serviceFeedback }}</span>
         <span v-if="deviceLabel" class="comfy-toolbar__status-device" :title="status?.dir || status?.baseUrl">
           {{ deviceLabel }}
         </span>
@@ -140,41 +153,41 @@ const { isDark, toggleTheme } = useThemeTransition()
             v-if="status?.mode === 'local' && !status.installed"
             type="button"
             class="comfy-toolbar__status-btn comfy-toolbar__status-btn--primary"
-            :disabled="installing"
-            title="安装 ComfyUI"
+            :disabled="installing || busy"
+            :title="serviceAction === 'installing' ? '正在安装 ComfyUI' : '安装 ComfyUI'"
             @click="emit('install')"
           >
-            <UIcon name="i-lucide-download" class="size-3" />
-            <span>安装</span>
+            <UIcon :name="serviceAction === 'installing' ? 'i-lucide-loader-circle' : 'i-lucide-download'" class="size-3" :class="{ 'animate-spin': serviceAction === 'installing' }" />
+            <span>{{ serviceAction === 'installing' ? '安装中' : '安装' }}</span>
           </button>
           <button
             v-if="canStart"
             type="button"
             class="comfy-toolbar__status-btn"
-            title="启动 ComfyUI"
+            :title="serviceAction === 'starting' ? '正在启动 ComfyUI' : '启动 ComfyUI'"
             :disabled="busy"
             @click="emit('start')"
           >
-            <UIcon name="i-lucide-play" class="size-3" />
+            <UIcon :name="serviceAction === 'starting' ? 'i-lucide-loader-circle' : 'i-lucide-play'" class="size-3" :class="{ 'animate-spin': serviceAction === 'starting' }" />
           </button>
           <button
             v-if="canStop"
             type="button"
             class="comfy-toolbar__status-btn"
-            title="停止 ComfyUI"
-            :disabled="busy"
-            @click="emit('stop')"
+            :title="serviceAction === 'stopping' ? '正在停止 ComfyUI' : '停止 ComfyUI'"
+            :disabled="busy || stopping"
+            @click="onStop()"
           >
-            <UIcon name="i-lucide-square" class="size-3" />
+            <UIcon :name="serviceAction === 'stopping' || stopping ? 'i-lucide-loader-circle' : 'i-lucide-square'" class="size-3" :class="{ 'animate-spin': serviceAction === 'stopping' || stopping }" />
           </button>
           <button
             type="button"
             class="comfy-toolbar__status-btn"
-            title="刷新服务状态"
-            :disabled="busy"
+            :title="serviceAction === 'refreshing' ? '正在刷新服务状态' : '刷新服务状态'"
+            :disabled="busy || stopping"
             @click="emit('refresh')"
           >
-            <UIcon name="i-lucide-refresh-cw" class="size-3" :class="{ 'animate-spin': busy }" />
+            <UIcon name="i-lucide-refresh-cw" class="size-3" :class="{ 'animate-spin': busy || serviceAction === 'refreshing' }" />
           </button>
         </div>
       </div>
@@ -389,3 +402,33 @@ const { isDark, toggleTheme } = useThemeTransition()
     </Teleport>
   </header>
 </template>
+
+<style scoped>
+@media (max-width: 1100px) {
+  .comfy-toolbar {
+    height: auto;
+    flex-wrap: wrap;
+    padding-block: 0.5rem;
+  }
+
+  .comfy-toolbar__center,
+  .comfy-toolbar__right {
+    flex: 1 1 100%;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    min-width: 0;
+  }
+
+  .comfy-toolbar__actions {
+    flex-wrap: wrap;
+  }
+
+  .comfy-toolbar__status-pill {
+    flex-wrap: wrap;
+  }
+
+  .comfy-toolbar__running-pill {
+    max-width: 100%;
+  }
+}
+</style>

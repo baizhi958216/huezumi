@@ -148,18 +148,7 @@ export function useComfyServer() {
   }
 }
 
-export interface ComfyLlmPromptOutput {
-  nodeId: string
-  promptId: string
-  positivePrompt: string
-  negativePrompt: string
-  referenceCount?: string
-  status: 'fresh' | 'cached' | 'error'
-  timestamp: number
-}
-
 const executedOutputs = ref<Record<string, Record<string, unknown>>>({})
-const llmPromptOutputs = ref<Record<string, ComfyLlmPromptOutput>>({})
 
 // 模块级事件状态：保证工作流页面、工具栏、检查器与各节点卡片状态完全同步
 const connected = ref(false)
@@ -198,18 +187,6 @@ export function useComfyEvents() {
       case 'execution_cached': {
         const cached = (data.nodes as string[] | undefined) ?? []
         cachedNodeIds.value = cached
-        for (const nodeId of cached) {
-          if (llmPromptOutputs.value[nodeId]) {
-            llmPromptOutputs.value = {
-              ...llmPromptOutputs.value,
-              [nodeId]: {
-                ...llmPromptOutputs.value[nodeId]!,
-                status: 'cached',
-                promptId: promptId || llmPromptOutputs.value[nodeId]!.promptId,
-              },
-            }
-          }
-        }
         break
       }
       case 'executing': {
@@ -233,25 +210,6 @@ export function useComfyEvents() {
             ...executedOutputs.value,
             [node]: output,
           }
-          const rawPos = output.positive_prompt
-          const rawNeg = output.negative_prompt
-          if (rawPos !== undefined || rawNeg !== undefined) {
-            const pos = Array.isArray(rawPos) ? String(rawPos[0] ?? '') : String(rawPos ?? '')
-            const neg = Array.isArray(rawNeg) ? String(rawNeg[0] ?? '') : String(rawNeg ?? '')
-            const count = Array.isArray(output.reference_count) ? String(output.reference_count[0] ?? '') : String(output.reference_count ?? '')
-            llmPromptOutputs.value = {
-              ...llmPromptOutputs.value,
-              [node]: {
-                nodeId: node,
-                promptId: promptId || '',
-                positivePrompt: pos,
-                negativePrompt: neg,
-                referenceCount: count,
-                status: 'fresh',
-                timestamp: Date.now(),
-              },
-            }
-          }
         }
         break
       }
@@ -259,15 +217,6 @@ export function useComfyEvents() {
         lastError.value = String(data.exception_message ?? '工作流执行失败')
         const failedNodeId = typeof data.node_id === 'string' ? data.node_id : null
         lastErrorNodeId.value = failedNodeId
-        if (failedNodeId && llmPromptOutputs.value[failedNodeId]) {
-          llmPromptOutputs.value = {
-            ...llmPromptOutputs.value,
-            [failedNodeId]: {
-              ...llmPromptOutputs.value[failedNodeId]!,
-              status: 'error',
-            },
-          }
-        }
         runningPromptId.value = null
         executingNodeId.value = null
         progress.value = null
@@ -342,7 +291,6 @@ export function useComfyEvents() {
     lastErrorNodeId,
     completedPromptIds,
     executedOutputs,
-    llmPromptOutputs,
     connect,
     disconnect,
     watchPrompt,

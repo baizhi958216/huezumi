@@ -3,9 +3,10 @@ import type { ComfyObjectInfo, ComfyUploadType, ComfyWorkflowJSON, ComfyWorkflow
 import type { Connection } from '@vue-flow/core'
 import type { ComfyFlowEdge, ComfyFlowNode, ComfyNodeData } from '~/utils/comfy-graph'
 import { canConnectTypes, serializeGraphToApiPrompt } from '#shared/types/comfyui'
-import { useVueFlow, VueFlow } from '@vue-flow/core'
+import { useNodesInitialized, useVueFlow, VueFlow } from '@vue-flow/core'
 import { useIntervalFn } from '@vueuse/core'
 import { useComfyEvents, useComfyOutputs, useComfyServer } from '~/composables/useComfyServer'
+import { nextSeedValues } from '~/utils/comfy-controls'
 import {
   buildTypeIndex,
   createNodeData,
@@ -69,6 +70,15 @@ const {
   viewport,
 } = useVueFlow()
 
+const nodesInitialized = useNodesInitialized()
+const pendingFit = ref(false)
+watch([pendingFit, nodesInitialized], ([pending, ready]) => {
+  if (pending && ready) {
+    pendingFit.value = false
+    fitView({ padding: 0.2, duration: 300, maxZoom: 1 })
+  }
+}, { flush: 'post' })
+
 const flowNodes = computed<ComfyFlowNode[]>(() => nodes.value as unknown as ComfyFlowNode[])
 const flowEdges = computed(() => edges.value as unknown as ComfyFlowEdge[])
 
@@ -79,6 +89,10 @@ const workflowName = ref('未命名工作流')
 const workflowVisibility = ref<ComfyWorkflowVisibility>('private')
 const currentWorkflowId = ref<string | undefined>()
 const saving = ref(false)
+const serviceAction = ref<'starting' | 'stopping' | 'refreshing' | 'installing' | null>(null)
+const stopping = computed(() => serviceAction.value === 'stopping')
+const serviceFeedback = ref<string | null>(null)
+let serviceFeedbackTimer: ReturnType<typeof setTimeout> | undefined
 const issues = ref<string[]>([])
 const runError = ref<string | null>(null)
 const clientId = ref<string>('')
@@ -238,6 +252,10 @@ async function runWorkflow() {
     const result = await submitPrompt({ prompt, workflow: graph, clientId: clientId.value })
     runningPromptId.value = result.promptId
     events.watchPrompt(result.promptId)
+    for (const node of flowNodes.value) {
+      if (node.data?.mode === 0)
+        updateNodeData<ComfyNodeData>(node.id, { widgets: nextSeedValues(node.data.widgetSpecs, node.data.widgets) })
+    }
   }
   catch (error) {
     runError.value = messageOf(error)
@@ -251,12 +269,14 @@ async function loadSample() {
     return
   }
   setNodes(sample.nodes)
+  events.executedOutputs.value = {}
   setEdges(sample.edges)
   await nextTick()
-  fitView({ padding: 0.2, duration: 300, maxZoom: 1 })
+  pendingFit.value = true
 }
 
 function resetGraph(name = '未命名工作流') {
+  events.executedOutputs.value = {}
   setNodes([])
   setEdges([])
   workflowName.value = name
@@ -303,11 +323,12 @@ async function openSaved(id: string) {
     }
     const { nodes: nextNodes, edges: nextEdges } = importWorkflow(record.graph, typeIndex.value)
     setNodes(nextNodes)
+    events.executedOutputs.value = {}
     setEdges(nextEdges)
     issues.value = []
     outputsState.outputs.value = []
     await nextTick()
-    fitView({ padding: 0.2, duration: 300, maxZoom: 1 })
+    pendingFit.value = true
   }
   catch (error) {
     runError.value = messageOf(error)
@@ -349,12 +370,13 @@ function onImportChange(event: Event) {
       const graph = JSON.parse(String(reader.result)) as ComfyWorkflowJSON
       const result = importWorkflow(graph, typeIndex.value)
       setNodes(result.nodes)
+      events.executedOutputs.value = {}
       setEdges(result.edges)
       issues.value = result.missing.map(type => `工作流使用了当前环境没有的节点类型：${type}`)
       workflowName.value = graph.name || '导入的工作流'
       workflowVisibility.value = 'private'
       currentWorkflowId.value = undefined
-      nextTick(() => fitView({ padding: 0.2, duration: 300, maxZoom: 1 }))
+      pendingFit.value = true
     }
     catch (error) {
       runError.value = error instanceof Error ? `解析 JSON 失败：${error.message}` : '解析 JSON 失败'
@@ -377,7 +399,12 @@ function updateNodeWidget(payload: { nodeId: string, widgetName: string, value: 
   })
 }
 
-async function onUpload(payload: { file: File, kind: ComfyUploadType, nodeId: string, widgetName: string }) {
+let uploadQueue = Promise.resolve()
+function onUpload(payload: { file: File, kind: ComfyUploadType, nodeId: string, widgetName: string }) {
+  uploadQueue = uploadQueue.then(() => uploadOne(payload))
+}
+
+async function uploadOne(payload: { file: File, kind: ComfyUploadType, nodeId: string, widgetName: string }) {
   try {
     const uploaded = await uploadAsset(payload.file, payload.kind)
     const value = [uploaded.subfolder, uploaded.name].filter(Boolean).join('/')
@@ -418,6 +445,7 @@ async function pollCompletion() {
     const entry = await fetchHistoryEntry(runningPromptId.value)
     if (entry?.status?.completed || entry?.status?.status_str === 'error') {
       outputsState.setFromHistory(entry)
+      events.executedOutputs.value = { ...events.executedOutputs.value, ...entry.outputs }
       if (entry.status.status_str === 'error') {
         const messages = entry.status.messages as unknown as Array<[string, { exception_message?: string, node_id?: string, node_type?: string }]> | undefined
         const errItem = messages?.find(m => Array.isArray(m) && m[0] === 'execution_error')
@@ -435,41 +463,87 @@ async function pollCompletion() {
 }
 
 async function doStart() {
+  if (serviceAction.value)
+    return
+  serviceAction.value = 'starting'
+  serviceFeedback.value = null
+  runError.value = null
   try {
     await startService()
+    showServiceFeedback('ComfyUI 已启动')
   }
   catch (error) {
     runError.value = messageOf(error)
+  }
+  finally {
+    serviceAction.value = null
   }
 }
 
 async function doStop() {
+  if (serviceAction.value)
+    return
+  runError.value = null
+  serviceFeedback.value = null
+  serviceAction.value = 'stopping'
   try {
     await stopService()
+    showServiceFeedback('ComfyUI 已停止')
   }
   catch (error) {
     runError.value = messageOf(error)
+  }
+  finally {
+    serviceAction.value = null
   }
 }
 
 async function doInstall() {
+  if (serviceAction.value)
+    return
+  serviceAction.value = 'installing'
+  serviceFeedback.value = null
+  runError.value = null
   try {
     await installService(true)
+    showServiceFeedback('ComfyUI 已安装')
   }
   catch (error) {
     runError.value = messageOf(error)
+  }
+  finally {
+    serviceAction.value = null
   }
 }
 
 async function doRefresh() {
+  if (serviceAction.value)
+    return
+  serviceAction.value = 'refreshing'
+  serviceFeedback.value = null
+  runError.value = null
   try {
     await refreshStatus()
     if (status.value?.state === 'running')
       await loadObjectInfo(true)
+    showServiceFeedback('服务状态已刷新')
   }
   catch (error) {
     runError.value = messageOf(error)
   }
+  finally {
+    serviceAction.value = null
+  }
+}
+
+function showServiceFeedback(message: string) {
+  if (serviceFeedbackTimer)
+    clearTimeout(serviceFeedbackTimer)
+  serviceFeedback.value = message
+  serviceFeedbackTimer = setTimeout(() => {
+    serviceFeedback.value = null
+    serviceFeedbackTimer = undefined
+  }, 2200)
 }
 
 async function loadWorkflowLibrary() {
@@ -561,6 +635,8 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
+  if (serviceFeedbackTimer)
+    clearTimeout(serviceFeedbackTimer)
   statusPolling.pause()
   completionPolling.pause()
   events.disconnect()
@@ -573,7 +649,11 @@ onBeforeUnmount(() => {
       v-model:name="workflowName"
       v-model:visibility="workflowVisibility"
       :status="status"
-      :busy="status?.install.phase === 'running' || status?.state === 'starting'"
+      :busy="status?.install.phase === 'running' || status?.state === 'starting' || Boolean(serviceAction)"
+      :stopping="stopping"
+      :on-stop="doStop"
+      :service-action="serviceAction"
+      :service-feedback="serviceFeedback"
       :running="isRunning"
       :queue-remaining="events.queueRemaining.value"
       :connected="events.connected.value"
@@ -583,7 +663,6 @@ onBeforeUnmount(() => {
       :progress="events.progress.value"
       @refresh="doRefresh"
       @start="doStart"
-      @stop="doStop"
       @install="doInstall"
       @run="runWorkflow"
       @interrupt="doInterrupt"

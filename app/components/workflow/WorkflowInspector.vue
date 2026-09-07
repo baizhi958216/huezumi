@@ -2,7 +2,7 @@
 import type { ComfyOutputFile, ComfyUploadType, ComfyWidgetSpec } from '#shared/types/comfyui'
 import type { ComfyFlowEdge, ComfyFlowNode, ComfyNodeData } from '~/utils/comfy-graph'
 import { CONTROL_AFTER_GENERATE_OPTIONS } from '#shared/types/comfyui'
-import { useComfyEvents } from '~/composables/useComfyServer'
+import { getUploadTargets } from '~/utils/comfy-controls'
 import { buildInputViewUrl, buildViewUrl, isVideoFile } from '~/utils/comfy-graph'
 
 const props = defineProps<{
@@ -32,36 +32,21 @@ const emit = defineEmits<{
 const fileInput = ref<HTMLInputElement>()
 const controlAfterGenerateItems: string[] = [...CONTROL_AFTER_GENERATE_OPTIONS]
 
-const { llmPromptOutputs } = useComfyEvents()
-
 const selectedData = computed<ComfyNodeData | null>(() => props.selectedNode?.data ?? null)
-const isPromptNode = computed(() => selectedData.value?.type === 'ForkVdoPrompt')
-const isImageCollection = computed(() => selectedData.value?.type === 'ForkVdoImageCollection')
-
-const promptOutput = computed(() => props.selectedNode ? (llmPromptOutputs.value[props.selectedNode.id] ?? null) : null)
-
-function regeneratePrompt() {
-  if (!props.selectedNode)
-    return
-  const current = Number(selectedData.value?.widgets.refresh_token) || 0
-  updateWidget('refresh_token', current + 1)
-}
-
-const copiedField = ref<'pos' | 'neg' | null>(null)
-async function copyPrompt(text: string, field: 'pos' | 'neg') {
-  if (!text)
-    return
-  await navigator.clipboard.writeText(text)
-  copiedField.value = field
-  setTimeout(() => {
-    copiedField.value = null
-  }, 2000)
-}
 
 const selectedWidgets = computed(() => selectedData.value?.widgetSpecs ?? [])
 const selectedInputSlots = computed(() => selectedData.value?.inputSlots ?? [])
 const selectedUploadWidgets = computed(() => selectedWidgets.value.filter(widget => widget.uploadType))
-const selectedUploadWidget = computed(() => selectedUploadWidgets.value[0])
+const uploadTarget = ref('')
+const uploadError = ref('')
+watch(() => props.selectedNode?.id, () => {
+  uploadTarget.value = ''
+  uploadError.value = ''
+})
+const selectedUploadWidget = computed(() => selectedUploadWidgets.value.find(widget => widget.name === uploadTarget.value) ?? selectedUploadWidgets.value[0])
+const uploadTargets = computed(() => selectedUploadWidgets.value.map(widget => ({ label: widget.name, value: widget.name })))
+const canUploadMultiple = computed(() => selectedUploadWidgets.value.filter(widget => widget.uploadType === 'image').length > 1)
+const uploadedImages = computed(() => selectedUploadWidgets.value.filter(widget => widget.uploadType === 'image'))
 
 const panelTitle = computed(() => {
   if (props.selectedNode)
@@ -188,15 +173,22 @@ function onWidgetNumberChange(widgetName: string, value: unknown) {
 
 function onFileChange(event: Event) {
   const input = event.target as HTMLInputElement
-  const file = input.files?.[0]
+  const files = Array.from(input.files ?? [])
   const widget = selectedUploadWidget.value
-  if (file && widget && props.selectedNode) {
-    emit('upload', {
-      file,
-      kind: widget.uploadType as ComfyUploadType,
-      nodeId: props.selectedNode.id,
-      widgetName: widget.name,
-    })
+  uploadError.value = ''
+  if (widget && props.selectedNode) {
+    try {
+      const nodeId = props.selectedNode.id
+      const targets = getUploadTargets(selectedUploadWidgets.value, selectedData.value?.widgets ?? {}, widget.name, files.length)
+      files.forEach((file, index) => {
+        const target = targets[index]
+        if (target?.uploadType)
+          emit('upload', { file, kind: target.uploadType, nodeId, widgetName: target.name })
+      })
+    }
+    catch (error) {
+      uploadError.value = error instanceof Error ? error.message : '无法分配上传槽位'
+    }
   }
   input.value = ''
 }
@@ -224,115 +216,14 @@ function onFileChange(event: Event) {
           <span class="comfy-inspector__hint">{{ selectedData?.type }}</span>
         </p>
 
-        <!-- 大模型提示词专属状态与生成面板 -->
-        <div v-if="isPromptNode" class="comfy-inspector__prompt-box">
-          <div class="comfy-inspector__prompt-header">
-            <span class="comfy-inspector__prompt-title">大模型提示词状态</span>
-            <span
-              v-if="promptOutput"
-              class="comfy-node__status-badge"
-              :class="{
-                'comfy-node__status-badge--fresh': promptOutput.status === 'fresh',
-                'comfy-node__status-badge--cached': promptOutput.status === 'cached',
-                'comfy-node__status-badge--error': promptOutput.status === 'error',
-              }"
-            >
-              {{ promptOutput.status === 'fresh' ? '本次新生成' : promptOutput.status === 'cached' ? '复用成功提示词' : '生成失败' }}
-            </span>
-            <span v-else class="text-xs text-neutral-400">待执行</span>
-          </div>
-
-          <div class="flex items-center justify-between gap-2 pt-1 border-t border-neutral-700/50">
-            <span class="text-xs text-neutral-400">刷新序号：{{ selectedData?.widgets.refresh_token ?? 0 }}</span>
-            <UButton
-              size="xs"
-              color="primary"
-              variant="soft"
-              icon="i-lucide-refresh-cw"
-              @click="regeneratePrompt"
-            >
-              重新生成提示词
-            </UButton>
-          </div>
-          <p class="text-[11px] text-neutral-400 mt-0.5 leading-tight">
-            下游生图失败重试时，ComfyUI 会自动复用已生成的提示词；若需让大模型重新理解需求，请点击上方按钮。
-          </p>
-
-          <div v-if="promptOutput && (promptOutput.positivePrompt || promptOutput.negativePrompt)" class="space-y-2 mt-2">
-            <div v-if="promptOutput.positivePrompt">
-              <div class="flex items-center justify-between mb-1">
-                <span class="text-xs font-semibold text-emerald-400">正向提示词</span>
-                <UButton
-                  size="xs"
-                  color="neutral"
-                  variant="ghost"
-                  :icon="copiedField === 'pos' ? 'i-lucide-check' : 'i-lucide-copy'"
-                  @click="copyPrompt(promptOutput.positivePrompt, 'pos')"
-                >
-                  {{ copiedField === 'pos' ? '已复制' : '复制' }}
-                </UButton>
-              </div>
-              <div class="comfy-inspector__prompt-content">
-                {{ promptOutput.positivePrompt }}
-              </div>
-            </div>
-
-            <div v-if="promptOutput.negativePrompt">
-              <div class="flex items-center justify-between mb-1">
-                <span class="text-xs font-semibold text-neutral-400">反向提示词</span>
-                <UButton
-                  size="xs"
-                  color="neutral"
-                  variant="ghost"
-                  :icon="copiedField === 'neg' ? 'i-lucide-check' : 'i-lucide-copy'"
-                  @click="copyPrompt(promptOutput.negativePrompt, 'neg')"
-                >
-                  {{ copiedField === 'neg' ? '已复制' : '复制' }}
-                </UButton>
-              </div>
-              <div class="comfy-inspector__prompt-content text-neutral-400">
-                {{ promptOutput.negativePrompt }}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 图片集合：有序参考素材插槽一览 -->
-        <div v-if="isImageCollection" class="comfy-inspector__prompt-box">
-          <div class="comfy-inspector__prompt-header">
-            <span class="comfy-inspector__prompt-title">有序参考图片（图1 ~ 图8）</span>
-            <span class="text-xs text-neutral-400">大模型严格按此顺序理解</span>
-          </div>
-
-          <div class="comfy-inspector__slots-grid mt-1">
-            <div
-              v-for="i in 8"
-              :key="i"
-              class="comfy-inspector__slot-row"
-            >
-              <span class="comfy-inspector__slot-num">图{{ i }}</span>
-              <img
-                v-if="selectedData?.widgets[`image_${i}`]"
-                :src="buildInputViewUrl(String(selectedData?.widgets[`image_${i}`]))"
-                :alt="`图${i}`"
-                class="comfy-inspector__slot-thumb"
-              >
-              <div v-else class="w-7 h-7 rounded bg-neutral-800 flex items-center justify-center text-neutral-500 text-xs flex-shrink-0">
-                空
-              </div>
-              <span class="text-xs text-neutral-300 truncate flex-1">
-                {{ selectedData?.widgets[`image_${i}`] || '未选择图片' }}
-              </span>
-              <UButton
-                v-if="selectedData?.widgets[`image_${i}`]"
-                size="xs"
-                color="neutral"
-                variant="ghost"
-                icon="i-lucide-x"
-                title="清空此插槽"
-                @click="updateWidget(`image_${i}`, '')"
-              />
-            </div>
+        <WorkflowTextOutput :node-id="selectedNode.id" />
+        <div v-if="uploadedImages.length" class="comfy-inspector__slots-grid">
+          <div v-for="widget in uploadedImages" :key="widget.name" class="comfy-inspector__slot-row">
+            <span class="comfy-inspector__slot-num">{{ widget.name }}</span>
+            <img v-if="selectedData?.widgets[widget.name]" :src="buildInputViewUrl(String(selectedData.widgets[widget.name]))" :alt="widget.name" class="comfy-inspector__slot-thumb">
+            <span v-else class="text-xs text-muted">空</span>
+            <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-upload" :aria-label="`上传 ${widget.name}`" @click="uploadTarget = widget.name; onPickFile()" />
+            <UButton v-if="selectedData?.widgets[widget.name]" size="xs" color="neutral" variant="ghost" icon="i-lucide-x" :aria-label="`清空 ${widget.name}`" @click="updateWidget(widget.name, '')" />
           </div>
         </div>
 
@@ -377,7 +268,7 @@ function onFileChange(event: Event) {
             />
 
             <UTextarea
-              v-else-if="widget.kind === 'STRING' && (widget.options.multiline || widget.options.dynamic_prompts)"
+              v-else-if="widget.kind === 'STRING' && (widget.options.multiline || widget.options.dynamic_prompts || widget.options.dynamicPrompts)"
               :id="`inspector-${selectedNode.id}-${widget.name}`"
               :model-value="String(selectedData?.widgets[widget.name] ?? '')"
               :rows="3"
@@ -406,6 +297,9 @@ function onFileChange(event: Event) {
               @update:model-value="updateWidget(widget.name, $event)"
             />
 
+            <p v-if="widget.options.tooltip" class="comfy-inspector__hint">
+              {{ widget.options.tooltip }}
+            </p>
             <p v-if="hasMinMax(widget)" class="comfy-inspector__hint">
               {{ widget.options.min }} – {{ widget.options.max }}
             </p>
@@ -458,15 +352,21 @@ function onFileChange(event: Event) {
           <span v-if="selectedUploadWidget" class="comfy-inspector__hint">{{ selectedUploadWidget.name }}</span>
         </div>
         <template v-if="selectedUploadWidget">
+          <USelect v-if="selectedUploadWidgets.length > 1" :model-value="selectedUploadWidget.name" :items="uploadTargets" aria-label="上传目标槽位" size="sm" @update:model-value="uploadTarget = $event" />
           <UButton size="sm" color="neutral" variant="soft" icon="i-lucide-upload" @click="onPickFile">
             {{ uploadLabel }}
           </UButton>
-          <input ref="fileInput" type="file" :accept="uploadAccept" class="hidden" @change="onFileChange">
+          <input ref="fileInput" type="file" :accept="uploadAccept" :multiple="canUploadMultiple" class="hidden" @change="onFileChange">
         </template>
         <p class="comfy-inspector__hint">
           {{ uploadHint }}
+          <span v-if="canUploadMultiple">多选图片会从目标槽开始依次填入空槽，不覆盖已有图片；单选会替换目标槽。</span>
         </p>
       </section>
+
+      <p v-if="uploadError" role="alert" class="text-sm text-error">
+        {{ uploadError }}
+      </p>
 
       <div v-if="error" class="comfy-inspector__error-box">
         <div class="comfy-inspector__error-title">
