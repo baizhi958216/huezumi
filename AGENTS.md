@@ -23,7 +23,7 @@ pnpm check        # 文档约束 + lint + typecheck
 pnpm check:full   # 上述检查 + production build
 ```
 
-需要真实调用供应商时，复制 `.env.example` 为 `.env` 并仅在本机填写密钥。不得提交 `.env`、API Key、用户素材或生成结果。
+需要真实调用供应商时，复制 `.env.example` 为 `.env`；工作流专属的大模型连接也可以由用户填写到私有工作流配置中。不得提交 `.env`、公开包含 API Key 的工作流、用户素材或生成结果。
 
 ## 代码地图
 
@@ -53,7 +53,7 @@ pnpm check:full   # 上述检查 + production build
 - 平台层使用 `GenerationRequest`/`GenerationRecord`，不得把供应商原始请求类型泄漏到 UI 或 API 契约。
 - 供应商差异集中在 `server/services/providers/`；能力差异声明在 `catalog.ts`，UI 应由 `/api/providers` 驱动。
 - 所有外部输入在 API 边界校验。客户端校验只改善体验，不能替代服务端校验。
-- API Key 只从私有 runtime config 读取，禁止进入 `runtimeConfig.public`、客户端日志或错误响应。
+- API Key 只能来自私有 runtime config 或用户明确配置的私有工作流连接，禁止进入 `runtimeConfig.public`、公开工作流、客户端日志或错误响应。
 - 对已经持久化的 `GenerationRecord` 做不兼容修改时，必须给出迁移或兼容读取策略。
 - `PENDING`/`RUNNING` 任务查询可以触发供应商刷新；终态任务不得再次请求供应商。
 - 上传文件大小、类型和可访问性限制需要前后端保持一致。
@@ -87,7 +87,7 @@ pnpm check:full   # 上述检查 + production build
 - 实现满足对应 spec 的验收条件，且未扩大任务范围。
 - `pnpm check` 通过；高风险改动还需 `pnpm check:full`。
 - 新行为、环境变量、API 或架构决策已同步到 `spec/`、`docs/`、`.env.example` 或 README 中恰当的位置。
-- 不包含密钥、临时文件、生成产物和无关用户改动。
+- 不包含意外暴露的密钥、临时文件、生成产物和无关用户改动。
 - 最终说明列出结果、关键文件、验证命令及仍存在的限制。
 
 ## 规格与决策

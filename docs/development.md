@@ -146,25 +146,22 @@ docker compose -f docker-compose.production.yml up -d --build
 
 目标机器必须安装 NVIDIA Container Toolkit，并在上线前实测 GPU、驱动、PyTorch、ComfyUI 版本和所需模型。主应用生产环境若使用 local/auto 或 remote URL 为空，会拒绝初始化 ComfyUI 配置。开发环境仍可使用 local/auto 安装与启动流程。
 
-### ComfyUI 多模态大模型提示词节点与配置
+### ComfyUI 图片创作工作流
 
-项目维护的自定义节点包位于 `comfyui/custom_nodes/forkvdo_prompt`，提供 `ForkVdoImageCollection` 与 `ForkVdoPrompt` 两个节点。
+内置 [图片创作工作流](../workflows/image-creation.json) 将大模型连接、生图、原图编辑和遮罩局部重绘合为十个节点。它替代两个 Anima 大模型模板，用户已保存的旧工作流不删除。完整的节点、模式、安装和模型兼容说明见 [节点包指南](../comfyui/custom_nodes/forkvdo_prompt/README.md)。
 
-1. **连接与密钥配置**：
-   通过私有环境变量 `FORKVDO_LLM_CONNECTIONS_JSON` 配置可用的大模型连接。
-   - 本地开发：在 `.env` 中填写 `NUXT_COMFYUI_LLM_CONNECTIONS_JSON`，Nuxt 启动子进程时会自动传递。
-   - 远程 ComfyUI：在执行端环境中设置 `FORKVDO_LLM_CONNECTIONS_JSON`。
-   - 节点仅保存连接标识（如 `openai-main`），画布及客户端不包含或泄露 API Key 与 Base URL。
-2. **协议与格式**：
-   - 采用 OpenAI Chat Completions 协议：`<baseUrl>/v1/chat/completions`。
-   - 支持结构化输出：自动优先使用 `response_format: { type: "json_schema" }`，兼容端点返回 400 时自动退化重试，并由节点保证返回非空的 `positive_prompt` 与合法的 `negative_prompt`。
-3. **缓存与强制刷新**：
-   - 普通生图重试复用已生成的提示词，避免重复消耗大模型费用。
-   - 需要重新生成时，点击节点或检查器中的“重新生成提示词”即可变更 `refresh_token`，强制绕过缓存。
-4. **内置公开工作流**：
-   - `workflows/anima-llm-prompt-generate.json`：包含参考图片集合、大模型提示词提炼与 Anima 生图全链路。
-   - `workflows/anima-llm-multi-image-edit.json`：支持原图参与生成、局部重绘与微调编辑模板。
-   - 服务端自动将 `workflows/` 中的公开模板聚合至工作流库面板，无需手动导入。
+- 更新包后重启 ComfyUI，再刷新节点定义。默认 checkpoint 是本机已有模型；其他环境需在模型节点重新选择已安装的兼容 SD1.5/SDXL checkpoint。
+- 单张/多张图片进入图片集合；需求通过独立文本节点连入大模型；正负提示词可追加或替换。多参考图只帮助 LLM 理解，编辑时仅指定原图进入扩散模型。
+- 大模型支持两种方式：模板中的“③ 大模型连接”节点填写用户自己的 OpenAI Chat Completions 兼容地址、API Key、模型和视觉能力；或者由执行端配置私有 `NUXT_COMFYUI_LLM_CONNECTIONS_JSON` / `FORKVDO_LLM_CONNECTIONS_JSON`。连接节点中的 Key 会保存到工作流 JSON，含 Key 的工作流必须保持私有，导出时也会包含 Key。
+- 模板默认改为使用工作流连接；如果不配置连接，可切换 `manual`，直接使用需求文本。`refresh_token` 变化或上传图片内容变化使提示词缓存失效。
+- 局部重绘必须上传与原图同尺寸的黑白遮罩，白改黑留；黑色区域以原图像素合回。整图编辑不保证人物完全一致。不同架构模型需匹配的 loader/专用生成链路，平台不自动下载或承诺任意模型兼容。
+
+节点测试不依赖 GPU 或真实凭据，使用已有 ComfyUI Python 环境：
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 vendor/ComfyUI/.venv/bin/python comfyui/custom_nodes/forkvdo_prompt/test_workflow.py
+pnpm check:full
+```
 
 ## 供应商配置
 

@@ -56,6 +56,8 @@ Drizzle schema 位于 `server/database/schema.ts`，SQL migration 位于 `drizzl
 
 当前任意 ComfyUI 工作流只向管理员开放。所有 `/api/comfyui/**` HTTP 端点和 WebSocket 都验证管理员 session 与来源；浏览器始终通过 Nuxt 代理访问。这样共享队列、全局 interrupt、节点文件候选项和执行事件不会暴露给普通用户。以后向普通用户开放时，需要先实现审核模板、节点白名单、资源预算和每次执行的 owner 输出映射。
 
+图片创作模板位于 `workflows/image-creation.json`，将生图、原图编辑、遮罩重绘和用户自定义大模型连接组合在一张图中。执行逻辑位于 `comfyui/custom_nodes/forkvdo_prompt/`：提示词输出为通用 STRING，生成节点接标准 MODEL/CLIP/VAE，复用 ComfyUI 编码、采样和解码；不扩展平台生成/计费契约。工作流连接节点中的 API Key 随私有工作流保存，公开工作流禁止携带 Key。画布按 `/object_info` 的上传、强制连线、种子控件元数据渲染，文本执行输出统一展示，不识别具体节点类名。多参考图用于 LLM 理解，编辑只将指定原图送入扩散链路；局部重绘使用遮罩并合回未修改像素。
+
 ## 6. 管理面与运维
 
 管理员控制面板提供概览、用户停启、额度调整、邀请码、价格版本、全部用户生成任务、异常任务核对/释放额度和审计记录。所有变更写 append-only 额度流水或审计日志，不修改历史流水。
