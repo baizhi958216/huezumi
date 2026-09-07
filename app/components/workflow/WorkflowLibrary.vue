@@ -120,7 +120,7 @@ function onDragStart(event: DragEvent, type: string) {
           :aria-selected="mode === 'workflows'"
           @click="mode = 'workflows'"
         >
-          <span class="i-lucide-workflow" aria-hidden="true" />
+          <UIcon name="i-lucide-workflow" class="size-3.5" aria-hidden="true" />
           <span>工作流</span>
         </button>
         <button
@@ -131,7 +131,7 @@ function onDragStart(event: DragEvent, type: string) {
           :aria-selected="mode === 'nodes'"
           @click="mode = 'nodes'"
         >
-          <span class="i-lucide-boxes" aria-hidden="true" />
+          <UIcon name="i-lucide-boxes" class="size-3.5" aria-hidden="true" />
           <span>节点</span>
         </button>
       </div>
@@ -190,11 +190,11 @@ function onDragStart(event: DragEvent, type: string) {
     <div class="comfy-panel__body studio-scroll">
       <template v-if="mode === 'workflows'">
         <div v-if="loading" class="comfy-panel__empty">
-          <span class="i-lucide-loader-circle animate-spin" aria-hidden="true" />
+          <UIcon name="i-lucide-loader-circle" class="size-5 animate-spin" aria-hidden="true" />
           <span>正在加载工作流...</span>
         </div>
         <p v-else-if="!workflowItems.length" class="comfy-panel__empty">
-          <span class="i-lucide-folder-open" aria-hidden="true" />
+          <UIcon name="i-lucide-folder-open" class="size-5" aria-hidden="true" />
           <span>{{ keyword ? '没有匹配的工作流' : workflowScope === 'mine' ? '还没有保存工作流' : '暂时没有公开工作流' }}</span>
         </p>
         <div v-else class="comfy-workflow-list">
@@ -207,7 +207,7 @@ function onDragStart(event: DragEvent, type: string) {
             @click="emit('load', item.id)"
           >
             <span class="comfy-workflow-card__icon">
-              <span class="i-lucide-workflow" aria-hidden="true" />
+              <UIcon name="i-lucide-workflow" class="size-3.5" aria-hidden="true" />
             </span>
             <span class="comfy-workflow-card__body">
               <span class="comfy-workflow-card__name">{{ item.name }}</span>
@@ -217,7 +217,7 @@ function onDragStart(event: DragEvent, type: string) {
                 <span>{{ formatTime(item.updatedAt) }}</span>
               </span>
             </span>
-            <span class="comfy-workflow-card__arrow i-lucide-chevron-right" aria-hidden="true" />
+            <UIcon name="i-lucide-chevron-right" class="comfy-workflow-card__arrow size-3.5" aria-hidden="true" />
           </button>
         </div>
       </template>
@@ -231,7 +231,7 @@ function onDragStart(event: DragEvent, type: string) {
 
         <section v-for="group in visibleGroups" :key="group.category" class="comfy-group">
           <button type="button" class="comfy-group__title" @click="toggle(group.category)">
-            <span class="i-lucide-chevron-right comfy-group__chevron" :class="{ 'is-open': group.isOpen }" />
+            <UIcon name="i-lucide-chevron-right" class="comfy-group__chevron size-3.5" :class="{ 'is-open': group.isOpen }" />
             <span class="truncate">{{ group.category }}</span>
             <span class="comfy-group__count">{{ group.items.length }}</span>
           </button>

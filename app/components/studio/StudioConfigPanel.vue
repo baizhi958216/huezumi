@@ -68,7 +68,7 @@ function updateDurationSlider(value: number | number[] | undefined) {
       </div>
       <div v-if="reusedFromId" class="mt-2.5 flex items-center justify-between rounded-lg bg-primary/10 px-3 py-1.5 text-xs text-primary">
         <span class="flex items-center gap-1.5 truncate">
-          <span class="i-lucide-sparkles text-xs shrink-0" />
+          <UIcon name="i-lucide-sparkles" class="size-3.5 shrink-0" />
           <span class="truncate">已回填任务 {{ reusedFromId.slice(0, 8) }} 的生成参数与参考素材</span>
         </span>
         <button type="button" class="ml-2 text-xs hover:underline shrink-0" @click="reusedFromId = undefined">

@@ -226,7 +226,12 @@ async function upload(event: Event) {
             class="flex min-w-0 items-center gap-2 rounded-md border border-default bg-default/50 px-2 py-1"
           >
             <img v-if="isImage" :src="item.url" :alt="item.name || `${label} ${index + 1}`" class="h-8 w-8 shrink-0 rounded object-cover">
-            <span v-else :class="uploading ? 'i-lucide-loader-circle' : icon" class="shrink-0 text-sm text-dimmed" />
+            <UIcon
+              v-else
+              :name="uploading ? 'i-lucide-loader-circle' : icon"
+              class="size-4 shrink-0 text-dimmed"
+              :class="{ 'animate-spin': uploading }"
+            />
             <span class="min-w-0 flex-1 truncate text-xs" :title="item.name || item.url">
               {{ item.name || item.url }}
             </span>

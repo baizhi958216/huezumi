@@ -95,7 +95,7 @@ onBeforeUnmount(() => animationCleanup?.())
             </NuxtLink>
             <span class="liquid-nav__divider" aria-hidden="true" />
             <div class="liquid-nav__workspace-title">
-              <span class="i-lucide-clapperboard" />
+              <UIcon name="i-lucide-clapperboard" class="size-4 text-dimmed" />
               创作台
             </div>
             <div class="liquid-nav__workspace-actions">

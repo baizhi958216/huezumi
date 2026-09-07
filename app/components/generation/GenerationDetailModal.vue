@@ -255,7 +255,7 @@ async function triggerRefresh() {
                 横屏 {{ record.ratio }}
               </UBadge>
               <UBadge v-if="record.videoArchived" color="success" variant="subtle" size="md">
-                <span class="i-lucide-circle-check mr-1 text-xs" />
+                <UIcon name="i-lucide-circle-check" class="mr-1 size-3.5" />
                 OSS 已持久归档
               </UBadge>
             </div>
@@ -272,7 +272,7 @@ async function triggerRefresh() {
                 title="上一个作品 (Left Arrow)"
                 @click="emit('prev')"
               >
-                <span class="i-lucide-chevron-left text-lg" />
+                <UIcon name="i-lucide-chevron-left" class="size-5" />
               </button>
               <button
                 type="button"
@@ -281,7 +281,7 @@ async function triggerRefresh() {
                 title="下一个作品 (Right Arrow)"
                 @click="emit('next')"
               >
-                <span class="i-lucide-chevron-right text-lg" />
+                <UIcon name="i-lucide-chevron-right" class="size-5" />
               </button>
               <div class="mx-1 h-4 w-px bg-default dark:bg-zinc-800" />
               <button
@@ -290,7 +290,7 @@ async function triggerRefresh() {
                 title="关闭 (Esc)"
                 @click="emit('update:open', false)"
               >
-                <span class="i-lucide-x text-lg" />
+                <UIcon name="i-lucide-x" class="size-5" />
               </button>
             </div>
           </div>
@@ -332,7 +332,7 @@ async function triggerRefresh() {
                       @click="togglePlay"
                     >
                       <div class="h-16 w-16 flex items-center justify-center rounded-full bg-white/20 text-white backdrop-blur-md transition hover:scale-110 hover:bg-primary">
-                        <span class="i-lucide-play ml-1 text-2xl" />
+                        <UIcon name="i-lucide-play" class="ml-0.5 size-7" />
                       </div>
                     </button>
                   </div>
@@ -344,9 +344,10 @@ async function triggerRefresh() {
                     class="h-16 w-16 flex items-center justify-center rounded-2xl"
                     :class="record.status === 'FAILED' ? 'bg-red-500/10 text-red-400' : 'bg-primary/10 text-primary'"
                   >
-                    <span
-                      :class="record.status === 'FAILED' ? 'i-lucide-circle-x' : 'i-lucide-loader-circle animate-spin'"
-                      class="text-3xl"
+                    <UIcon
+                      :name="record.status === 'FAILED' ? 'i-lucide-circle-x' : 'i-lucide-loader-circle'"
+                      class="size-8"
+                      :class="{ 'animate-spin': record.status !== 'FAILED' }"
                     />
                   </div>
                   <div>
@@ -397,7 +398,7 @@ async function triggerRefresh() {
                       :title="isPlaying ? '暂停 (Space)' : '播放 (Space)'"
                       @click="togglePlay"
                     >
-                      <span :class="isPlaying ? 'i-lucide-pause' : 'i-lucide-play'" class="text-base" />
+                      <UIcon :name="isPlaying ? 'i-lucide-pause' : 'i-lucide-play'" class="size-4" />
                     </button>
                     <button
                       type="button"
@@ -406,7 +407,7 @@ async function triggerRefresh() {
                       :class="{ 'text-primary': isLooping }"
                       @click="isLooping = !isLooping"
                     >
-                      <span class="i-lucide-rotate-ccw text-base" />
+                      <UIcon name="i-lucide-rotate-ccw" class="size-4" />
                     </button>
                     <button
                       type="button"
@@ -414,7 +415,7 @@ async function triggerRefresh() {
                       :title="isMuted ? '取消静音' : '静音'"
                       @click="toggleMute"
                     >
-                      <span :class="isMuted ? 'i-lucide-volume-x' : 'i-lucide-volume-2'" class="text-base" />
+                      <UIcon :name="isMuted ? 'i-lucide-volume-x' : 'i-lucide-volume-2'" class="size-4" />
                     </button>
 
                     <!-- 倍速切换 -->
@@ -440,7 +441,7 @@ async function triggerRefresh() {
                       class="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs text-zinc-300 transition hover:bg-white/10 hover:text-white"
                       title="下载视频"
                     >
-                      <span class="i-lucide-download text-xs" />
+                      <UIcon name="i-lucide-download" class="size-3.5" />
                       <span class="hidden sm:inline">下载</span>
                     </a>
                     <button
@@ -449,7 +450,7 @@ async function triggerRefresh() {
                       title="全屏播放"
                       @click="toggleFullscreen"
                     >
-                      <span class="i-lucide-maximize text-base" />
+                      <UIcon name="i-lucide-maximize" class="size-4" />
                     </button>
                   </div>
                 </div>
@@ -490,7 +491,7 @@ async function triggerRefresh() {
                       class="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-muted transition hover:bg-muted hover:text-highlighted dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white"
                       @click="copyText(record.prompt, 'prompt')"
                     >
-                      <span :class="copiedKey === 'prompt' ? 'i-lucide-check text-emerald-400' : 'i-lucide-copy'" class="text-xs" />
+                      <UIcon :name="copiedKey === 'prompt' ? 'i-lucide-check' : 'i-lucide-copy'" class="size-3.5" :class="{ 'text-emerald-400': copiedKey === 'prompt' }" />
                       <span>{{ copiedKey === 'prompt' ? '已复制' : '复制' }}</span>
                     </button>
                   </div>
@@ -508,7 +509,7 @@ async function triggerRefresh() {
                       class="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-muted transition hover:bg-muted hover:text-highlighted dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white"
                       @click="copyText(record.negativePrompt, 'negativePrompt')"
                     >
-                      <span :class="copiedKey === 'negativePrompt' ? 'i-lucide-check text-emerald-400' : 'i-lucide-copy'" class="text-xs" />
+                      <UIcon :name="copiedKey === 'negativePrompt' ? 'i-lucide-check' : 'i-lucide-copy'" class="size-3.5" :class="{ 'text-emerald-400': copiedKey === 'negativePrompt' }" />
                       <span>{{ copiedKey === 'negativePrompt' ? '已复制' : '复制' }}</span>
                     </button>
                   </div>
@@ -547,9 +548,9 @@ async function triggerRefresh() {
                           :alt="item.name || '参考图'"
                           class="h-full w-full object-cover transition group-hover:scale-105"
                         >
-                        <span v-else-if="item.type === 'reference_video'" class="i-lucide-video text-xl text-amber-400" />
-                        <span v-else-if="item.type === 'reference_audio'" class="i-lucide-audio-lines text-xl text-emerald-400" />
-                        <span v-else class="i-lucide-file-text text-xl text-muted dark:text-zinc-400" />
+                        <UIcon v-else-if="item.type === 'reference_video'" name="i-lucide-video" class="size-6 text-amber-400" />
+                        <UIcon v-else-if="item.type === 'reference_audio'" name="i-lucide-audio-lines" class="size-6 text-emerald-400" />
+                        <UIcon v-else name="i-lucide-file-text" class="size-6 text-muted dark:text-zinc-400" />
                       </div>
 
                       <div class="min-w-0 flex-1">
@@ -571,7 +572,7 @@ async function triggerRefresh() {
                       </div>
                     </div>
 
-                    <span class="i-lucide-external-link shrink-0 text-dimmed transition group-hover:text-toned dark:text-zinc-500 dark:group-hover:text-zinc-300" />
+                    <UIcon name="i-lucide-external-link" class="size-3.5 shrink-0 text-dimmed transition group-hover:text-toned dark:text-zinc-500 dark:group-hover:text-zinc-300" />
                   </div>
                 </div>
 
@@ -656,7 +657,7 @@ async function triggerRefresh() {
                       @click="copyText(record.id, 'taskId')"
                     >
                       {{ record.id.slice(0, 16) }}...
-                      <span :class="copiedKey === 'taskId' ? 'i-lucide-check text-emerald-400' : 'i-lucide-copy'" class="inline text-xs" />
+                      <UIcon :name="copiedKey === 'taskId' ? 'i-lucide-check' : 'i-lucide-copy'" class="inline size-3" :class="{ 'text-emerald-400': copiedKey === 'taskId' }" />
                     </button>
                   </div>
                   <div class="flex items-center justify-between">

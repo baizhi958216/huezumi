@@ -72,7 +72,7 @@ onUnmounted(() => {
                 rel="noopener noreferrer"
                 class="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs text-muted transition hover:bg-muted hover:text-highlighted dark:text-zinc-400 dark:hover:bg-white/10 dark:hover:text-white"
               >
-                <span class="i-lucide-external-link text-xs" />
+                <UIcon name="i-lucide-external-link" class="size-3.5" />
                 新窗口打开
               </a>
               <button
@@ -80,7 +80,7 @@ onUnmounted(() => {
                 class="rounded-lg p-1.5 text-muted transition hover:bg-muted hover:text-highlighted dark:text-zinc-400 dark:hover:bg-white/10 dark:hover:text-white"
                 @click="close"
               >
-                <span class="i-lucide-x text-lg" />
+                <UIcon name="i-lucide-x" class="size-5" />
               </button>
             </div>
           </div>
@@ -103,7 +103,7 @@ onUnmounted(() => {
             />
             <div v-else-if="isAudio" class="w-80 flex flex-col items-center gap-4 py-8">
               <div class="h-16 w-16 flex items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                <span class="i-lucide-audio-lines text-3xl" />
+                <UIcon name="i-lucide-audio-lines" class="size-8" />
               </div>
               <p class="text-sm font-medium text-highlighted dark:text-zinc-200">
                 {{ item.name || '参考音频' }}
@@ -111,7 +111,7 @@ onUnmounted(() => {
               <audio :src="item.url" controls class="w-full" />
             </div>
             <div v-else class="flex flex-col items-center gap-3 py-8 text-center">
-              <span class="i-lucide-file-text text-4xl text-muted dark:text-zinc-400" />
+              <UIcon name="i-lucide-file-text" class="size-10 text-muted dark:text-zinc-400" />
               <p class="text-sm text-toned dark:text-zinc-300">
                 {{ item.name || item.url }}
               </p>
@@ -120,7 +120,7 @@ onUnmounted(() => {
                 target="_blank"
                 class="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-xs font-medium text-white transition hover:bg-primary/90"
               >
-                <span class="i-lucide-download text-xs" />
+                <UIcon name="i-lucide-download" class="size-3.5" />
                 下载素材
               </a>
             </div>
