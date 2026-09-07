@@ -356,6 +356,13 @@ export function buildViewUrl(file: ComfyOutputFile): string {
   return `/api/comfyui/view?${params.toString()}`
 }
 
+/** 用于在检查器和节点卡片中预览已上传到 ComfyUI input 目录的图片。 */
+export function buildInputViewUrl(filename: string): string {
+  const value = filename.replace(/\s*\[(?:input|output|temp)\]$/i, '')
+  const params = new URLSearchParams({ filename: value, type: 'input' })
+  return `/api/comfyui/view?${params.toString()}`
+}
+
 export function isVideoFile(file: ComfyOutputFile): boolean {
   return /\.(?:mp4|webm|mov|mkv|gif)$/i.test(file.filename)
 }

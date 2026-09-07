@@ -21,6 +21,41 @@ export class ComfyUpstreamError extends Error {
   }
 }
 
+function summarizeErrorResponse(body: string): string | undefined {
+  let payload: unknown
+  try {
+    payload = JSON.parse(body)
+  }
+  catch {
+    return undefined
+  }
+
+  if (!payload || typeof payload !== 'object')
+    return undefined
+  const record = payload as Record<string, unknown>
+  const nodeErrors = record.node_errors
+  if (nodeErrors && typeof nodeErrors === 'object') {
+    for (const value of Object.values(nodeErrors as Record<string, unknown>)) {
+      if (!value || typeof value !== 'object')
+        continue
+      const errors = (value as Record<string, unknown>).errors
+      if (!Array.isArray(errors))
+        continue
+      const first = errors.find(item => item && typeof item === 'object' && typeof (item as Record<string, unknown>).message === 'string') as Record<string, unknown> | undefined
+      if (first) {
+        const message = String(first.message)
+        const details = typeof first.details === 'string' ? first.details : ''
+        return details && details !== message ? `${message}（${details}）` : message
+      }
+    }
+  }
+
+  const error = record.error
+  if (error && typeof error === 'object' && typeof (error as Record<string, unknown>).message === 'string')
+    return String((error as Record<string, unknown>).message)
+  return typeof error === 'string' ? error : undefined
+}
+
 async function request(path: string, init: RequestInit & { timeoutMs?: number } = {}): Promise<unknown> {
   const config = getComfyConfig()
   const baseUrl = getComfyBaseUrl(config)
@@ -44,9 +79,14 @@ async function request(path: string, init: RequestInit & { timeoutMs?: number } 
   clearTimeout(timer)
 
   if (!response.ok) {
-    // 上游错误正文可能包含内部路径，只保留前 200 字符用于排障提示。
-    const detail = (await response.text().catch(() => '')).slice(0, 200)
-    throw new ComfyUpstreamError(`ComfyUI 返回 ${response.status}`, 502, detail || undefined)
+    // 只提取 ComfyUI 返回的节点校验摘要，不把内部路径或完整响应透传给浏览器。
+    const body = await response.text().catch(() => '')
+    const detail = summarizeErrorResponse(body)
+    throw new ComfyUpstreamError(
+      detail ? `ComfyUI 返回 ${response.status}：${detail}` : `ComfyUI 返回 ${response.status}`,
+      502,
+      detail,
+    )
   }
 
   // ComfyUI 部分控制接口（如 POST /queue、POST /free、POST /interrupt）成功时返回 200 但正文为空，

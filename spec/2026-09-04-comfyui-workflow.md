@@ -46,7 +46,7 @@ forkvdo 现有的生成链路面向"一家供应商一个 HTTP 任务"：平台�
    - remote 模式连不上 → 展示错误与基地址，提示检查 `NUXT_COMFYUI_REMOTE_BASE_URL`。
 3. 用户点击安装 → 后端异步执行 clone（可选装依赖），页面轮询 status 展示进度日志。
 4. 用户启动 → 后端 spawn 进程并轮询 `/system_stats` 直到就绪，页面显示"启动中…"与实时日志。
-5. 就绪后：用户从左侧节点库点击或拖拽添加节点，在画布上连线，在节点卡片上填参数。
+5. 就绪后：用户从左侧节点库点击或拖拽添加节点，在画布上连线；点击节点后，右侧检查器展示该节点的参数并可直接修改，文件加载节点还可从检查器上传对应类型的图片、音频或视频。
 6. 点击"运行" → 前端把图序列化为 API prompt，`POST /api/comfyui/prompt` 提交，通过 WebSocket 接收 `execution_start` / `executing` / `progress` / `executed` / `execution_error`，节点高亮显示当前执行位置与进度条。
 7. 执行完成后前端拉 `/api/comfyui/history/{promptId}`，把输出文件渲染为预览（图片走 `/api/comfyui/view`，视频用 `<video>`）。
 8. 用户可保存/加载/导入/导出工作流，可清队、中断当前执行、释放显存。
@@ -111,7 +111,7 @@ forkvdo 现有的生成链路面向"一家供应商一个 HTTP 任务"：平台�
 
 对 `input.required` 与 `input.optional`（先 required 后 optional，按声明顺序）：
 
-- 类型为数组 → **COMBO 控件**（数组即选项列表）。
+- 类型为数组或字符串 `COMBO` → **COMBO 控件**（数组或 `options.options` 即选项列表）。
 - 类型为 `INT` / `FLOAT` / `STRING` / `BOOLEAN` → **对应控件**。
 - 其他类型（`MODEL`、`CLIP`、`VAE`、`IMAGE`、`LATENT`、`CONDITIONING`、`MASK` 等）→ **连线输入插槽**。
 
@@ -119,6 +119,7 @@ forkvdo 现有的生成链路面向"一家供应商一个 HTTP 任务"：平台�
 
 - 节点类型 ∈ {`KSampler`, `KSamplerAdvanced`, `PrimitiveNode`} 且输入名为 `seed` / `noise_seed` 时，紧跟一个前端专用控件 `control_after_generate`（`randomize` / `fixed` / `increment` / `decrement`）。该控件 **不参与序列化**（等价官方 `options.serialize === false`）。
 - `control` 字段支持 `default`、`min`、`max`、`step`、`multiline`、`dynamic_prompts`。
+- `image_upload` / `audio_upload` / `video_upload` 标记的 COMBO 控件显示对应的上传入口；上传成功后刷新 object_info 并将返回文件名写回该控件。
 - `output_node: true` 的节点（如 `SaveImage`）标记为输出节点，运行后参与结果展示。
 
 ### 连线类型校验
@@ -196,7 +197,7 @@ Nitro `data` storage（`./.data`）：
 | POST   | `/api/comfyui/queue`              | body `{ clear?: true, delete?: number[] }`                                       |
 | POST   | `/api/comfyui/interrupt`          | 中断当前执行                                                                     |
 | POST   | `/api/comfyui/free`               | body `{ unloadModels?, freeMemory? }`                                            |
-| POST   | `/api/comfyui/upload`             | multipart `image` → `{ name, subfolder, type }`，成功后失效 object_info 缓存     |
+| POST   | `/api/comfyui/upload`             | multipart `{ file, kind }`；kind=image/audio/video；成功后失效 object_info 缓存  |
 | GET    | `/api/comfyui/view`               | `?filename=&subfolder=&type=&preview=` 二进制流                                  |
 | GET    | `/api/comfyui/workflows`          | 工作流列表                                                                       |
 | POST   | `/api/comfyui/workflows`          | body `{ id?, name, graph }` 保存（id 存在则更新）                                |
@@ -227,6 +228,8 @@ Nitro `data` storage（`./.data`）：
 - 重复提交：ComfyUI 串行执行，前端在队列非空时禁用重复运行按钮并提示队列位置。
 - 上游限流/崩溃：进程退出后 status 变为 `stopped`，前端提示重启。
 - 图片上传与 COMBO 刷新：上传后必须失效 object_info 缓存，否则 `LoadImage` 下拉不出现新文件。
+- 音频/视频上传与 COMBO 刷新：`LoadAudio` / `LoadVideo` 使用字符串 `COMBO` 定义，上传后必须刷新节点定义并回填选中的节点参数。
+- 右侧检查器：未选中节点时显示运行与输出；选中节点时展示其控件、连线输入和对应文件上传入口，参数修改必须同步到画布节点与最终 prompt。
 - 大图预览：`/view` 支持 `preview` 参数，列表用缩略图，点击看原图。
 - 节点缺失：加载的工作流引用了当前环境不存在的节点类型时，渲染为缺失节点卡片并阻止运行。
 - 端口占用：8188 已被其他 ComfyUI 占用时，本地启动失败，日志显示端口冲突，需人工换端口。

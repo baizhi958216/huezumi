@@ -107,33 +107,42 @@ onMounted(() => {
     <header class="comfy-node__header" @dblclick.stop="toggleCollapse">
       <span class="comfy-node__title" :title="`${data.title} (${data.type})`">{{ data.title }}</span>
       <div class="comfy-node__actions nodrag">
-        <button
-          type="button"
-          class="comfy-node__action"
-          :class="{ 'is-active': isCollapsed }"
-          :title="isCollapsed ? '展开节点参数 (双击标题也可切换)' : '折叠节点参数 (双击标题也可切换)'"
-          @click.stop="toggleCollapse"
-        >
-          <span :class="isCollapsed ? 'i-lucide-chevron-down' : 'i-lucide-chevron-up'" />
-        </button>
-        <button
-          type="button"
-          class="comfy-node__action"
-          :class="{ 'is-active': data.mode === 2 }"
-          :aria-label="data.mode === 2 ? '取消静音' : '静音节点'"
-          @click.stop="setMode(2)"
-        >
-          <span class="i-lucide-volume-off" />
-        </button>
-        <button
-          type="button"
-          class="comfy-node__action"
-          :class="{ 'is-active': data.mode === 4 }"
-          :aria-label="data.mode === 4 ? '取消绕过' : '绕过节点'"
-          @click.stop="setMode(4)"
-        >
-          <span class="i-lucide-circle-slash" />
-        </button>
+        <UTooltip :text="isCollapsed ? '展开节点参数（也可双击标题）' : '折叠节点参数（也可双击标题）'">
+          <button
+            type="button"
+            class="comfy-node__action nodrag"
+            :class="{ 'is-active': isCollapsed }"
+            :aria-label="isCollapsed ? '展开节点参数' : '折叠节点参数'"
+            :aria-pressed="isCollapsed"
+            @click.stop="toggleCollapse"
+          >
+            <UIcon :name="isCollapsed ? 'i-lucide-chevron-down' : 'i-lucide-chevron-up'" class="size-3.5" aria-hidden="true" />
+          </button>
+        </UTooltip>
+        <UTooltip :text="data.mode === 2 ? '取消静音节点' : '静音节点（不参与执行）'">
+          <button
+            type="button"
+            class="comfy-node__action nodrag"
+            :class="{ 'is-active': data.mode === 2 }"
+            :aria-label="data.mode === 2 ? '取消静音节点' : '静音节点'"
+            :aria-pressed="data.mode === 2"
+            @click.stop="setMode(2)"
+          >
+            <UIcon :name="data.mode === 2 ? 'i-lucide-volume-2' : 'i-lucide-volume-off'" class="size-3.5" aria-hidden="true" />
+          </button>
+        </UTooltip>
+        <UTooltip :text="data.mode === 4 ? '取消绕过节点' : '绕过节点（保留在工作流中但跳过执行）'">
+          <button
+            type="button"
+            class="comfy-node__action nodrag"
+            :class="{ 'is-active': data.mode === 4 }"
+            :aria-label="data.mode === 4 ? '取消绕过节点' : '绕过节点'"
+            :aria-pressed="data.mode === 4"
+            @click.stop="setMode(4)"
+          >
+            <UIcon name="i-lucide-circle-slash" class="size-3.5" aria-hidden="true" />
+          </button>
+        </UTooltip>
       </div>
     </header>
 

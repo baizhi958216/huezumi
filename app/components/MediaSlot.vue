@@ -17,6 +17,7 @@ const props = defineProps<{
 const emit = defineEmits<{ change: [payload: MediaInput[]] }>()
 
 const uploading = ref(false)
+const { requireLogin } = useAuth()
 const uploadProgress = ref(0)
 const uploadTotal = ref(0)
 const errorMessage = ref('')
@@ -139,6 +140,11 @@ function remove(index: number) {
 }
 
 async function upload(event: Event) {
+  if (!requireLogin()) {
+    if (input.value)
+      input.value.value = ''
+    return
+  }
   const files = Array.from((event.target as HTMLInputElement).files || [])
   if (!files.length)
     return

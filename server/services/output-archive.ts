@@ -1,7 +1,9 @@
 import type { GenerationErrorCode } from '#shared/types/generation'
 import type { OssUploader } from '../utils/oss'
+import { lookup } from 'node:dns/promises'
 import { createWriteStream } from 'node:fs'
 import { mkdtemp, rm, stat } from 'node:fs/promises'
+import { isIP } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { finished } from 'node:stream/promises'
@@ -75,6 +77,38 @@ function videoFormat(contentTypeValue: string | null, sourceUrl?: URL): VideoFor
   throw new OutputArchiveError('OUTPUT_TRANSFER_FAILED')
 }
 
+function isPrivateAddress(address: string) {
+  if (address === '::1' || address.startsWith('fc') || address.startsWith('fd') || address.startsWith('fe80:'))
+    return true
+  if (isIP(address) !== 4)
+    return false
+  const [a, b] = address.split('.').map(Number)
+  return a === 10 || a === 127 || a === 0 || (a === 169 && b === 254) || (a === 172 && b! >= 16 && b! <= 31) || (a === 192 && b === 168)
+}
+
+async function assertPublicUrl(url: URL) {
+  if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password)
+    throw new OutputArchiveError('OUTPUT_TRANSFER_FAILED')
+  const addresses = await lookup(url.hostname, { all: true }).catch(() => [])
+  if (!addresses.length || addresses.some(item => isPrivateAddress(item.address)))
+    throw new OutputArchiveError('OUTPUT_TRANSFER_FAILED')
+}
+
+async function fetchPublicUrl(initial: URL, timeoutMs: number) {
+  let current = initial
+  for (let redirect = 0; redirect <= 5; redirect++) {
+    await assertPublicUrl(current)
+    const response = await fetch(current, { redirect: 'manual', signal: AbortSignal.timeout(timeoutMs) })
+    if (![301, 302, 303, 307, 308].includes(response.status))
+      return { response, url: current }
+    const location = response.headers.get('location')
+    if (!location)
+      throw new OutputArchiveError('OUTPUT_TRANSFER_FAILED')
+    current = new URL(location, current)
+  }
+  throw new OutputArchiveError('OUTPUT_TRANSFER_FAILED')
+}
+
 async function writeResponseBody(response: Response, path: string, maxBytes: number) {
   if (!response.body)
     throw new OutputArchiveError('OUTPUT_TRANSFER_FAILED')
@@ -126,8 +160,10 @@ async function uploadOutputFile(
   }
 }
 
-export async function archiveRemoteOutput(generationId: string, source: string) {
+export async function archiveRemoteOutput(generationId: string, source: string, ownerId?: string) {
   const config = getOutputArchiveConfig()
+  if (ownerId)
+    config.outputPrefix = `${config.outputPrefix}/${ownerId}`
   const uploader = requireUploader()
   let sourceUrl: URL
   try {
@@ -144,7 +180,9 @@ export async function archiveRemoteOutput(generationId: string, source: string) 
   try {
     let response: Response
     try {
-      response = await fetch(sourceUrl, { redirect: 'follow', signal: AbortSignal.timeout(config.transferTimeoutMs) })
+      const fetched = await fetchPublicUrl(sourceUrl, config.transferTimeoutMs)
+      response = fetched.response
+      sourceUrl = fetched.url
     }
     catch {
       throw new OutputArchiveError('OUTPUT_TRANSFER_FAILED')

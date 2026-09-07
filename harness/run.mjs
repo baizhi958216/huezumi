@@ -14,6 +14,7 @@ if (unknown.length) {
 
 const steps = [
   { name: 'repository contract', run: validateRepository },
+  { name: 'unit tests', command: ['pnpm', 'test'] },
   { name: 'lint', command: ['pnpm', 'lint'] },
   { name: 'typecheck', command: ['pnpm', 'typecheck'] },
 ]
@@ -79,7 +80,7 @@ function validateRepository() {
     throw new Error(`Missing required engineering files: ${missing.join(', ')}`)
 
   const packageJson = JSON.parse(readFileSync('package.json', 'utf8'))
-  const requiredScripts = ['build', 'check', 'check:full', 'dev', 'lint', 'typecheck']
+  const requiredScripts = ['build', 'check', 'check:full', 'dev', 'lint', 'test', 'typecheck']
   const missingScripts = requiredScripts.filter(script => !packageJson.scripts?.[script])
   if (missingScripts.length)
     throw new Error(`Missing package scripts: ${missingScripts.join(', ')}`)

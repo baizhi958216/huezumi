@@ -30,6 +30,15 @@ export default defineNuxtConfig({
     },
   },
   runtimeConfig: {
+    databaseUrl: '',
+    redisUrl: '',
+    queueMode: '',
+    workerEnabled: false,
+    workerConcurrency: 4,
+    registrationMode: 'invite',
+    signupCredits: 0,
+    userMaxActiveGenerations: 3,
+    platformDailyCreditBudget: 100000,
     // 阿里云百炼 DashScope
     dashscopeApiKey: '',
     dashscopeWorkspaceId: '',
@@ -56,17 +65,19 @@ export default defineNuxtConfig({
     // MiniMax / 可灵 / Seedance 均可通过对应 *_BASE_URL 覆盖默认接入点
     minimaxBaseUrl: '',
     klingBaseUrl: '',
-    // 阿里云 OSS：配置完整后，输入素材和生成结果都会转存并返回 OSS URL
+    // OSS 兼容对象存储：可接阿里云 OSS 或本地 MinIO
     ossAccessKeyId: '',
     ossAccessKeySecret: '',
     ossBucket: '',
     ossRegion: 'cn-beijing',
     ossEndpoint: '',
+    ossSecure: '',
     ossPublicBaseUrl: '',
     ossPrefix: 'forkvdo/uploads',
     ossOutputPrefix: 'forkvdo/outputs',
     ossMaxOutputBytes: 1073741824,
     ossTransferTimeoutMs: 300000,
+    ossSignedUrlTtlSeconds: 86400,
     // ComfyUI 工作流：本地托管或连接其他机器上已运行的服务
     comfyuiMode: 'auto',
     comfyuiDir: '',
@@ -75,6 +86,9 @@ export default defineNuxtConfig({
     comfyuiPort: 8188,
     comfyuiArgs: '',
     comfyuiRemoteBaseUrl: '',
+    comfyuiCustomNodeSourceDir: '',
+    // JSON remains private and is passed only to a local ComfyUI child process.
+    comfyuiLlmConnectionsJson: '',
     comfyuiStartTimeoutMs: 180000,
     comfyuiProbeTimeoutMs: 1500,
     public: {
@@ -91,9 +105,6 @@ export default defineNuxtConfig({
         driver: 'fs',
         base: './.data',
       },
-    },
-    routeRules: {
-      '/api/**': { cors: true },
     },
   },
   typescript: {

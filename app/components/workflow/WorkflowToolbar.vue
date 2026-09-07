@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ComfyUIStatus, ComfyWorkflowSummary } from '#shared/types/comfyui'
+import type { ComfyUIStatus, ComfyWorkflowSummary, ComfyWorkflowVisibility } from '#shared/types/comfyui'
 
 const props = defineProps<{
   status: ComfyUIStatus | null
@@ -26,6 +26,7 @@ const emit = defineEmits<{
 }>()
 
 const name = defineModel<string>('name', { required: true })
+const visibility = defineModel<ComfyWorkflowVisibility>('visibility', { required: true })
 
 const stateMeta = computed(() => {
   const state = props.status?.state
@@ -76,11 +77,7 @@ function formatTime(isoStr: string) {
   }
 }
 
-const colorMode = useColorMode()
-const isDark = computed(() => colorMode.value === 'dark')
-function toggleColorMode() {
-  colorMode.preference = isDark.value ? 'light' : 'dark'
-}
+const { isDark, toggleTheme } = useThemeTransition()
 </script>
 
 <template>
@@ -182,6 +179,16 @@ function toggleColorMode() {
     <!-- 右侧：工作流操作与运行 -->
     <div class="comfy-toolbar__right">
       <div class="comfy-toolbar__actions">
+        <UButton
+          size="xs"
+          :color="visibility === 'public' ? 'primary' : 'neutral'"
+          :variant="visibility === 'public' ? 'soft' : 'ghost'"
+          :icon="visibility === 'public' ? 'i-lucide-globe-2' : 'i-lucide-lock-keyhole'"
+          :title="visibility === 'public' ? '当前保存为公开工作流，点击改为私有' : '当前保存为私有工作流，点击改为公开'"
+          @click="visibility = visibility === 'public' ? 'private' : 'public'"
+        >
+          {{ visibility === 'public' ? '公开' : '私有' }}
+        </UButton>
         <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-save" @click="emit('save')">
           保存
         </UButton>
@@ -225,7 +232,7 @@ function toggleColorMode() {
           :icon="isDark ? 'i-lucide-sun' : 'i-lucide-moon'"
           :title="isDark ? '切换到浅色模式' : '切换到深色模式'"
           class="comfy-toolbar__icon-btn"
-          @click="toggleColorMode"
+          @click="toggleTheme"
         />
       </ClientOnly>
 
@@ -271,7 +278,7 @@ function toggleColorMode() {
               <div class="flex items-center gap-2 text-sm font-semibold text-highlighted">
                 <span class="i-lucide-folder-open text-primary" />
                 工作流库
-                <span class="text-xs text-muted font-normal">({{ workflows.length }} 个已保存)</span>
+                <span class="text-xs text-muted font-normal">({{ workflows.length }} 个可用)</span>
               </div>
               <UButton
                 size="xs"
@@ -305,6 +312,9 @@ function toggleColorMode() {
                       <span class="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary">
                         {{ item.nodeCount }} 节点
                       </span>
+                      <span v-if="item.scope === 'public'" class="rounded bg-emerald-500/10 px-1.5 py-0.5 text-[10px] text-emerald-600 dark:text-emerald-400">
+                        公开
+                      </span>
                     </div>
                     <p class="text-xs text-muted">
                       更新于 {{ formatTime(item.updatedAt) }}
@@ -313,6 +323,7 @@ function toggleColorMode() {
 
                   <div class="flex items-center gap-1.5 shrink-0">
                     <UButton
+                      v-if="item.scope === 'mine'"
                       size="xs"
                       color="primary"
                       variant="soft"

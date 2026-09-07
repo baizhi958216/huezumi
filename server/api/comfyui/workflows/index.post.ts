@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { saveWorkflow } from '../../../services/comfyui/workflows'
+import { requireUser } from '../../../utils/auth'
 
 const graphSchema = z.object({
   last_node_id: z.number().int().min(0),
@@ -11,6 +12,7 @@ const graphSchema = z.object({
     size: z.tuple([z.number(), z.number()]),
     order: z.number().int(),
     mode: z.union([z.literal(0), z.literal(2), z.literal(4)]),
+    flags: z.record(z.string(), z.unknown()).optional(),
     inputs: z.array(z.object({
       name: z.string().max(255),
       type: z.string().max(255),
@@ -20,22 +22,30 @@ const graphSchema = z.object({
       name: z.string().max(255),
       type: z.string().max(255),
       links: z.array(z.number().int()).nullable().optional(),
+      slot_index: z.number().int().optional(),
     })).optional(),
     title: z.string().max(255).optional(),
     properties: z.record(z.string(), z.unknown()).optional(),
     widgets_values: z.array(z.unknown()).optional(),
   })),
   links: z.array(z.tuple([z.number().int(), z.number().int(), z.number().int(), z.number().int(), z.number().int(), z.string().max(255)])),
-  version: z.number().int().optional(),
+    version: z.number().int().optional(),
+  id: z.string().max(64).optional(),
+  name: z.string().max(120).optional(),
+  groups: z.array(z.unknown()).optional(),
+  config: z.record(z.string(), z.unknown()).optional(),
+  extra: z.record(z.string(), z.unknown()).optional(),
 })
 
 const bodySchema = z.object({
   id: z.string().max(64).optional(),
   name: z.string().min(1).max(120),
+  visibility: z.enum(['private', 'public']).optional(),
   graph: graphSchema,
 })
 
 export default defineEventHandler(async (event) => {
+  const user = await requireUser(event)
   const parsed = bodySchema.safeParse(await readBody(event))
   if (!parsed.success) {
     throw createError({
@@ -46,5 +56,5 @@ export default defineEventHandler(async (event) => {
   }
 
   const body = parsed.data
-  return await saveWorkflow({ id: body.id, name: body.name, graph: body.graph })
+  return await saveWorkflow(user.id, { id: body.id, name: body.name, visibility: body.visibility, graph: body.graph })
 })

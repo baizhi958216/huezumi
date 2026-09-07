@@ -1,86 +1,78 @@
 # HTTP API
 
-所有路径由 Nitro 提供。当前没有认证；不要把服务直接用于私密素材或多租户场景。
+所有路径由 Nitro 提供。私有 API 使用 `forkvdo_session` HttpOnly Cookie；未登录返回 401，普通用户访问管理或 ComfyUI 接口返回 403。修改请求执行同源校验。用户资源查询始终在服务端加入 owner 条件。
 
-## `GET /api/providers`
+## 帐号
 
-返回供应商能力目录及各供应商的启用状态；不会返回服务端凭据。
+| 方法      | 路径                    | 说明                                                                        |
+| --------- | ----------------------- | --------------------------------------------------------------------------- |
+| GET       | `/api/auth/session`     | 当前会话与公开用户资料；未登录返回 `{ user: null }`                         |
+| POST      | `/api/auth/register`    | `{ email, password, displayName, invitationCode? }`；注册模式由环境变量控制 |
+| POST      | `/api/auth/login`       | 邮箱密码登录并设置安全 Cookie                                               |
+| POST      | `/api/auth/logout`      | 删除当前 session 与 Cookie                                                  |
+| GET/PATCH | `/api/auth/profile`     | 查询或修改昵称；头像仅接受当前用户上传的 `/api/files/:id` 图片路径          |
+| POST      | `/api/auth/password`    | `{ currentPassword, newPassword }` 修改密码并撤销旧会话                     |
+| GET       | `/api/billing/ledger`   | 当前用户额度流水                                                            |
+| GET       | `/api/account/overview` | 当前用户额度、存储、作品和模型资产概览                                      |
 
-## `POST /api/generations`
+`/api/account/overview` 的消耗统计只累计实际结算的 `charge` 流水；`available` 为余额减去预留额度。模型资产统计只包含当前用户未软删除的资产。
 
-提交统一的 `GenerationRequest`。请求结构以 `shared/types/generation.ts` 和 `server/utils/generation-schema.ts` 为准。
+## 用户模型资产
 
-`media` 是有序数组，同一种 `type` 可以重复出现，用于提交多张参考图、多个参考视频或多个参考音频。平台会按当前模型能力校验单类上限及跨类型组合上限；当前请求最多包含 50 份素材。创作台会将每一份素材分别保留并提交，公网 URL 仍需满足供应商可访问要求。
+| 方法 | 路径          | 说明                                                               |
+| ---- | ------------- | ------------------------------------------------------------------ |
+| GET  | `/api/models` | 当前用户自己的模型资产元数据列表；不返回 OSS key、密钥或运行时路径 |
 
-RollDek 的 `reference_video` 素材必须携带自身的 `duration`（秒），服务端会映射为上游 `reference_videos[].duration`；这与顶层生成输出时长字段无关。RollDek 还要求提示词和所有素材 URL 均为服务端可访问的公网 HTTPS 地址。其模型 ID 的 `-480p` / `-720p` / `-1080p` 后缀决定输出清晰度，覆盖请求中的清晰度选择。
+模型资产的上传、Civitai 下载、OSS 存储和 ComfyUI 部署尚未在当前阶段开放；页面空状态不会触发外部模型流量。
 
-Runway Dev 当前接入 Gen-4.5、WAN 3.0、Seedance 2/2.5、Hailuo 3 和 Gemini Omni Flash。适配器根据输入素材选择 `POST /v1/text_to_video`、`/v1/image_to_video` 或 `/v1/video_to_video`，将统一的首尾帧、参考图、参考视频和参考音频映射到 Runway 对应字段，并按模型映射像素 ratio / resolution。Runway 素材 URL 必须是公网 HTTPS 且满足供应商的 HEAD、Content-Type 和大小要求；任务完成后的输出 URL 为临时地址，服务端会沿用统一结果归档流程。
+## 报价与生成
 
-常见错误：
+`POST /api/billing/quote` 接收经平台 schema 验证的 `GenerationRequest`，返回报价 ID、预估额度、价格版本、来源说明和过期时间。规则缺失返回 422。
 
-| 状态码 | 含义                           |
-| ------ | ------------------------------ |
-| 400    | 供应商不存在或尚未接入         |
-| 422    | 请求结构或供应商能力组合不合法 |
-| 503    | 供应商凭据未配置               |
-| 5xx    | 上游或内部处理失败             |
+`POST /api/generations` 在生成请求中额外要求 `quoteId` 与 `idempotencyKey`。报价必须属于当前用户、未过期且请求摘要一致。接口原子预留额度并创建待派发任务；余额不足返回 402，并发超限返回 429，报价冲突返回 409。相同用户和幂等键重复提交相同请求时返回原任务，不再次预留或派发。
 
-## `GET /api/generations`
+`GET /api/generations` 返回当前用户任务，按创建时间倒序。`GET /api/generations/:id` 返回当前用户单条任务。两者只读 PostgreSQL，不调用供应商。`POST /api/generations/:id/refresh` 只把已有供应商任务加入查询队列，不会重新提交生成。
 
-返回全部生成记录，按 `createdAt` 倒序排列。接口会并发刷新所有 `PENDING`/`RUNNING` 记录；供应商任务成功时同步把结果归档到 OSS。刷新或归档单条失败时保留旧记录并写服务端日志。
+返回记录的 `billing` 包含预估、实际扣费、价格版本与结算状态。对象存储 key、供应商密钥和上游原始错误不进入响应。
 
-## `GET /api/generations/:id`
+## 私有文件
 
-返回单条记录并刷新进行中状态。`?refresh=1` 可显式恢复状态待确认的任务，或重试任意供应商已成功但尚未归档的任务；只查询原供应商任务，不会重新提交。`outputArchive` 返回归档状态和非敏感错误码，内部 OSS object key 不进入响应。记录不存在时返回 404。
+`POST /api/files` 接收字段名为 `file` 的 multipart 上传。视频最大 100 MiB，其他素材最大 20 MiB，同时受用户存储上限约束。生产环境未配置 OSS 时返回 503；开发环境可回退到 `.data`。
 
-## `POST /api/files`
+`GET /api/files/:id` 验证 owner 或管理员。OSS 资产返回短期签名地址的 302；本地开发资产直接返回字节。私有响应使用 `no-store`。生成结果通过 `GET /api/generations/:id/video` 使用相同所有权和签名流程。
 
-接收字段名为 `file` 的 multipart 上传。视频最大 100 MiB，其他文件最大 20 MiB。返回元数据与绝对读取 URL。
+个人资料页的头像通过 `POST /api/files` 上传图片后再保存资料；资料接口会再次验证素材属于当前用户、未删除且为图片。头像不接受外部在线 URL。密码修改要求当前密码和至少 10 个字符的新密码，成功后当前请求会建立新 session，原有 session 全部失效。
 
-当阿里云 OSS 配置完整时，文件会同时转存到 OSS，返回的 `url` 为 OSS 公网 URL；OSS 配置为空时返回本地 `/api/files/:id` URL。OSS 配置不完整返回 503，OSS 上传失败返回 502。
+## 供应商目录
 
-## `GET /api/files/:id`
+`GET /api/providers` 返回平台能力目录和服务端启用状态，不返回凭据。请求结构以 `shared/types/generation.ts` 和 `server/utils/generation-schema.ts` 为准；供应商特有映射保留在 `server/services/providers/`。
 
-以内联方式返回素材，并设置一年 immutable 公共缓存。素材不存在时返回 404。
+## 管理 API
 
-## ComfyUI 工作流模块
+全部要求 admin：
 
-`/api/comfyui/**` 是浏览器与 ComfyUI 进程之间的唯一通道。所有响应经过 Nuxt 转发，错误信息不携带上游堆栈或凭据。
+| 方法     | 路径                                | 说明                                                 |
+| -------- | ----------------------------------- | ---------------------------------------------------- |
+| GET      | `/api/admin/overview`               | 用户、任务、资产、预算等概览                         |
+| GET      | `/api/admin/users`                  | 用户、额度、存储和任务数量                           |
+| PATCH    | `/api/admin/users/:id`              | 修改状态、角色或存储上限；停用会撤销会话             |
+| POST     | `/api/admin/users/:id/credits`      | 通过调整流水增减额度                                 |
+| POST     | `/api/admin/invitations`            | 创建一次性邀请码                                     |
+| GET/POST | `/api/admin/pricing`                | 查询或发布不可变价格版本                             |
+| GET      | `/api/admin/generations`            | 最近 200 个所有用户任务                              |
+| POST     | `/api/admin/generations/:id/action` | `refresh` 核对，或带理由 `release`/`charge` 人工结算 |
+| GET      | `/api/admin/audit`                  | 最近 200 条管理员审计记录                            |
 
-| 方法   | 路径                             | 说明                                                                                                           |
-| ------ | -------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| GET    | `/api/comfyui/status`            | 模式（local/remote）、安装状态、运行状态、基地址、进程 pid、`system_stats`、进程日志尾部、安装任务状态         |
-| POST   | `/api/comfyui/install`           | body `{ installDeps?: boolean }`，异步执行 clone / 装依赖；`remote` 模式返回 `409`                             |
-| POST   | `/api/comfyui/start`             | 拉起本地进程并等待就绪；`remote` 模式返回 `409`                                                                |
-| POST   | `/api/comfyui/stop`              | 停止本地进程；`remote` 模式返回 `409`                                                                          |
-| GET    | `/api/comfyui/object-info`       | 节点定义；`?refresh=1` 强制回源                                                                                |
-| POST   | `/api/comfyui/prompt`            | body `{ prompt, clientId?, front?, workflow? }` → `{ promptId, number, nodeErrors }`；上游校验失败映射为 `422` |
-| GET    | `/api/comfyui/history`           | `?maxItems=` 历史列表                                                                                          |
-| GET    | `/api/comfyui/history/:promptId` | 单条历史，含 outputs                                                                                           |
-| GET    | `/api/comfyui/queue`             | `{ queueRunning, queuePending }`                                                                               |
-| POST   | `/api/comfyui/queue`             | body `{ clear?: true, delete?: number[] }`                                                                     |
-| POST   | `/api/comfyui/interrupt`         | 中断当前执行                                                                                                   |
-| POST   | `/api/comfyui/free`              | body `{ unloadModels?, freeMemory? }`                                                                          |
-| POST   | `/api/comfyui/upload`            | multipart `image` → `{ name, subfolder, type }`，成功后失效 object_info 缓存                                   |
-| GET    | `/api/comfyui/view`              | `?filename=&subfolder=&type=&preview=` 二进制流；`type` 必须是 `input                                          | output | temp` |
-| GET    | `/api/comfyui/workflows`         | 工作流列表                                                                                                     |
-| POST   | `/api/comfyui/workflows`         | body `{ id?, name, graph }` 保存（`id` 存在则更新）                                                            |
-| GET    | `/api/comfyui/workflows/:id`     | 读取单个                                                                                                       |
-| DELETE | `/api/comfyui/workflows/:id`     | 删除                                                                                                           |
-| WS     | `/api/comfyui/ws?clientId=`      | WebSocket 代理，逐帧转发 ComfyUI `/ws` 事件                                                                    |
+## ComfyUI
 
-通用状态码：
+当前所有 `/api/comfyui/**` 端点和 `/api/comfyui/ws` 仅管理员可用。HTTP 覆盖 status、object-info、prompt、history、queue、interrupt、free、upload、view 和工作流 CRUD；WebSocket 转发实时事件。生产 local/auto 配置返回服务配置错误，本地 install/start/stop 只服务开发环境。
 
-| 状态码 | 含义                                                       |
-| ------ | ---------------------------------------------------------- |
-| 404    | 工作流 id 不存在                                           |
-| 409    | 在 `remote` 模式调用本地启停/安装                          |
-| 422    | 提交体校验失败（来自 ComfyUI 的 `{ error, node_errors }`） |
-| 502    | ComfyUI 不可达或返回异常                                   |
-| 504    | 本地启动就绪探测超时                                       |
+`POST /api/comfyui/upload` 接收 multipart 字段 `file` 与 `kind`（`image`、`audio` 或 `video`），上传到 ComfyUI input 目录后失效节点定义缓存；工作流右侧检查器会根据选中加载节点的上传标记选择文件类型，并把返回文件名写回节点参数。
 
-`prompt` 提交体可附带 `workflow` 字段（标准 ComfyUI workflow JSON），服务端会写入 `extra_data.extra_pnginfo.workflow`，官方前端据此可重新打开图。输入控件顺序依赖 `object_info` 的声明顺序；可选控件排在必填控件之前的少数节点会导致导入时控件错位，已记录为已知限制。
+工作流保存到 PostgreSQL并绑定 owner；prompt ID 同步记录到 `comfy_executions`。共享实例的任意工作流尚未对普通用户开放。
+
+工作流 CRUD 的列表会返回当前用户自己的记录和 `visibility=public` 的公开记录。摘要和详情额外返回 `visibility`（`private` / `public`）以及 `scope`（`mine` / `public`）；左侧“公开工作流”按 `visibility=public` 筛选，因此拥有者自己的公开工作流会同时出现在“我的工作流”和“公开工作流”中。公开工作流允许读取和载入，保存公开工作流时只能更新自己的记录，载入他人的公开工作流会在页面中按副本保存。`POST /api/comfyui/workflows` 可传 `visibility`，默认是私有；删除仍只允许工作流拥有者。
 
 ## 契约演进
 
-修改 API 时同时更新共享类型、Zod schema、能力校验、相关 spec 和本文。破坏性修改需要版本化或兼容窗口，不得静默改变已持久化记录的含义。
+修改 API 时同步共享类型、Zod schema、spec 与本文。数据库结构通过 `drizzle/` migration 演进；持久化 generation payload 带 `schemaVersion`，不兼容变更必须提供兼容读取或迁移。

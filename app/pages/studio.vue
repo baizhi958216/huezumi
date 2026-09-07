@@ -4,6 +4,7 @@ import { getMediaValidationIssue, MEDIA_META, MODE_META, resolveModelCapability,
 import { useIntervalFn } from '@vueuse/core'
 
 const { data: providerCatalog } = await useFetch<ProviderCapability[]>('/api/providers')
+const { user, authDialogOpen } = useAuth()
 
 const providerId = ref<string>()
 const capability = computed(() => providerCatalog.value?.find(item => item.id === providerId.value))
@@ -29,6 +30,7 @@ const advancedOpen = ref(false)
 const submitting = ref(false)
 const errorMessage = ref('')
 const task = ref<GenerationRecord>()
+const quote = ref<{ id: string, estimatedCredits: number, expiresAt: string, sourceLabel: string, idempotencyKey: string }>()
 
 const providerItems = computed(() => (providerCatalog.value || []).map(item => ({
   label: item.enabled ? item.name : `${item.name} · 未配置凭据`,
@@ -200,26 +202,42 @@ async function generate() {
     return
   }
 
+  if (!user.value) {
+    authDialogOpen.value = true
+    return
+  }
+
   submitting.value = true
   try {
+    const request = {
+      provider: providerId.value,
+      model: model.value,
+      mode: mode.value,
+      prompt: prompt.value,
+      negativePrompt: negativePrompt.value || undefined,
+      media: media.value,
+      resolution: resolution.value,
+      ratio: ratio.value,
+      duration: effectiveDuration.value,
+      audio: audio.value,
+      promptExtend: promptExtend.value,
+      watermark: watermark.value,
+      seed: seed.value,
+    }
+    if (!quote.value || new Date(quote.value.expiresAt).getTime() <= Date.now()) {
+      const response = await $fetch<{ id: string, estimatedCredits: number, expiresAt: string, sourceLabel: string }>('/api/billing/quote', { method: 'POST', body: request })
+      quote.value = { ...response, idempotencyKey: crypto.randomUUID() }
+      return
+    }
     task.value = await $fetch<GenerationRecord>('/api/generations', {
       method: 'POST',
       body: {
-        provider: providerId.value,
-        model: model.value,
-        mode: mode.value,
-        prompt: prompt.value,
-        negativePrompt: negativePrompt.value || undefined,
-        media: media.value,
-        resolution: resolution.value,
-        ratio: ratio.value,
-        duration: effectiveDuration.value,
-        audio: audio.value,
-        promptExtend: promptExtend.value,
-        watermark: watermark.value,
-        seed: seed.value,
+        ...request,
+        quoteId: quote.value.id,
+        idempotencyKey: quote.value.idempotencyKey,
       },
     })
+    quote.value = undefined
     polling.resume()
   }
   catch (error: any) {
@@ -230,10 +248,15 @@ async function generate() {
   }
 }
 
+watch([providerId, model, mode, prompt, negativePrompt, media, resolution, ratio, effectiveDuration, audio, promptExtend, watermark, seed], () => {
+  quote.value = undefined
+}, { deep: true })
+
 async function refreshTaskExplicitly() {
   if (!task.value)
     return
-  task.value = await $fetch<GenerationRecord>(`/api/generations/${task.value.id}?refresh=1`)
+  await $fetch(`/api/generations/${task.value.id}/refresh`, { method: 'POST' })
+  task.value = await $fetch<GenerationRecord>(`/api/generations/${task.value.id}`)
   if (['PENDING', 'RUNNING'].includes(task.value.status))
     polling.resume()
 }
@@ -333,6 +356,7 @@ onBeforeUnmount(polling.pause)
         :selected-model-name="selectedModelName"
         :submitting="submitting"
         :error-message="errorMessage"
+        :quote="quote"
         :media-values="mediaValues"
         :media-slot-max="mediaSlotMax"
         :set-media="setMedia"

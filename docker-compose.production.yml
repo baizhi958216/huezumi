@@ -1,0 +1,85 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: forkvdo
+      POSTGRES_USER: forkvdo
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U forkvdo]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:8-alpine
+    command: [redis-server, --appendonly, yes]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  migrate:
+    build: .
+    environment: &app-env
+      NUXT_DATABASE_URL: postgresql://forkvdo:${POSTGRES_PASSWORD}@postgres:5432/forkvdo
+      NUXT_REDIS_URL: redis://redis:6379
+      NUXT_QUEUE_MODE: redis
+      NUXT_COMFYUI_MODE: remote
+      NUXT_COMFYUI_REMOTE_BASE_URL: http://comfyui:8188
+    command: [pnpm, 'db:migrate']
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  web:
+    build: .
+    environment:
+      <<: *app-env
+      NUXT_WORKER_ENABLED: 'false'
+    ports:
+      - '3000:3000'
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+  worker:
+    build: .
+    environment:
+      <<: *app-env
+      NUXT_WORKER_ENABLED: 'true'
+      NUXT_WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-4}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+  comfyui:
+    build:
+      context: .
+      dockerfile: docker/comfyui/Dockerfile
+      args:
+        COMFYUI_REF: ${COMFYUI_REF:-v0.3.59}
+    gpus: all
+    volumes:
+      - ${COMFYUI_MODELS_DIR:?set COMFYUI_MODELS_DIR}:/opt/ComfyUI/models:ro
+      - comfy-input:/opt/ComfyUI/input
+      - comfy-output:/opt/ComfyUI/output
+      - comfy-temp:/opt/ComfyUI/temp
+    expose:
+      - '8188'
+
+volumes:
+  postgres-data:
+  redis-data:
+  comfy-input:
+  comfy-output:
+  comfy-temp:
