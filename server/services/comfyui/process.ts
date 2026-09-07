@@ -187,16 +187,34 @@ export async function stopComfy(): Promise<ComfyUIStatus> {
 
   const target = child as ChildProcess
   await new Promise<void>((resolve) => {
-    const timer = setTimeout(() => {
+    let settled = false
+    let timer: NodeJS.Timeout | undefined
+
+    const finish = () => {
+      if (settled)
+        return
+      settled = true
+      if (timer)
+        clearTimeout(timer)
+      target.off('exit', finish)
+      resolve()
+    }
+
+    target.once('exit', finish)
+    timer = setTimeout(() => {
       if (isChildAlive(target))
         target.kill('SIGKILL')
-      resolve()
+      finish()
     }, STOP_GRACE_MS)
-    target.once('exit', () => {
-      clearTimeout(timer)
-      resolve()
-    })
-    target.kill('SIGTERM')
+
+    try {
+      if (!target.kill('SIGTERM') && !isChildAlive(target))
+        finish()
+    }
+    catch {
+      // The process may have exited between the liveness check and SIGTERM.
+      finish()
+    }
   })
 
   runtime.child = undefined
