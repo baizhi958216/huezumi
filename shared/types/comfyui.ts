@@ -231,11 +231,15 @@ export function buildNodeTypeInfo(name: string, def: ComfyNodeDef): ComfyNodeTyp
         continue
       }
       if (WIDGET_TYPES.has(type)) {
+        if (options.forceInput || options.force_input) {
+          inputs.push({ name: inputName, type, group })
+          continue
+        }
         widgets.push({ name: inputName, kind: type as ComfyWidgetKind, options, serialize: true, group })
         if (type === 'STRING' && isConnectableString(options))
           inputs.push({ name: inputName, type, group })
         if ((inputName === 'seed' || inputName === 'noise_seed')
-          && (CONTROL_AFTER_GENERATE_NODES as readonly string[]).includes(name)) {
+          && (options.control_after_generate || (CONTROL_AFTER_GENERATE_NODES as readonly string[]).includes(name))) {
           widgets.push({
             name: 'control_after_generate',
             kind: 'CONTROL_AFTER_GENERATE',

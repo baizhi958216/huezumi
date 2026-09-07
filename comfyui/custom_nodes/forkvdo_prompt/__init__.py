@@ -5,6 +5,10 @@ Remote ComfyUI instances should mount or copy this repository directory.
 """
 
 from .nodes import NODE_CLASS_MAPPINGS, NODE_DISPLAY_NAME_MAPPINGS
+from .image_workflow import NODE_CLASS_MAPPINGS as IMAGE_NODES, NODE_DISPLAY_NAME_MAPPINGS as IMAGE_NAMES
+
+NODE_CLASS_MAPPINGS = {**NODE_CLASS_MAPPINGS, **IMAGE_NODES}
+NODE_DISPLAY_NAME_MAPPINGS = {**NODE_DISPLAY_NAME_MAPPINGS, **IMAGE_NAMES}
 
 
 def _patch_broken_pipe() -> None:

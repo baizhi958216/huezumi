@@ -1,8 +1,8 @@
 """One-shot multimodal prompt nodes for forkvdo.
 
-The node deliberately keeps provider secrets out of graph inputs.  A ComfyUI
-execution host supplies FORKVDO_LLM_CONNECTIONS_JSON, and graph inputs only
-refer to a connection id.
+Connections can come from the execution host or from the user-owned workflow
+configuration node. The latter is intentionally opt-in so a workflow copy can
+carry its own OpenAI-compatible endpoint and credentials.
 """
 
 from __future__ import annotations
@@ -10,7 +10,6 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
-import mimetypes
 import os
 from io import BytesIO
 from typing import Any
@@ -32,14 +31,14 @@ DEFAULT_TIMEOUT_SECONDS = 120
 DEFAULT_RULES = """You are an expert prompt director for an AI image-generation workflow.
 Your task is to analyze the user's natural language request and any ordered reference images (labeled as 图1, 图2...), and produce two prompts: positive_prompt and negative_prompt.
 Return exactly one JSON object with these keys:
-- positive_prompt: A descriptive, concrete prompt tailored for the Anima image model. Must be a non-empty string.
+- positive_prompt: A descriptive, concrete image prompt. Must be a non-empty string.
 - negative_prompt: Undesired visual flaws, artifacts, or traits. May be an empty string.
 
 Guidelines:
 1. Understand the exact role of each reference image based on the user's request (e.g. "图1 is art style, 图2 is character 3-view turnaround, generate this character in a desert").
 2. Separate visual traits that must be preserved (e.g., character identity, hair/eye color, costume, facial features, or artistic style) from elements that must be changed (e.g., background, lighting, action, camera angle).
 3. Do not arbitrarily alter key character or scene features that the user did not ask to change.
-4. Adapt prompt style specifically for Anima: describe concrete visual subjects, composition, lighting, materials, colors, camera framing, and quality keywords (e.g. masterpiece, best quality, detailed background). Avoid meta descriptions or story narratives.
+4. Follow the target model guidance when supplied. Otherwise describe subjects, composition, lighting, materials, colors and camera framing in natural language. Do not invent model-specific trigger words.
 5. Do not include image indices, instructions, API parameters, or markdown fences in either prompt string.
 """
 
@@ -72,15 +71,14 @@ def _configured_connections() -> dict[str, dict[str, Any]]:
 
 
 def _connection_ids() -> list[str]:
-    return sorted(_configured_connections().keys()) or ["default"]
+    return ["manual", "workflow"] + sorted(key for key in _configured_connections() if key not in {"manual", "workflow"})
 
 
 def _input_image_choices() -> list[str]:
-    files = folder_paths.get_filename_list("input")
-    try:
-        files = folder_paths.filter_files_content_types(files, ["image"])
-    except Exception:
-        files = []
+    root = folder_paths.get_input_directory()
+    files = [os.path.relpath(os.path.join(directory, name), root)
+             for directory, _, names in os.walk(root) for name in names]
+    files = folder_paths.filter_files_content_types(files, ["image"])
     return [""] + sorted({str(name) for name in files})
 
 
@@ -114,6 +112,15 @@ class ForkVdoImageCollection:
     CATEGORY = "forkvdo/reference"
     DESCRIPTION = "按顺序合并多张参考图片；可通过 previous 串联多个集合节点。"
 
+    @classmethod
+    def IS_CHANGED(cls, previous=None, **kwargs):
+        digest = hashlib.sha256()
+        for index in range(1, MAX_COLLECTION_SLOTS + 1):
+            name = str(kwargs.get(f"image_{index}") or "").strip()
+            if name and kwargs.get(f"image_{index}_input") is None:
+                digest.update(_read_file_item(name)[0])
+        return digest.hexdigest()
+
     def collect(self, previous=None, **kwargs):
         items: list[dict[str, Any]] = []
         if isinstance(previous, dict) and isinstance(previous.get("items"), list):
@@ -132,16 +139,17 @@ class ForkVdoImageCollection:
             if filename and filename not in {"__COMBO_EMPTY__", "[none]", "none"}:
                 items.append({"kind": "file", "value": filename, "slot": index})
 
-        image_names = [
-            str(item.get("value") or f"连线图片{i + 1}") if item.get("kind") == "file" else f"连线张量{i + 1}"
-            for i, item in enumerate(items)
-        ]
+        if len(items) > 64:
+            raise RuntimeError("图片集合最多 64 张，请减少素材")
+        for item in items:
+            if item.get("kind") == "file":
+                _read_file_item(str(item["value"]))
 
         return {
             "result": ({"items": items},),
             "ui": {
                 "image_count": [str(len(items))],
-                "images": image_names,
+                "text": [f"共 {len(items)} 张图片，按非空槽位顺序编号；编辑时选择原图序号。"],
             },
         }
 
@@ -174,13 +182,23 @@ def _read_file_item(filename: str) -> tuple[bytes, str]:
         raise RuntimeError("参考图片不存在或已被移除，请重新上传")
     try:
         path = folder_paths.get_annotated_filepath(filename, folder_paths.get_input_directory())
+        roots = [folder_paths.get_input_directory(), folder_paths.get_output_directory(), folder_paths.get_temp_directory()]
+        if not any(os.path.commonpath([os.path.realpath(path), os.path.realpath(root)]) == os.path.realpath(root) for root in roots):
+            raise RuntimeError("参考图片必须位于 ComfyUI 素材目录")
         with open(path, "rb") as handle:
-            data = handle.read()
+            data = handle.read(200 * 1024 * 1024 + 1)
     except (OSError, ValueError):
         raise RuntimeError("读取参考图片失败，请重新上传") from None
-    mime = mimetypes.guess_type(filename, strict=False)[0] or "image/png"
-    if not mime.startswith("image/"):
-        raise RuntimeError("参考素材必须是图片")
+    if len(data) > 200 * 1024 * 1024:
+        raise RuntimeError("单张图片超过 200MB 读取上限")
+    try:
+        with Image.open(BytesIO(data)) as image:
+            if getattr(image, "n_frames", 1) != 1:
+                raise RuntimeError("仅支持静态图片，请将动画转换为单张图片")
+            mime = Image.MIME.get(image.format, "image/png")
+            image.verify()
+    except (OSError, ValueError, Image.DecompressionBombError):
+        raise RuntimeError("参考素材不是有效图片，请重新上传") from None
     return data, mime
 
 
@@ -271,7 +289,7 @@ def _post_json(url: str, api_key: str, payload: dict[str, Any], timeout: int) ->
     request = Request(
         url,
         data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
-        headers={"content-type": "application/json", "authorization": f"Bearer {api_key}"},
+        headers={"content-type": "application/json", **({"authorization": f"Bearer {api_key}"} if api_key else {})},
         method="POST",
     )
     try:
@@ -287,7 +305,9 @@ def _post_json(url: str, api_key: str, payload: dict[str, Any], timeout: int) ->
 
 def _call_model(connection: dict[str, Any], model: str, messages: list[dict[str, Any]], timeout: int) -> tuple[str, str]:
     api_key = str(connection.get("apiKey") or "").strip()
-    if not api_key:
+    if connection.get("auth") == "none":
+        api_key = ""
+    elif not api_key:
         raise RuntimeError("大模型连接未配置 apiKey")
     url = f"{_normalise_base_url(connection.get('baseUrl'))}/chat/completions"
     payload: dict[str, Any] = {
@@ -331,15 +351,16 @@ class ForkVdoPrompt:
         first_connection = connections.get(sorted(connections.keys())[0], {}) if connections else {}
         return {
             "required": {
-                "connection_id": (_connection_ids(), {"tooltip": "只保存连接标识；密钥由 ComfyUI 执行端环境提供"}),
+                "connection_id": (_connection_ids(), {"tooltip": "workflow 表示使用已连接的工作流配置；云端连接标识仍从 ComfyUI 执行端环境读取"}),
                 "model_name": ("STRING", {"default": str(first_connection.get("defaultModel") or ""), "socketless": True}),
-                "user_request": ("STRING", {"default": "", "multiline": True, "dynamicPrompts": True, "socketless": True}),
+                "user_request": ("STRING", {"default": "", "multiline": True, "dynamicPrompts": True}),
                 "default_rules": ("STRING", {"default": DEFAULT_RULES, "multiline": True, "dynamicPrompts": True, "socketless": True}),
-                "target_config": (["anima"], {"default": "anima"}),
+                "target_config": ("STRING", {"default": "通用图片模型；使用自然语言描述画面", "socketless": True}),
                 "refresh_token": ("INT", {"default": 0, "min": 0, "max": 0x7FFFFFFF}),
             },
             "optional": {
                 "reference_images": ("IMAGE_COLLECTION", {"tooltip": "可选；按集合节点中的图1、图2顺序发送"}),
+                "llm_config": ("FORKVDO_LLM_CONFIG", {"tooltip": "可选；连接工作流内的大模型配置后优先使用"}),
             },
         }
 
@@ -347,13 +368,14 @@ class ForkVdoPrompt:
     RETURN_NAMES = ("positive_prompt", "negative_prompt")
     FUNCTION = "generate"
     CATEGORY = "forkvdo/prompt"
-    DESCRIPTION = "一次性理解文字与参考图，输出 Anima 正向和反向提示词。"
+    DESCRIPTION = "理解文字与有序参考图，输出正负提示词。选择 manual 直接使用需求，不调用大模型；其他连接可为云端或本地视觉模型。修改 refresh_token 后再次运行可重新生成。"
 
     @classmethod
-    def IS_CHANGED(cls, connection_id, model_name, user_request, default_rules, target_config, refresh_token, reference_images=None):
+    def IS_CHANGED(cls, connection_id, model_name, user_request, default_rules, target_config, refresh_token, reference_images=None, llm_config=None):
         # The explicit refresh token is intentionally part of the cache key. Other values are
         # included so normal edits invalidate the node without making every retry call the LLM.
         digest = hashlib.sha256()
+        digest.update(os.environ.get("FORKVDO_LLM_CONNECTIONS_JSON", "").encode("utf-8"))
         digest.update(json.dumps({
             "connection_id": connection_id,
             "model_name": model_name,
@@ -362,36 +384,44 @@ class ForkVdoPrompt:
             "target_config": target_config,
             "refresh_token": refresh_token,
             "reference_count": len(reference_images.get("items", [])) if isinstance(reference_images, dict) else 0,
+            "llm_config": llm_config,
         }, ensure_ascii=False, sort_keys=True).encode("utf-8"))
         return digest.hexdigest()
 
-    def generate(self, connection_id, model_name, user_request, default_rules, target_config, refresh_token, reference_images=None):
+    def generate(self, connection_id, model_name, user_request, default_rules, target_config, refresh_token, reference_images=None, llm_config=None):
         del refresh_token
-        connections = _connection_config()
-        connection_key = str(connection_id or "").strip()
-        connection = connections.get(connection_key)
-        if connection is None:
-            raise RuntimeError("大模型连接标识无效，请选择已配置的连接")
-        model = str(model_name or connection.get("defaultModel") or "").strip()
-        if not model:
-            raise RuntimeError("请填写大模型名称")
-        if reference_images is not None and not bool(connection.get("supportsVision", False)):
-            raise RuntimeError("当前连接未声明支持视觉输入，不能处理参考图片")
-
-        images = _image_parts(reference_images, connection)
         request_text = str(user_request or "").strip()
         if not request_text:
             raise RuntimeError("请填写用户需求")
+        if llm_config is None and connection_id == "manual":
+            return {"result": (request_text, ""), "ui": {"text": ["手动模式：直接使用需求文本，参考图未经过大模型理解。", request_text]}}
+        if llm_config is not None:
+            if not isinstance(llm_config, dict):
+                raise RuntimeError("工作流大模型配置格式无效")
+            connection = llm_config
+        else:
+            connections = _connection_config()
+            connection_key = str(connection_id or "").strip()
+            connection = connections.get(connection_key)
+            if connection is None:
+                raise RuntimeError("大模型连接标识无效，请选择已配置的连接")
+        model = str(model_name or connection.get("defaultModel") or "").strip()
+        if not model:
+            raise RuntimeError("请填写大模型名称")
+        images = _image_parts(reference_images, connection)
+        if images and not bool(connection.get("supportsVision", False)):
+            raise RuntimeError("当前连接未声明支持视觉输入，不能处理参考图片")
         rules = str(default_rules or DEFAULT_RULES).strip() or DEFAULT_RULES
-        target = str(target_config or "anima")
+        target = str(target_config or "generic image generation")
         image_note = ""
         if images:
             image_note = f"\nThe following {len(images)} reference images are provided in exact UI order. Use the user's description to infer each image's purpose; do not assume they are separate outputs."
-        system = f"{rules}\n\nTarget prompt adapter: {target}. Generate prompts suitable for the existing Anima image workflow."
+        system = f"{rules}\n\nTarget model guidance: {target}"
         user_content: Any = request_text + image_note
         if images:
             user_content = [{"type": "text", "text": request_text + image_note}]
-            for image in images:
+            for index, image in enumerate(images, 1):
+                user_content.append({"type": "text", "text": f"图{index}"})
                 user_content.append({"type": "image_url", "image_url": {"url": image["url"]}})
         messages = [
             {"role": "system", "content": system},
@@ -402,6 +432,7 @@ class ForkVdoPrompt:
         return {
             "result": (positive, negative),
             "ui": {
+                "text": [f"正向提示词：\n{positive}", f"反向提示词：\n{negative}"],
                 "positive_prompt": [positive],
                 "negative_prompt": [negative],
                 "reference_count": [str(len(images))],

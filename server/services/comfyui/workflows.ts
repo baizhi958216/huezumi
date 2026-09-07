@@ -22,6 +22,16 @@ function normalizeVisibility(value: string): ComfyWorkflowVisibility {
   return value === 'public' ? 'public' : 'private'
 }
 
+/** A workflow-owned key is intentionally visible to its owner, but never to a public copy. */
+export function hasEmbeddedLlmSecret(graph: ComfyWorkflowJSON): boolean {
+  return graph.nodes?.some((node) => {
+    if (node.type !== 'ForkVdoLLMConfig')
+      return false
+    const apiKey = node.widgets_values?.[1]
+    return typeof apiKey === 'string' && apiKey.trim().length > 0
+  }) ?? false
+}
+
 function scopeFor(row: typeof workflows.$inferSelect, ownerId: string): ComfyWorkflowScope {
   return row.ownerId === ownerId ? 'mine' : 'public'
 }
@@ -160,6 +170,12 @@ export async function saveWorkflow(ownerId: string, input: SaveWorkflowInput): P
   if (input.id) {
     if (!isUuid(input.id))
       throw createError({ statusCode: 400, statusMessage: '无法直接覆盖内置工作流' })
+    const [existing] = await db.select({ visibility: workflows.visibility }).from(workflows).where(and(eq(workflows.id, input.id), eq(workflows.ownerId, ownerId))).limit(1)
+    if (!existing)
+      throw createError({ statusCode: 404, statusMessage: '工作流不存在' })
+    const visibility = normalizeVisibility(input.visibility ?? existing.visibility)
+    if (visibility === 'public' && hasEmbeddedLlmSecret(input.graph))
+      throw createError({ statusCode: 422, statusMessage: '包含工作流 API Key 的工作流不能设为公开，请改为私有后保存' })
     const values: { name: string, graph: ComfyWorkflowJSON, updatedAt: Date, visibility?: ComfyWorkflowVisibility } = {
       name: input.name.trim() || '未命名工作流',
       graph: input.graph,
@@ -172,7 +188,10 @@ export async function saveWorkflow(ownerId: string, input: SaveWorkflowInput): P
       throw createError({ statusCode: 404, statusMessage: '工作流不存在' })
     return toRecord(updated, ownerId)
   }
-  const [created] = await db.insert(workflows).values({ ownerId, name: input.name.trim() || '未命名工作流', visibility: input.visibility ?? 'private', graph: input.graph }).returning()
+  const visibility = input.visibility ?? 'private'
+  if (visibility === 'public' && hasEmbeddedLlmSecret(input.graph))
+    throw createError({ statusCode: 422, statusMessage: '包含工作流 API Key 的工作流不能设为公开，请改为私有后保存' })
+  const [created] = await db.insert(workflows).values({ ownerId, name: input.name.trim() || '未命名工作流', visibility, graph: input.graph }).returning()
   return toRecord(created!, ownerId)
 }
 

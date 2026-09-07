@@ -1,0 +1,625 @@
+{
+  "ForkVdoImageCollection": {
+    "name": "ForkVdoImageCollection",
+    "input": {
+      "required": {},
+      "optional": {
+        "previous": [
+          "IMAGE_COLLECTION",
+          {
+            "tooltip": "可连接上一个图片集合，顺序为前序在前"
+          }
+        ],
+        "image_1": [
+          [
+            "",
+            "one.png",
+            "two.png",
+            "mask.png"
+          ],
+          {
+            "image_upload": true,
+            "tooltip": "第 1 张图片；留空表示不使用"
+          }
+        ],
+        "image_2": [
+          [
+            "",
+            "one.png",
+            "two.png",
+            "mask.png"
+          ],
+          {
+            "image_upload": true,
+            "tooltip": "第 2 张图片；留空表示不使用"
+          }
+        ],
+        "image_3": [
+          [
+            "",
+            "one.png",
+            "two.png",
+            "mask.png"
+          ],
+          {
+            "image_upload": true,
+            "tooltip": "第 3 张图片；留空表示不使用"
+          }
+        ],
+        "image_4": [
+          [
+            "",
+            "one.png",
+            "two.png",
+            "mask.png"
+          ],
+          {
+            "image_upload": true,
+            "tooltip": "第 4 张图片；留空表示不使用"
+          }
+        ],
+        "image_5": [
+          [
+            "",
+            "one.png",
+            "two.png",
+            "mask.png"
+          ],
+          {
+            "image_upload": true,
+            "tooltip": "第 5 张图片；留空表示不使用"
+          }
+        ],
+        "image_6": [
+          [
+            "",
+            "one.png",
+            "two.png",
+            "mask.png"
+          ],
+          {
+            "image_upload": true,
+            "tooltip": "第 6 张图片；留空表示不使用"
+          }
+        ],
+        "image_7": [
+          [
+            "",
+            "one.png",
+            "two.png",
+            "mask.png"
+          ],
+          {
+            "image_upload": true,
+            "tooltip": "第 7 张图片；留空表示不使用"
+          }
+        ],
+        "image_8": [
+          [
+            "",
+            "one.png",
+            "two.png",
+            "mask.png"
+          ],
+          {
+            "image_upload": true,
+            "tooltip": "第 8 张图片；留空表示不使用"
+          }
+        ],
+        "image_1_input": [
+          "IMAGE",
+          {
+            "tooltip": "第 1 个图片连线；可接 LoadImage 或其他图片节点"
+          }
+        ],
+        "image_2_input": [
+          "IMAGE",
+          {
+            "tooltip": "第 2 个图片连线；可接 LoadImage 或其他图片节点"
+          }
+        ],
+        "image_3_input": [
+          "IMAGE",
+          {
+            "tooltip": "第 3 个图片连线；可接 LoadImage 或其他图片节点"
+          }
+        ],
+        "image_4_input": [
+          "IMAGE",
+          {
+            "tooltip": "第 4 个图片连线；可接 LoadImage 或其他图片节点"
+          }
+        ],
+        "image_5_input": [
+          "IMAGE",
+          {
+            "tooltip": "第 5 个图片连线；可接 LoadImage 或其他图片节点"
+          }
+        ],
+        "image_6_input": [
+          "IMAGE",
+          {
+            "tooltip": "第 6 个图片连线；可接 LoadImage 或其他图片节点"
+          }
+        ],
+        "image_7_input": [
+          "IMAGE",
+          {
+            "tooltip": "第 7 个图片连线；可接 LoadImage 或其他图片节点"
+          }
+        ],
+        "image_8_input": [
+          "IMAGE",
+          {
+            "tooltip": "第 8 个图片连线；可接 LoadImage 或其他图片节点"
+          }
+        ]
+      }
+    },
+    "output": [
+      "IMAGE_COLLECTION"
+    ],
+    "output_name": [
+      "images"
+    ]
+  },
+  "ForkVdoText": {
+    "name": "ForkVdoText",
+    "input": {
+      "required": {
+        "text": [
+          "STRING",
+          {
+            "default": "",
+            "multiline": true
+          }
+        ]
+      }
+    },
+    "output": [
+      "STRING"
+    ],
+    "output_name": [
+      "text"
+    ]
+  },
+  "ForkVdoPrompt": {
+    "name": "ForkVdoPrompt",
+    "input": {
+      "required": {
+        "connection_id": [
+          [
+            "manual",
+            "workflow",
+            "local-fixture"
+          ],
+          {
+            "tooltip": "workflow 表示使用工作流内的连接配置；其他连接从 ComfyUI 执行端环境读取"
+          }
+        ],
+        "model_name": [
+          "STRING",
+          {
+            "default": "",
+            "socketless": true
+          }
+        ],
+        "user_request": [
+          "STRING",
+          {
+            "default": "",
+            "multiline": true,
+            "dynamicPrompts": true
+          }
+        ],
+        "default_rules": [
+          "STRING",
+          {
+            "default": "You are an expert prompt director for an AI image-generation workflow.\nYour task is to analyze the user's natural language request and any ordered reference images (labeled as 图1, 图2...), and produce two prompts: positive_prompt and negative_prompt.\nReturn exactly one JSON object with these keys:\n- positive_prompt: A descriptive, concrete image prompt. Must be a non-empty string.\n- negative_prompt: Undesired visual flaws, artifacts, or traits. May be an empty string.\n\nGuidelines:\n1. Understand the exact role of each reference image based on the user's request (e.g. \"图1 is art style, 图2 is character 3-view turnaround, generate this character in a desert\").\n2. Separate visual traits that must be preserved (e.g., character identity, hair/eye color, costume, facial features, or artistic style) from elements that must be changed (e.g., background, lighting, action, camera angle).\n3. Do not arbitrarily alter key character or scene features that the user did not ask to change.\n4. Follow the target model guidance when supplied. Otherwise describe subjects, composition, lighting, materials, colors and camera framing in natural language. Do not invent model-specific trigger words.\n5. Do not include image indices, instructions, API parameters, or markdown fences in either prompt string.\n",
+            "multiline": true,
+            "dynamicPrompts": true,
+            "socketless": true
+          }
+        ],
+        "target_config": [
+          "STRING",
+          {
+            "default": "通用图片模型；使用自然语言描述画面",
+            "socketless": true
+          }
+        ],
+        "refresh_token": [
+          "INT",
+          {
+            "default": 0,
+            "min": 0,
+            "max": 2147483647
+          }
+        ]
+      },
+      "optional": {
+        "reference_images": [
+          "IMAGE_COLLECTION",
+          {
+            "tooltip": "可选；按集合节点中的图1、图2顺序发送"
+          }
+        ],
+        "llm_config": [
+          "FORKVDO_LLM_CONFIG",
+          {
+            "tooltip": "可选；连接工作流内的大模型配置后优先使用"
+          }
+        ]
+      }
+    },
+    "output": [
+      "STRING",
+      "STRING"
+    ],
+    "output_name": [
+      "positive_prompt",
+      "negative_prompt"
+    ]
+  },
+  "ForkVdoLLMConfig": {
+    "name": "ForkVdoLLMConfig",
+    "input": {
+      "required": {
+        "base_url": [
+          "STRING",
+          {
+            "default": "",
+            "tooltip": "OpenAI Chat Completions 兼容地址"
+          }
+        ],
+        "api_key": [
+          "STRING",
+          {
+            "default": "",
+            "secret": true,
+            "tooltip": "会随私有工作流保存"
+          }
+        ],
+        "auth": [
+          [
+            "bearer",
+            "none"
+          ],
+          {
+            "default": "bearer",
+            "tooltip": "云端一般使用 bearer；本机免鉴权服务选择 none"
+          }
+        ],
+        "model_name": [
+          "STRING",
+          {
+            "default": ""
+          }
+        ],
+        "supports_vision": [
+          "BOOLEAN",
+          {
+            "default": true
+          }
+        ],
+        "timeout_seconds": [
+          "INT",
+          {
+            "default": 120,
+            "min": 5,
+            "max": 600
+          }
+        ]
+      }
+    },
+    "output": [
+      "FORKVDO_LLM_CONFIG"
+    ],
+    "output_name": [
+      "config"
+    ]
+  },
+  "ForkVdoPromptText": {
+    "name": "ForkVdoPromptText",
+    "input": {
+      "required": {
+        "operation": [
+          [
+            "append",
+            "replace"
+          ],
+          {
+            "tooltip": "append：保留大模型结果并追加；replace：用下方文本替换"
+          }
+        ],
+        "text": [
+          "STRING",
+          {
+            "default": "",
+            "multiline": true
+          }
+        ]
+      },
+      "optional": {
+        "prompt": [
+          "STRING",
+          {
+            "forceInput": true
+          }
+        ]
+      }
+    },
+    "output": [
+      "STRING"
+    ],
+    "output_name": [
+      "prompt"
+    ]
+  },
+  "ForkVdoImagePlan": {
+    "name": "ForkVdoImagePlan",
+    "input": {
+      "required": {
+        "positive": [
+          "STRING",
+          {
+            "forceInput": true
+          }
+        ],
+        "negative": [
+          "STRING",
+          {
+            "forceInput": true
+          }
+        ],
+        "mode": [
+          [
+            "generate",
+            "edit",
+            "inpaint"
+          ],
+          {
+            "tooltip": "generate 生图；edit 整图编辑；inpaint 局部重绘"
+          }
+        ],
+        "width": [
+          "INT",
+          {
+            "default": 512,
+            "min": 64,
+            "max": 4096,
+            "step": 8,
+            "tooltip": "仅生图使用；编辑保留原图尺寸"
+          }
+        ],
+        "height": [
+          "INT",
+          {
+            "default": 512,
+            "min": 64,
+            "max": 4096,
+            "step": 8
+          }
+        ],
+        "source_index": [
+          "INT",
+          {
+            "default": 1,
+            "min": 1,
+            "max": 64,
+            "tooltip": "编辑哪张原图：按图片集合实际非空顺序，从1开始"
+          }
+        ],
+        "edit_strength": [
+          "FLOAT",
+          {
+            "default": 0.45,
+            "min": 0,
+            "max": 1,
+            "step": 0.05,
+            "tooltip": "越低越接近原图；0直接返回原图；生图模式忽略此值"
+          }
+        ]
+      },
+      "optional": {
+        "images": [
+          "IMAGE_COLLECTION"
+        ],
+        "mask_image": [
+          [
+            "",
+            "one.png",
+            "two.png",
+            "mask.png"
+          ],
+          {
+            "image_upload": true,
+            "tooltip": "局部重绘需同尺寸黑白遮罩：白色修改，黑色保留。支持灰度过渡。"
+          }
+        ],
+        "mask": [
+          "MASK",
+          {
+            "tooltip": "可接其他遮罩节点；连线优先于遮罩文件"
+          }
+        ]
+      }
+    },
+    "output": [
+      "IMAGE_PLAN"
+    ],
+    "output_name": [
+      "plan"
+    ]
+  },
+  "CheckpointLoaderSimple": {
+    "name": "CheckpointLoaderSimple",
+    "input": {
+      "required": {
+        "ckpt_name": [
+          [
+            "anythingv5nijimix_25BEST.safetensors"
+          ],
+          {
+            "tooltip": "The name of the checkpoint (model) to load."
+          }
+        ]
+      }
+    },
+    "output": [
+      "MODEL",
+      "CLIP",
+      "VAE"
+    ],
+    "output_name": [
+      "MODEL",
+      "CLIP",
+      "VAE"
+    ]
+  },
+  "ForkVdoImageGenerate": {
+    "name": "ForkVdoImageGenerate",
+    "input": {
+      "required": {
+        "model": [
+          "MODEL"
+        ],
+        "clip": [
+          "CLIP"
+        ],
+        "vae": [
+          "VAE"
+        ],
+        "plan": [
+          "IMAGE_PLAN"
+        ],
+        "seed": [
+          "INT",
+          {
+            "default": 0,
+            "min": 0,
+            "max": 4294967295,
+            "control_after_generate": true
+          }
+        ],
+        "steps": [
+          "INT",
+          {
+            "default": 24,
+            "min": 1,
+            "max": 100
+          }
+        ],
+        "cfg": [
+          "FLOAT",
+          {
+            "default": 7,
+            "min": 0,
+            "max": 30,
+            "step": 0.5
+          }
+        ],
+        "sampler_name": [
+          [
+            "euler",
+            "euler_cfg_pp",
+            "euler_ancestral",
+            "euler_ancestral_cfg_pp",
+            "heun",
+            "heunpp2",
+            "exp_heun_2_x0",
+            "exp_heun_2_x0_sde",
+            "dpm_2",
+            "dpm_2_ancestral",
+            "lms",
+            "dpm_fast",
+            "dpm_adaptive",
+            "dpmpp_2s_ancestral",
+            "dpmpp_2s_ancestral_cfg_pp",
+            "dpmpp_sde",
+            "dpmpp_sde_gpu",
+            "dpmpp_2m",
+            "dpmpp_2m_cfg_pp",
+            "dpmpp_2m_sde",
+            "dpmpp_2m_sde_gpu",
+            "dpmpp_2m_sde_heun",
+            "dpmpp_2m_sde_heun_gpu",
+            "dpmpp_3m_sde",
+            "dpmpp_3m_sde_gpu",
+            "ddpm",
+            "lcm",
+            "ipndm",
+            "ipndm_v",
+            "deis",
+            "cfgpp_ud10_ab",
+            "res_multistep",
+            "res_multistep_cfg_pp",
+            "res_multistep_ancestral",
+            "res_multistep_ancestral_cfg_pp",
+            "gradient_estimation",
+            "gradient_estimation_cfg_pp",
+            "er_sde",
+            "seeds_2",
+            "seeds_3",
+            "sa_solver",
+            "sa_solver_pece",
+            "ddim",
+            "uni_pc",
+            "uni_pc_bh2"
+          ],
+          {
+            "tooltip": "The algorithm used when sampling, this can affect the quality, speed, and style of the generated output."
+          }
+        ],
+        "scheduler": [
+          [
+            "simple",
+            "sgm_uniform",
+            "karras",
+            "exponential",
+            "ddim_uniform",
+            "beta",
+            "normal",
+            "linear_quadratic",
+            "kl_optimal"
+          ],
+          {
+            "tooltip": "The scheduler controls how noise is gradually removed to form the image."
+          }
+        ]
+      }
+    },
+    "output": [
+      "IMAGE"
+    ],
+    "output_name": [
+      "image"
+    ]
+  },
+  "SaveImage": {
+    "name": "SaveImage",
+    "input": {
+      "required": {
+        "images": [
+          "IMAGE",
+          {
+            "tooltip": "The images to save."
+          }
+        ],
+        "filename_prefix": [
+          "STRING",
+          {
+            "default": "ComfyUI",
+            "tooltip": "The prefix for the file to save. This may include formatting information such as %date:yyyy-MM-dd% or %Empty Latent Image.width% to include values from nodes."
+          }
+        ]
+      }
+    },
+    "output": [
+      "IMAGE"
+    ],
+    "output_name": [
+      "images"
+    ]
+  }
+}
