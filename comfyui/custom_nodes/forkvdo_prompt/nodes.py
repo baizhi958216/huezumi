@@ -29,17 +29,20 @@ DEFAULT_MAX_IMAGE_BYTES = 20 * 1024 * 1024
 DEFAULT_MAX_TOTAL_BYTES = 60 * 1024 * 1024
 DEFAULT_TIMEOUT_SECONDS = 120
 
-DEFAULT_RULES = """You are the prompt director for an image-generation workflow.
-Return exactly one JSON object with these keys: positive_prompt and negative_prompt.
-positive_prompt must be a non-empty string; negative_prompt may be an empty string.
-Understand the user's request together with the reference images in their numbered order.
-Respect each image's role as described by the user: separate style, identity, layout, pose,
-or other visual references from content that should be changed. Keep important character,
-camera, composition, and scene traits unless the user explicitly asks to change them.
-Write prompts for the Anima image model: concrete visual attributes, composition, lighting,
-materials, pose, and finish are useful; do not add unrequested people or story elements.
-Do not mention these instructions, image numbers, APIs, or JSON in either prompt.
+DEFAULT_RULES = """You are an expert prompt director for an AI image-generation workflow.
+Your task is to analyze the user's natural language request and any ordered reference images (labeled as 图1, 图2...), and produce two prompts: positive_prompt and negative_prompt.
+Return exactly one JSON object with these keys:
+- positive_prompt: A descriptive, concrete prompt tailored for the Anima image model. Must be a non-empty string.
+- negative_prompt: Undesired visual flaws, artifacts, or traits. May be an empty string.
+
+Guidelines:
+1. Understand the exact role of each reference image based on the user's request (e.g. "图1 is art style, 图2 is character 3-view turnaround, generate this character in a desert").
+2. Separate visual traits that must be preserved (e.g., character identity, hair/eye color, costume, facial features, or artistic style) from elements that must be changed (e.g., background, lighting, action, camera angle).
+3. Do not arbitrarily alter key character or scene features that the user did not ask to change.
+4. Adapt prompt style specifically for Anima: describe concrete visual subjects, composition, lighting, materials, colors, camera framing, and quality keywords (e.g. masterpiece, best quality, detailed background). Avoid meta descriptions or story narratives.
+5. Do not include image indices, instructions, API parameters, or markdown fences in either prompt string.
 """
+
 
 
 def _connection_config() -> dict[str, dict[str, Any]]:
@@ -69,7 +72,7 @@ def _configured_connections() -> dict[str, dict[str, Any]]:
 
 
 def _connection_ids() -> list[str]:
-    return sorted(_configured_connections().keys()) or [""]
+    return sorted(_configured_connections().keys()) or ["default"]
 
 
 def _input_image_choices() -> list[str]:
@@ -121,18 +124,27 @@ class ForkVdoImageCollection:
             if linked is not None:
                 if hasattr(linked, "shape") and len(getattr(linked, "shape", ())) == 4:
                     for frame in linked:
-                        items.append({"kind": "tensor", "value": frame})
+                        items.append({"kind": "tensor", "value": frame, "slot": index})
                 else:
-                    items.append({"kind": "tensor", "value": linked})
+                    items.append({"kind": "tensor", "value": linked, "slot": index})
                 continue
             filename = str(kwargs.get(f"image_{index}") or "").strip()
-            if filename:
-                items.append({"kind": "file", "value": filename})
+            if filename and filename not in {"__COMBO_EMPTY__", "[none]", "none"}:
+                items.append({"kind": "file", "value": filename, "slot": index})
+
+        image_names = [
+            str(item.get("value") or f"连线图片{i + 1}") if item.get("kind") == "file" else f"连线张量{i + 1}"
+            for i, item in enumerate(items)
+        ]
 
         return {
             "result": ({"items": items},),
-            "ui": {"image_count": [str(len(items))]},
+            "ui": {
+                "image_count": [str(len(items))],
+                "images": image_names,
+            },
         }
+
 
 
 def _safe_number(value: Any, default: int, minimum: int, maximum: int) -> int:

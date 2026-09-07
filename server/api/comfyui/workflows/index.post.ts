@@ -29,7 +29,7 @@ const graphSchema = z.object({
     widgets_values: z.array(z.unknown()).optional(),
   })),
   links: z.array(z.tuple([z.number().int(), z.number().int(), z.number().int(), z.number().int(), z.number().int(), z.string().max(255)])),
-    version: z.number().int().optional(),
+  version: z.number().int().optional(),
   id: z.string().max(64).optional(),
   name: z.string().max(120).optional(),
   groups: z.array(z.unknown()).optional(),

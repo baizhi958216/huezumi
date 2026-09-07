@@ -1,0 +1,248 @@
+{
+  "name": "Anima 多图编辑与重绘工作流",
+  "last_node_id": 12,
+  "last_link_id": 15,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "LoadImage",
+      "pos": [40, 100],
+      "size": [280, 280],
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        { "name": "IMAGE", "type": "IMAGE", "links": [1, 2], "slot_index": 0 },
+        { "name": "MASK", "type": "MASK", "links": null, "slot_index": 1 }
+      ],
+      "title": "原始参考/待编辑图像",
+      "properties": { "Node name for S&R": "LoadImage" },
+      "widgets_values": ["example.png", "image"]
+    },
+    {
+      "id": 2,
+      "type": "ForkVdoImageCollection",
+      "pos": [40, 420],
+      "size": [280, 260],
+      "order": 1,
+      "mode": 0,
+      "inputs": [
+        { "name": "previous", "type": "IMAGE_COLLECTION", "link": null },
+        { "name": "image_1_input", "type": "IMAGE", "link": 1 },
+        { "name": "image_2_input", "type": "IMAGE", "link": null },
+        { "name": "image_3_input", "type": "IMAGE", "link": null },
+        { "name": "image_4_input", "type": "IMAGE", "link": null },
+        { "name": "image_5_input", "type": "IMAGE", "link": null },
+        { "name": "image_6_input", "type": "IMAGE", "link": null },
+        { "name": "image_7_input", "type": "IMAGE", "link": null },
+        { "name": "image_8_input", "type": "IMAGE", "link": null }
+      ],
+      "outputs": [
+        { "name": "images", "type": "IMAGE_COLLECTION", "links": [3], "slot_index": 0 }
+      ],
+      "title": "参考图片集合 (图1为原图)",
+      "properties": { "Node name for S&R": "ForkVdoImageCollection" },
+      "widgets_values": ["", "", "", "", "", "", "", ""]
+    },
+    {
+      "id": 3,
+      "type": "ForkVdoPrompt",
+      "pos": [360, 420],
+      "size": [360, 340],
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        { "name": "reference_images", "type": "IMAGE_COLLECTION", "link": 3 }
+      ],
+      "outputs": [
+        { "name": "positive_prompt", "type": "STRING", "links": [4], "slot_index": 0 },
+        { "name": "negative_prompt", "type": "STRING", "links": [5], "slot_index": 1 }
+      ],
+      "title": "大模型多图编辑提示词提炼",
+      "properties": { "Node name for S&R": "ForkVdoPrompt" },
+      "widgets_values": [
+        "openai-main",
+        "gpt-4o-mini",
+        "图1是原图，请保持原图人物的面部特征与发型不变，在人物脸上添加一副精致的金丝方框眼镜，并将背景光影转为温暖的黄昏逆光氛围",
+        "You are an expert prompt director for an AI image-generation workflow.\nYour task is to analyze the user's natural language request and any ordered reference images (labeled as 图1, 图2...), and produce two prompts: positive_prompt and negative_prompt.\nReturn exactly one JSON object with these keys:\n- positive_prompt: A descriptive, concrete prompt tailored for the Anima image model. Must be a non-empty string.\n- negative_prompt: Undesired visual flaws, artifacts, or traits. May be an empty string.\n\nGuidelines:\n1. Understand the exact role of each reference image based on the user's request (e.g. \"图1 is art style, 图2 is character 3-view turnaround, generate this character in a desert\").\n2. Separate visual traits that must be preserved (e.g., character identity, hair/eye color, costume, facial features, or artistic style) from elements that must be changed (e.g., background, lighting, action, camera angle).\n3. Do not arbitrarily alter key character or scene features that the user did not ask to change.\n4. Adapt prompt style specifically for Anima: describe concrete visual subjects, composition, lighting, materials, colors, camera framing, and quality keywords (e.g. masterpiece, best quality, detailed background). Avoid meta descriptions or story narratives.\n5. Do not include image indices, instructions, API parameters, or markdown fences in either prompt string.",
+        "anima",
+        0
+      ]
+    },
+    {
+      "id": 4,
+      "type": "UNETLoader",
+      "pos": [40, 720],
+      "size": [280, 120],
+      "order": 3,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        { "name": "MODEL", "type": "MODEL", "links": [6], "slot_index": 0 }
+      ],
+      "title": "Anima Aesthetic v1.1",
+      "properties": { "Node name for S&R": "UNETLoader" },
+      "widgets_values": ["anima-aesthetic-v1.1.safetensors", "default"]
+    },
+    {
+      "id": 5,
+      "type": "CLIPLoader",
+      "pos": [40, 880],
+      "size": [280, 140],
+      "order": 4,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        { "name": "CLIP", "type": "CLIP", "links": [7, 8], "slot_index": 0 }
+      ],
+      "title": "Qwen 3 0.6B Text Encoder",
+      "properties": { "Node name for S&R": "CLIPLoader" },
+      "widgets_values": ["qwen_3_06b_base.safetensors", "qwen_image", "default"]
+    },
+    {
+      "id": 6,
+      "type": "VAELoader",
+      "pos": [40, 1060],
+      "size": [280, 100],
+      "order": 5,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        { "name": "VAE", "type": "VAE", "links": [9, 10], "slot_index": 0 }
+      ],
+      "title": "Qwen Image VAE",
+      "properties": { "Node name for S&R": "VAELoader" },
+      "widgets_values": ["qwen_image_vae.safetensors"]
+    },
+    {
+      "id": 7,
+      "type": "CLIPTextEncode",
+      "pos": [760, 420],
+      "size": [400, 240],
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        { "name": "clip", "type": "CLIP", "link": 7 },
+        { "name": "text", "type": "STRING", "link": 4 }
+      ],
+      "outputs": [
+        { "name": "CONDITIONING", "type": "CONDITIONING", "links": [11], "slot_index": 0 }
+      ],
+      "title": "正向文本编码 (编辑提示词)",
+      "properties": { "Node name for S&R": "CLIPTextEncode" },
+      "widgets_values": [""]
+    },
+    {
+      "id": 8,
+      "type": "CLIPTextEncode",
+      "pos": [760, 700],
+      "size": [400, 200],
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        { "name": "clip", "type": "CLIP", "link": 8 },
+        { "name": "text", "type": "STRING", "link": 5 }
+      ],
+      "outputs": [
+        { "name": "CONDITIONING", "type": "CONDITIONING", "links": [12], "slot_index": 0 }
+      ],
+      "title": "反向文本编码 (编辑负面词)",
+      "properties": { "Node name for S&R": "CLIPTextEncode" },
+      "widgets_values": [""]
+    },
+    {
+      "id": 9,
+      "type": "VAEEncode",
+      "pos": [360, 100],
+      "size": [260, 120],
+      "order": 8,
+      "mode": 0,
+      "inputs": [
+        { "name": "pixels", "type": "IMAGE", "link": 2 },
+        { "name": "vae", "type": "VAE", "link": 9 }
+      ],
+      "outputs": [
+        { "name": "LATENT", "type": "LATENT", "links": [13], "slot_index": 0 }
+      ],
+      "title": "VAE 潜空间编码 (原图)",
+      "properties": { "Node name for S&R": "VAEEncode" },
+      "widgets_values": []
+    },
+    {
+      "id": 10,
+      "type": "KSampler",
+      "pos": [1200, 240],
+      "size": [280, 280],
+      "order": 9,
+      "mode": 0,
+      "inputs": [
+        { "name": "model", "type": "MODEL", "link": 6 },
+        { "name": "positive", "type": "CONDITIONING", "link": 11 },
+        { "name": "negative", "type": "CONDITIONING", "link": 12 },
+        { "name": "latent_image", "type": "LATENT", "link": 13 }
+      ],
+      "outputs": [
+        { "name": "LATENT", "type": "LATENT", "links": [14], "slot_index": 0 }
+      ],
+      "title": "KSampler (降噪 0.65 编辑模式)",
+      "properties": { "Node name for S&R": "KSampler" },
+      "widgets_values": [0, "randomize", 30, 4.5, "euler", "simple", 0.65]
+    },
+    {
+      "id": 11,
+      "type": "VAEDecode",
+      "pos": [1520, 240],
+      "size": [240, 120],
+      "order": 10,
+      "mode": 0,
+      "inputs": [
+        { "name": "samples", "type": "LATENT", "link": 14 },
+        { "name": "vae", "type": "VAE", "link": 10 }
+      ],
+      "outputs": [
+        { "name": "IMAGE", "type": "IMAGE", "links": [15], "slot_index": 0 }
+      ],
+      "title": "VAE 图像解码",
+      "properties": { "Node name for S&R": "VAEDecode" },
+      "widgets_values": []
+    },
+    {
+      "id": 12,
+      "type": "SaveImage",
+      "pos": [1800, 240],
+      "size": [280, 260],
+      "order": 11,
+      "mode": 0,
+      "inputs": [
+        { "name": "images", "type": "IMAGE", "link": 15 }
+      ],
+      "outputs": [],
+      "title": "保存编辑后图像",
+      "properties": { "Node name for S&R": "SaveImage" },
+      "widgets_values": ["forkvdo-anima-edit"]
+    }
+  ],
+  "links": [
+    [1, 1, 0, 2, 1, "IMAGE"],
+    [2, 1, 0, 9, 0, "IMAGE"],
+    [3, 2, 0, 3, 0, "IMAGE_COLLECTION"],
+    [4, 3, 0, 7, 1, "STRING"],
+    [5, 3, 1, 8, 1, "STRING"],
+    [6, 4, 0, 10, 0, "MODEL"],
+    [7, 5, 0, 7, 0, "CLIP"],
+    [8, 5, 0, 8, 0, "CLIP"],
+    [9, 6, 0, 9, 1, "VAE"],
+    [10, 6, 0, 11, 1, "VAE"],
+    [11, 7, 0, 10, 1, "CONDITIONING"],
+    [12, 8, 0, 10, 2, "CONDITIONING"],
+    [13, 9, 0, 10, 3, "LATENT"],
+    [14, 10, 0, 11, 0, "LATENT"],
+    [15, 11, 0, 12, 0, "IMAGE"]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "ds": { "scale": 0.85, "offset": [10, 30] }
+  },
+  "version": 1
+}
