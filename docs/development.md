@@ -146,6 +146,26 @@ docker compose -f docker-compose.production.yml up -d --build
 
 目标机器必须安装 NVIDIA Container Toolkit，并在上线前实测 GPU、驱动、PyTorch、ComfyUI 版本和所需模型。主应用生产环境若使用 local/auto 或 remote URL 为空，会拒绝初始化 ComfyUI 配置。开发环境仍可使用 local/auto 安装与启动流程。
 
+### ComfyUI 多模态大模型提示词节点与配置
+
+项目维护的自定义节点包位于 `comfyui/custom_nodes/forkvdo_prompt`，提供 `ForkVdoImageCollection` 与 `ForkVdoPrompt` 两个节点。
+
+1. **连接与密钥配置**：
+   通过私有环境变量 `FORKVDO_LLM_CONNECTIONS_JSON` 配置可用的大模型连接。
+   - 本地开发：在 `.env` 中填写 `NUXT_COMFYUI_LLM_CONNECTIONS_JSON`，Nuxt 启动子进程时会自动传递。
+   - 远程 ComfyUI：在执行端环境中设置 `FORKVDO_LLM_CONNECTIONS_JSON`。
+   - 节点仅保存连接标识（如 `openai-main`），画布及客户端不包含或泄露 API Key 与 Base URL。
+2. **协议与格式**：
+   - 采用 OpenAI Chat Completions 协议：`<baseUrl>/v1/chat/completions`。
+   - 支持结构化输出：自动优先使用 `response_format: { type: "json_schema" }`，兼容端点返回 400 时自动退化重试，并由节点保证返回非空的 `positive_prompt` 与合法的 `negative_prompt`。
+3. **缓存与强制刷新**：
+   - 普通生图重试复用已生成的提示词，避免重复消耗大模型费用。
+   - 需要重新生成时，点击节点或检查器中的“重新生成提示词”即可变更 `refresh_token`，强制绕过缓存。
+4. **内置公开工作流**：
+   - `workflows/anima-llm-prompt-generate.json`：包含参考图片集合、大模型提示词提炼与 Anima 生图全链路。
+   - `workflows/anima-llm-multi-image-edit.json`：支持原图参与生成、局部重绘与微调编辑模板。
+   - 服务端自动将 `workflows/` 中的公开模板聚合至工作流库面板，无需手动导入。
+
 ## 供应商配置
 
 各供应商 API Key 仍从私有 Nuxt runtime config 读取，详见 `.env.example`。素材先写个人空间，worker 提交前将 `/api/files/:id` 换成有时效的 OSS 签名地址。供应商输出由 worker 归档后才作为平台长期结果。
