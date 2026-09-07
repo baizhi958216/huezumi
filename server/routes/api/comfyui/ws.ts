@@ -88,7 +88,18 @@ export default defineWebSocketHandler({
     }
     const config = getComfyConfig()
     const baseUrl = getComfyBaseUrl(config)
-    const target = `${baseUrl.replace(/^http/, 'ws')}/ws`
+    let search = ''
+    try {
+      const parsedUrl = new URL(peer.request.url, 'http://localhost')
+      const clientId = parsedUrl.searchParams.get('clientId')
+      if (clientId) {
+        search = `?clientId=${encodeURIComponent(clientId)}`
+      }
+    }
+    catch {
+      // 忽略无法解析的 URL 参数
+    }
+    const target = `${baseUrl.replace(/^http/, 'ws')}/ws${search}`
 
     try {
       const upstream = connectUpstream(target, {

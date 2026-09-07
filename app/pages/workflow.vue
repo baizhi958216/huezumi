@@ -92,6 +92,12 @@ const importInputRef = ref<HTMLInputElement | null>(null)
 const runningPromptId = ref<string | null>(null)
 const isRunning = computed(() => Boolean(runningPromptId.value))
 
+const executingNode = computed<ComfyFlowNode | null>(() => {
+  if (!events.executingNodeId.value)
+    return null
+  return flowNodes.value.find(node => node.id === events.executingNodeId.value) ?? null
+})
+
 const selectedNode = computed<ComfyFlowNode | null>(() => {
   const selected = getSelectedNodes.value as unknown as ComfyFlowNode[]
   return selected[0] ?? null
@@ -410,15 +416,17 @@ async function pollCompletion() {
     return
   try {
     const entry = await fetchHistoryEntry(runningPromptId.value)
-    if (entry?.status?.completed) {
-      const id = runningPromptId.value
+    if (entry?.status?.completed || entry?.status?.status_str === 'error') {
       outputsState.setFromHistory(entry)
       if (entry.status.status_str === 'error') {
-        runError.value = events.lastError.value ?? '工作流执行失败，请查看 ComfyUI 日志'
+        const messages = entry.status.messages as unknown as Array<[string, { exception_message?: string, node_id?: string, node_type?: string }]> | undefined
+        const errItem = messages?.find(m => Array.isArray(m) && m[0] === 'execution_error')
+        const exMsg = errItem?.[1]?.exception_message
+        const nodeInfo = errItem?.[1]?.node_id ? `（节点 #${errItem[1].node_id} ${errItem[1].node_type ?? ''}）` : ''
+        runError.value = exMsg ? `工作流执行失败${nodeInfo}：${exMsg}` : (events.lastError.value ?? '工作流执行失败，请查看 ComfyUI 日志')
       }
       runningPromptId.value = null
       events.resetRun()
-      void id
     }
   }
   catch {
@@ -571,11 +579,14 @@ onBeforeUnmount(() => {
       :connected="events.connected.value"
       :workflows="workflows"
       :can-run="canRun"
+      :executing-node="executingNode"
+      :progress="events.progress.value"
       @refresh="doRefresh"
       @start="doStart"
       @stop="doStop"
       @install="doInstall"
       @run="runWorkflow"
+      @interrupt="doInterrupt"
       @save="saveCurrent"
       @load="openSaved"
       @remove="deleteSaved"
@@ -627,16 +638,16 @@ onBeforeUnmount(() => {
 
         <div class="comfy-canvas__controls nodrag">
           <button type="button" class="comfy-canvas__control-btn" title="缩小" @click="zoomOut()">
-            <span class="i-lucide-minus" />
+            <UIcon name="i-lucide-minus" class="size-3.5" />
           </button>
           <button type="button" class="comfy-canvas__zoom-badge" title="重设缩放为 100%" @click="zoomTo(1)">
             {{ Math.round((viewport.zoom ?? 1) * 100) }}%
           </button>
           <button type="button" class="comfy-canvas__control-btn" title="放大" @click="zoomIn()">
-            <span class="i-lucide-plus" />
+            <UIcon name="i-lucide-plus" class="size-3.5" />
           </button>
           <button type="button" class="comfy-canvas__control-btn" title="适应画布" @click="fitView({ maxZoom: 1, padding: 0.2, duration: 250 })">
-            <span class="i-lucide-maximize-2" />
+            <UIcon name="i-lucide-maximize-2" class="size-3.5" />
           </button>
         </div>
 
@@ -656,6 +667,7 @@ onBeforeUnmount(() => {
         :running="isRunning"
         :queue-remaining="events.queueRemaining.value"
         :progress="events.progress.value"
+        :executing-node="executingNode"
         :outputs="outputsState.outputs.value"
         :error="runError ?? events.lastError.value"
         :issues="issues"

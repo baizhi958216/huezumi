@@ -2,12 +2,14 @@
 import type { ComfyOutputFile, ComfyUploadType, ComfyWidgetSpec } from '#shared/types/comfyui'
 import type { ComfyFlowEdge, ComfyFlowNode, ComfyNodeData } from '~/utils/comfy-graph'
 import { CONTROL_AFTER_GENERATE_OPTIONS } from '#shared/types/comfyui'
-import { buildViewUrl, isVideoFile } from '~/utils/comfy-graph'
+import { useComfyEvents } from '~/composables/useComfyServer'
+import { buildInputViewUrl, buildViewUrl, isVideoFile } from '~/utils/comfy-graph'
 
 const props = defineProps<{
   running: boolean
   queueRemaining: number
   progress: { value: number, max: number } | null
+  executingNode?: ComfyFlowNode | null
   outputs: ComfyOutputFile[]
   error: string | null
   issues: string[]
@@ -30,7 +32,32 @@ const emit = defineEmits<{
 const fileInput = ref<HTMLInputElement>()
 const controlAfterGenerateItems: string[] = [...CONTROL_AFTER_GENERATE_OPTIONS]
 
+const { llmPromptOutputs } = useComfyEvents()
+
 const selectedData = computed<ComfyNodeData | null>(() => props.selectedNode?.data ?? null)
+const isPromptNode = computed(() => selectedData.value?.type === 'ForkVdoPrompt')
+const isImageCollection = computed(() => selectedData.value?.type === 'ForkVdoImageCollection')
+
+const promptOutput = computed(() => props.selectedNode ? (llmPromptOutputs.value[props.selectedNode.id] ?? null) : null)
+
+function regeneratePrompt() {
+  if (!props.selectedNode)
+    return
+  const current = Number(selectedData.value?.widgets.refresh_token) || 0
+  updateWidget('refresh_token', current + 1)
+}
+
+const copiedField = ref<'pos' | 'neg' | null>(null)
+async function copyPrompt(text: string, field: 'pos' | 'neg') {
+  if (!text)
+    return
+  await navigator.clipboard.writeText(text)
+  copiedField.value = field
+  setTimeout(() => {
+    copiedField.value = null
+  }, 2000)
+}
+
 const selectedWidgets = computed(() => selectedData.value?.widgetSpecs ?? [])
 const selectedInputSlots = computed(() => selectedData.value?.inputSlots ?? [])
 const selectedUploadWidgets = computed(() => selectedWidgets.value.filter(widget => widget.uploadType))
@@ -52,14 +79,52 @@ const panelMeta = computed(() => {
   return `${props.nodeCount} 节点 · ${props.linkCount} 连线 · 队列 ${props.queueRemaining}`
 })
 
-const comboItems = computed<Record<string, string[]>>(() => {
-  const result: Record<string, string[]> = {}
+const COMBO_EMPTY_VALUE = '__COMBO_EMPTY__'
+
+interface ComboOption {
+  label: string
+  value: string
+}
+
+function normalizeComboItems(choices: string[] = []): ComboOption[] {
+  const seen = new Set<string>()
+  const items: ComboOption[] = []
+  for (const choice of choices) {
+    const str = String(choice ?? '')
+    const isNone = str === '' || str === '[none]'
+    const value = isNone ? COMBO_EMPTY_VALUE : str
+    const label = isNone ? '（未选择 / 空）' : str
+    if (!seen.has(value)) {
+      seen.add(value)
+      items.push({ label, value })
+    }
+  }
+  return items
+}
+
+const comboItems = computed<Record<string, ComboOption[]>>(() => {
+  const result: Record<string, ComboOption[]> = {}
   for (const widget of selectedWidgets.value) {
     if (widget.kind === 'COMBO')
-      result[widget.name] = widget.choices ?? []
+      result[widget.name] = normalizeComboItems(widget.choices ?? [])
   }
   return result
 })
+
+function getComboModelValue(name: string, val: unknown): string {
+  const str = String(val ?? '')
+  if (str === '' || str === '[none]') {
+    const items = comboItems.value[name] ?? []
+    const hasEmptyItem = items.some(item => item.value === COMBO_EMPTY_VALUE)
+    return hasEmptyItem ? COMBO_EMPTY_VALUE : ''
+  }
+  return str
+}
+
+function onComboChange(name: string, selectedValue: string) {
+  const finalVal = selectedValue === COMBO_EMPTY_VALUE ? '' : selectedValue
+  updateWidget(name, finalVal)
+}
 
 const uploadAccept = computed(() => {
   switch (selectedUploadWidget.value?.uploadType) {
@@ -158,6 +223,119 @@ function onFileChange(event: Event) {
           {{ selectedData?.title }}
           <span class="comfy-inspector__hint">{{ selectedData?.type }}</span>
         </p>
+
+        <!-- 大模型提示词专属状态与生成面板 -->
+        <div v-if="isPromptNode" class="comfy-inspector__prompt-box">
+          <div class="comfy-inspector__prompt-header">
+            <span class="comfy-inspector__prompt-title">大模型提示词状态</span>
+            <span
+              v-if="promptOutput"
+              class="comfy-node__status-badge"
+              :class="{
+                'comfy-node__status-badge--fresh': promptOutput.status === 'fresh',
+                'comfy-node__status-badge--cached': promptOutput.status === 'cached',
+                'comfy-node__status-badge--error': promptOutput.status === 'error',
+              }"
+            >
+              {{ promptOutput.status === 'fresh' ? '本次新生成' : promptOutput.status === 'cached' ? '复用成功提示词' : '生成失败' }}
+            </span>
+            <span v-else class="text-xs text-neutral-400">待执行</span>
+          </div>
+
+          <div class="flex items-center justify-between gap-2 pt-1 border-t border-neutral-700/50">
+            <span class="text-xs text-neutral-400">刷新序号：{{ selectedData?.widgets.refresh_token ?? 0 }}</span>
+            <UButton
+              size="xs"
+              color="primary"
+              variant="soft"
+              icon="i-lucide-refresh-cw"
+              @click="regeneratePrompt"
+            >
+              重新生成提示词
+            </UButton>
+          </div>
+          <p class="text-[11px] text-neutral-400 mt-0.5 leading-tight">
+            下游生图失败重试时，ComfyUI 会自动复用已生成的提示词；若需让大模型重新理解需求，请点击上方按钮。
+          </p>
+
+          <div v-if="promptOutput && (promptOutput.positivePrompt || promptOutput.negativePrompt)" class="space-y-2 mt-2">
+            <div v-if="promptOutput.positivePrompt">
+              <div class="flex items-center justify-between mb-1">
+                <span class="text-xs font-semibold text-emerald-400">正向提示词</span>
+                <UButton
+                  size="xs"
+                  color="neutral"
+                  variant="ghost"
+                  :icon="copiedField === 'pos' ? 'i-lucide-check' : 'i-lucide-copy'"
+                  @click="copyPrompt(promptOutput.positivePrompt, 'pos')"
+                >
+                  {{ copiedField === 'pos' ? '已复制' : '复制' }}
+                </UButton>
+              </div>
+              <div class="comfy-inspector__prompt-content">
+                {{ promptOutput.positivePrompt }}
+              </div>
+            </div>
+
+            <div v-if="promptOutput.negativePrompt">
+              <div class="flex items-center justify-between mb-1">
+                <span class="text-xs font-semibold text-neutral-400">反向提示词</span>
+                <UButton
+                  size="xs"
+                  color="neutral"
+                  variant="ghost"
+                  :icon="copiedField === 'neg' ? 'i-lucide-check' : 'i-lucide-copy'"
+                  @click="copyPrompt(promptOutput.negativePrompt, 'neg')"
+                >
+                  {{ copiedField === 'neg' ? '已复制' : '复制' }}
+                </UButton>
+              </div>
+              <div class="comfy-inspector__prompt-content text-neutral-400">
+                {{ promptOutput.negativePrompt }}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 图片集合：有序参考素材插槽一览 -->
+        <div v-if="isImageCollection" class="comfy-inspector__prompt-box">
+          <div class="comfy-inspector__prompt-header">
+            <span class="comfy-inspector__prompt-title">有序参考图片（图1 ~ 图8）</span>
+            <span class="text-xs text-neutral-400">大模型严格按此顺序理解</span>
+          </div>
+
+          <div class="comfy-inspector__slots-grid mt-1">
+            <div
+              v-for="i in 8"
+              :key="i"
+              class="comfy-inspector__slot-row"
+            >
+              <span class="comfy-inspector__slot-num">图{{ i }}</span>
+              <img
+                v-if="selectedData?.widgets[`image_${i}`]"
+                :src="buildInputViewUrl(String(selectedData?.widgets[`image_${i}`]))"
+                :alt="`图${i}`"
+                class="comfy-inspector__slot-thumb"
+              >
+              <div v-else class="w-7 h-7 rounded bg-neutral-800 flex items-center justify-center text-neutral-500 text-xs flex-shrink-0">
+                空
+              </div>
+              <span class="text-xs text-neutral-300 truncate flex-1">
+                {{ selectedData?.widgets[`image_${i}`] || '未选择图片' }}
+              </span>
+              <UButton
+                v-if="selectedData?.widgets[`image_${i}`]"
+                size="xs"
+                color="neutral"
+                variant="ghost"
+                icon="i-lucide-x"
+                title="清空此插槽"
+                @click="updateWidget(`image_${i}`, '')"
+              />
+            </div>
+          </div>
+        </div>
+
         <p v-if="selectedData?.missing" class="comfy-inspector__hint">
           当前 ComfyUI 环境缺少这个节点类型，无法编辑参数。
         </p>
@@ -173,11 +351,12 @@ function onFileChange(event: Event) {
             <USelect
               v-if="widget.kind === 'COMBO'"
               :id="`inspector-${selectedNode.id}-${widget.name}`"
-              :model-value="String(selectedData?.widgets[widget.name] ?? '')"
+              :model-value="getComboModelValue(widget.name, selectedData?.widgets[widget.name])"
               :items="comboItems[widget.name] ?? []"
               :disabled="!(comboItems[widget.name]?.length)"
+              placeholder="请选择"
               size="sm"
-              @update:model-value="updateWidget(widget.name, $event)"
+              @update:model-value="onComboChange(widget.name, $event)"
             />
 
             <USwitch
@@ -289,9 +468,15 @@ function onFileChange(event: Event) {
         </p>
       </section>
 
-      <p v-if="error" class="comfy-inspector__error">
-        {{ error }}
-      </p>
+      <div v-if="error" class="comfy-inspector__error-box">
+        <div class="comfy-inspector__error-title">
+          <UIcon name="i-lucide-circle-alert" class="size-3.5 shrink-0 text-error-500" />
+          <span>执行失败</span>
+        </div>
+        <p class="comfy-inspector__error-text">
+          {{ error }}
+        </p>
+      </div>
       <ul v-if="issues.length" class="comfy-inspector__issues">
         <li v-for="issue in issues" :key="issue">
           {{ issue }}
@@ -303,12 +488,29 @@ function onFileChange(event: Event) {
           <span>运行控制</span>
           <span>{{ nodeCount }} 节点 · {{ linkCount }} 连线 · 队列 {{ queueRemaining }}</span>
         </div>
-        <div v-if="running" class="comfy-inspector__progress">
-          <div class="comfy-inspector__label">
-            执行进度
-            <span v-if="progress">{{ progress.value }} / {{ progress.max }}</span>
+        <div v-if="running" class="comfy-inspector__running-card">
+          <div class="comfy-inspector__running-header">
+            <span class="flex items-center gap-1.5 font-medium text-xs text-signal-600 dark:text-signal-400">
+              <UIcon name="i-lucide-loader-circle" class="size-3.5 animate-spin" />
+              正在执行
+            </span>
+            <span v-if="executingNode" class="text-[11px] text-neutral-400">#{{ executingNode.id }}</span>
           </div>
-          <UProgress :model-value="progressPercent" size="sm" />
+
+          <div v-if="executingNode" class="text-xs font-semibold text-neutral-800 dark:text-neutral-100 mt-1">
+            {{ executingNode.data?.title || executingNode.data?.type }}
+          </div>
+          <div v-else class="text-xs text-neutral-400 mt-1">
+            准备中 / 正在建立连接...
+          </div>
+
+          <div v-if="progress && progress.max > 0" class="mt-2 space-y-1">
+            <div class="flex items-center justify-between text-[11px] text-neutral-400">
+              <span>采样步骤</span>
+              <span>{{ progress.value }} / {{ progress.max }} 步 ({{ Math.round(progressPercent) }}%)</span>
+            </div>
+            <UProgress :model-value="progressPercent" size="xs" />
+          </div>
         </div>
         <div class="comfy-inspector__row">
           <UButton size="sm" color="neutral" variant="soft" icon="i-lucide-ban" :disabled="!running" @click="emit('interrupt')">

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { ComfyUIStatus, ComfyWorkflowSummary, ComfyWorkflowVisibility } from '#shared/types/comfyui'
+import type { ComfyFlowNode } from '~/utils/comfy-graph'
 
 const props = defineProps<{
   status: ComfyUIStatus | null
@@ -9,6 +10,8 @@ const props = defineProps<{
   connected: boolean
   workflows: ComfyWorkflowSummary[]
   canRun: boolean
+  executingNode?: ComfyFlowNode | null
+  progress?: { value: number, max: number } | null
 }>()
 
 const emit = defineEmits<{
@@ -17,6 +20,7 @@ const emit = defineEmits<{
   stop: []
   install: []
   run: []
+  interrupt: []
   save: []
   load: [id: string]
   remove: [id: string]
@@ -90,15 +94,15 @@ const { isDark, toggleTheme } = useThemeTransition()
       <span class="comfy-toolbar__divider" aria-hidden="true" />
       <nav class="comfy-toolbar__nav" aria-label="页面切换">
         <NuxtLink to="/studio" class="comfy-toolbar__nav-link" title="前往创作台">
-          <span class="i-lucide-clapperboard" />
+          <UIcon name="i-lucide-clapperboard" class="size-3.5" />
           <span>创作台</span>
         </NuxtLink>
         <NuxtLink to="/projects" class="comfy-toolbar__nav-link" title="前往作品库">
-          <span class="i-lucide-library" />
+          <UIcon name="i-lucide-library" class="size-3.5" />
           <span>作品库</span>
         </NuxtLink>
         <div class="comfy-toolbar__nav-link is-active" title="当前位于工作流">
-          <span class="i-lucide-workflow" />
+          <UIcon name="i-lucide-workflow" class="size-3.5" />
           <span>工作流</span>
         </div>
       </nav>
@@ -140,7 +144,7 @@ const { isDark, toggleTheme } = useThemeTransition()
             title="安装 ComfyUI"
             @click="emit('install')"
           >
-            <span class="i-lucide-download" />
+            <UIcon name="i-lucide-download" class="size-3" />
             <span>安装</span>
           </button>
           <button
@@ -151,7 +155,7 @@ const { isDark, toggleTheme } = useThemeTransition()
             :disabled="busy"
             @click="emit('start')"
           >
-            <span class="i-lucide-play" />
+            <UIcon name="i-lucide-play" class="size-3" />
           </button>
           <button
             v-if="canStop"
@@ -161,7 +165,7 @@ const { isDark, toggleTheme } = useThemeTransition()
             :disabled="busy"
             @click="emit('stop')"
           >
-            <span class="i-lucide-square" />
+            <UIcon name="i-lucide-square" class="size-3" />
           </button>
           <button
             type="button"
@@ -170,7 +174,7 @@ const { isDark, toggleTheme } = useThemeTransition()
             :disabled="busy"
             @click="emit('refresh')"
           >
-            <span class="i-lucide-refresh-cw" :class="{ 'animate-spin': busy }" />
+            <UIcon name="i-lucide-refresh-cw" class="size-3" :class="{ 'animate-spin': busy }" />
           </button>
         </div>
       </div>
@@ -236,11 +240,39 @@ const { isDark, toggleTheme } = useThemeTransition()
         />
       </ClientOnly>
 
+      <!-- 运行中状态胶囊（实时提示节点与进度，参考 ComfyUI） -->
+      <div v-if="running" class="comfy-toolbar__running-pill">
+        <UIcon name="i-lucide-loader-circle" class="size-3.5 animate-spin text-signal-500 shrink-0" />
+        <span class="comfy-toolbar__running-node" :title="executingNode ? `${executingNode.data?.title ?? ''} (#${executingNode.id})` : '执行中'">
+          <template v-if="executingNode">
+            <span class="font-medium text-neutral-800 dark:text-neutral-100">{{ executingNode.data?.title || executingNode.data?.type }}</span>
+            <span class="comfy-toolbar__running-id">#{{ executingNode.id }}</span>
+          </template>
+          <template v-else>
+            <span>排队处理中...</span>
+          </template>
+        </span>
+
+        <span v-if="progress && progress.max > 0" class="comfy-toolbar__running-progress">
+          {{ progress.value }}/{{ progress.max }}步 ({{ Math.round((progress.value / progress.max) * 100) }}%)
+        </span>
+
+        <button
+          type="button"
+          class="comfy-toolbar__running-interrupt"
+          title="中断当前执行"
+          @click="emit('interrupt')"
+        >
+          <UIcon name="i-lucide-ban" class="size-3 text-error-400" />
+          <span>中断</span>
+        </button>
+      </div>
+
       <UButton
+        v-else
         size="xs"
         color="primary"
         icon="i-lucide-sparkles"
-        :loading="running"
         :disabled="!canRun"
         class="comfy-toolbar__run-btn"
         @click="emit('run')"
@@ -253,7 +285,7 @@ const { isDark, toggleTheme } = useThemeTransition()
 
     <!-- 安装日志浮层 -->
     <div v-if="installing" class="comfy-toolbar__install-banner">
-      <span class="i-lucide-loader-circle animate-spin" />
+      <UIcon name="i-lucide-loader-circle" class="size-3.5 animate-spin" />
       <span>{{ status?.install.step || '准备中' }}</span>
       <span v-if="status?.install.log.length" class="comfy-toolbar__install-log">
         {{ status.install.log.at(-1) }}
@@ -276,7 +308,7 @@ const { isDark, toggleTheme } = useThemeTransition()
           <div class="w-full max-w-lg overflow-hidden rounded-2xl border border-default bg-elevated shadow-2xl dark:border-white/10 dark:bg-zinc-900">
             <div class="flex items-center justify-between border-b border-default px-5 py-3.5 dark:border-white/10">
               <div class="flex items-center gap-2 text-sm font-semibold text-highlighted">
-                <span class="i-lucide-folder-open text-primary" />
+                <UIcon name="i-lucide-folder-open" class="size-4 text-primary" />
                 工作流库
                 <span class="text-xs text-muted font-normal">({{ workflows.length }} 个可用)</span>
               </div>
