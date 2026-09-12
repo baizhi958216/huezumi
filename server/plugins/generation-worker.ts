@@ -1,35 +1,36 @@
-import { Worker } from 'bullmq'
-import { eq } from 'drizzle-orm'
-import { useDatabase } from '../database/client'
-import { generations } from '../database/schema'
-import { publishOutbox, QUEUE_NAME, redisConnection } from '../services/generation-queue'
-import { runGenerationJob } from '../services/generation-worker'
+import type { GenerationJob } from '../database/task-queue'
+import { DEAD_LETTER_QUEUE, QUEUE_NAME } from '../database/task-queue'
+import { closeGenerationQueue, generationQueue, publishOutbox } from '../services/generation-queue'
+import { handleFailedGeneration, runGenerationJob } from '../services/generation-worker'
 
-export default defineNitroPlugin((nitro) => {
-  const config = useRuntimeConfig()
-  if (!config.workerEnabled || !config.redisUrl)
-    return
-  const worker = new Worker(QUEUE_NAME, async job => runGenerationJob(job.data), {
-    connection: redisConnection(),
-    concurrency: Number(config.workerConcurrency || 4),
-  })
-  const publishTimer = setInterval(() => publishOutbox().catch(error => console.error('Outbox publish failed', error)), 3000)
-  publishTimer.unref?.()
-  publishOutbox().catch(error => console.error('Initial outbox publish failed', error))
-  worker.on('failed', async (job, error) => {
-    console.error(`Generation job failed (${job?.id || 'unknown'})`, error)
-    if (job && job.attemptsMade >= Number(job.opts.attempts || 1) && job.data.kind === 'poll') {
-      await useDatabase().update(generations).set({
-        status: 'UNKNOWN',
-        dispatchStatus: 'reconciling',
-        settlementStatus: 'review',
-        error: '多次查询供应商失败，任务已转入人工核对。',
-        updatedAt: new Date(),
-      }).where(eq(generations.id, job.data.generationId))
-    }
-  })
+export default defineNitroPlugin(async (nitro) => {
+  let publishTimer: ReturnType<typeof setInterval> | undefined
+  let publishing: Promise<void> | undefined
   nitro.hooks.hook('close', async () => {
     clearInterval(publishTimer)
-    await worker.close()
+    await publishing
+    await closeGenerationQueue()
   })
+  const config = useRuntimeConfig()
+  if (!config.workerEnabled)
+    return
+  const boss = await generationQueue()
+  const concurrency = Math.max(1, Math.min(32, Math.floor(Number(config.workerConcurrency) || 4)))
+  await boss.work<GenerationJob>(QUEUE_NAME, { localConcurrency: concurrency, pollingIntervalSeconds: 1 }, async ([job]) => {
+    if (job)
+      await runGenerationJob(job.data)
+  })
+  await boss.work<GenerationJob>(DEAD_LETTER_QUEUE, { pollingIntervalSeconds: 1 }, async ([job]) => {
+    if (!job)
+      return
+    await handleFailedGeneration(job.data)
+  })
+  const publish = () => {
+    publishing ||= publishOutbox()
+      .catch(error => console.error('Outbox publish failed', error instanceof Error ? error.name : 'unknown'))
+      .finally(() => { publishing = undefined })
+  }
+  publishTimer = setInterval(publish, 3000)
+  publishTimer.unref()
+  publish()
 })

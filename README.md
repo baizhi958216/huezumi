@@ -11,7 +11,7 @@
 - 选择模型后，只显示它支持的分辨率、画幅、时长和素材数量
 - 邀请注册、登录、个人头像、管理员控制面板和用户数据隔离
 - 报价、额度预留、结算流水、幂等提交和平台预算保护
-- PostgreSQL 任务记录、Redis/BullMQ worker 和故障 outbox 补发
+- PostgreSQL 任务记录、pg-boss worker 和故障 outbox 补发
 - 把私有上传素材和生成结果归档到阿里云 OSS
 - 通过适配器接入其他供应商
 
@@ -57,7 +57,7 @@ NUXT_PUBLIC_APP_URL=https://your-public-domain.example.com
 
 ## Docker
 
-生产编排文件包含 PostgreSQL、Redis、migration、Web、worker 和独立 ComfyUI GPU 服务：
+生产编排文件包含 PostgreSQL、migration、Web、worker 和独立 ComfyUI GPU 服务：
 
 ```bash
 POSTGRES_PASSWORD='replace-me' COMFYUI_MODELS_DIR='/absolute/path/to/models' \
@@ -71,6 +71,7 @@ POSTGRES_PASSWORD='replace-me' COMFYUI_MODELS_DIR='/absolute/path/to/models' \
 ```bash
 pnpm check        # repository contract + tests + lint + typecheck
 pnpm check:full   # 上述检查 + production build
+pnpm test:postgres # PostgreSQL 队列与限流集成验证
 ```
 
 接入新供应商时，实现 `VideoProvider.submit()` 和 `VideoProvider.getTask()`，再把它注册到能力目录和 provider factory。上游请求类型留在 `server/services/providers/` 内，不进入 UI 或平台 API。

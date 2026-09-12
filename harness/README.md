@@ -11,3 +11,5 @@ node harness/run.mjs --list
 默认模式依次执行仓库约束检查、无网络单元测试、lint 和 typecheck。仓库约束会检查必需工程文件与脚本、规格状态、已完成规格的验收勾选、内部 Markdown 链接、关键忽略项，以及是否误跟踪 `.env` / `.data` 等运行时文件。`--full` 额外执行 production build。输出以步骤为单位，任何一步失败都会立即停止并保留原命令退出码。
 
 需要 Docker 或外部服务的检查应使用单独显式模式，不能让默认 harness 隐式消费额度。
+
+`pnpm test:postgres` 从 `.env` 读取数据库连接，创建随机独立测试库，迁移后验证 pg-boss 的去重、延迟、重启恢复、并发、重试与死信，以及原子限流和生成任务终态边界。测试供应商全部使用 mock；结束时删除测试库。数据库帐号需有 `CREATE DATABASE` 权限。默认 harness 跳过该集成文件，不连接 PostgreSQL。

@@ -2,6 +2,7 @@ import process from 'node:process'
 import { drizzle } from 'drizzle-orm/node-postgres'
 import { migrate } from 'drizzle-orm/node-postgres/migrator'
 import { Pool } from 'pg'
+import { openTaskQueue } from '../server/database/task-queue'
 
 const databaseUrl = process.env.NUXT_DATABASE_URL
 if (!databaseUrl)
@@ -9,6 +10,8 @@ if (!databaseUrl)
 const pool = new Pool({ connectionString: databaseUrl })
 try {
   await migrate(drizzle(pool), { migrationsFolder: './drizzle' })
+  const queue = await openTaskQueue(databaseUrl, { migrate: true })
+  await queue.stop()
   console.log('Database migrations applied')
 }
 finally {

@@ -10,7 +10,7 @@ forkvdo 是 Nuxt Web/API 与独立 worker 组成的多用户 AI 视频平台。�
 Browser ──HTTPS──> Nuxt Web/API ─────────────> PostgreSQL
                        │                         帐号、会话、报价、钱包、任务、工作流、审计、outbox
                        ├──签名读写────────────> private OSS
-                       └──publish─────────────> Redis / BullMQ
+                       └──publish─────────────> PostgreSQL / pg-boss
                                                    │
                                               generation worker
                                                ├──> provider APIs
@@ -20,13 +20,13 @@ Browser ──HTTPS──> Nuxt Web/API ─────────────>
 Admin Browser ──authenticated HTTP/WS──> Nuxt proxy ──private network──> ComfyUI GPU service
 ```
 
-PostgreSQL 是业务状态和账目的事实源。OSS 只保存媒体字节；Redis 只负责调度和限流。生产环境要求 Redis 队列、私有 OSS 和 remote ComfyUI，Web 请求不直接轮询供应商。
+PostgreSQL 是业务状态和账目的事实源，并通过 pg-boss 承担持久化调度，通过原子计数表承担限流。对象存储只保存媒体字节。生产环境要求 PostgreSQL 队列、私有对象存储和 remote ComfyUI，Web 请求不直接轮询供应商。
 
 ## 2. 身份、所有权与私密数据
 
 帐号支持 `user`、`admin` 角色和 `active`、`disabled` 等状态。密码使用带随机盐的 scrypt 哈希；随机 session token 仅通过 HttpOnly、SameSite Cookie 下发，数据库只保存 token 摘要。管理员由部署命令创建，注册请求不能指定角色。
 
-`generations`、`assets`、`workflows`、`comfy_executions` 均保存 `owner_id`。普通列表、详情和文件读取在服务端验证 owner；工作流读取允许 owner 或 `visibility=public`，公开工作流的更新和删除仍只允许 owner；管理 API 验证 admin。停用帐号时撤销其现有 session。修改请求执行同源检查，认证和生成入口另有 Redis/进程内限流。
+`generations`、`assets`、`workflows`、`comfy_executions` 均保存 `owner_id`。普通列表、详情和文件读取在服务端验证 owner；工作流读取允许 owner 或 `visibility=public`，公开工作流的更新和删除仍只允许 owner；管理 API 验证 admin。停用帐号时撤销其现有 session。修改请求执行同源检查，认证和生成入口另有 PostgreSQL 原子限流。
 
 OSS 对象使用 private ACL，数据库保存 object key。浏览器经平台鉴权后获得短期 302 签名地址；报价和供应商提交前也由服务端把平台资产 URL 换成短期签名 URL，再执行要求公网 HTTPS 的能力校验。开发环境可用 `.data` 保存新上传字节，生产环境拒绝该回退。
 
@@ -38,7 +38,7 @@ OSS 对象使用 private ACL，数据库保存 object key。浏览器经平台�
 
 1. `POST /api/billing/quote` 根据 provider、精确模型和分辨率选择已生效价格版本，生成绑定用户和请求摘要的十分钟报价。
 2. `POST /api/generations` 要求报价 ID 与幂等键。在 serializable 事务中校验报价、用户并发与平台日预算，原子预留钱包额度，写任务、账本和 outbox。
-3. outbox publisher 把任务 ID 发布到 BullMQ。重复消息由队列 job ID、任务条件更新、账本幂等键共同吸收。
+3. outbox publisher 把任务 ID 发布到 pg-boss。重复消息由队列 job ID、任务条件更新、账本幂等键共同吸收。
 4. worker 提交供应商并延迟轮询。明确失败时释放额度；提交结果不明或多次查询失败时进入 `review`，不自动再次提交。
 5. 成功输出由 worker 下载并归档到用户 OSS 路径，然后原子结算钱包与流水。归档失败保留生成成功状态，可继续恢复归档且不会重复扣费。
 
@@ -62,11 +62,13 @@ MiniMax H3 本地视频预设位于 `workflows/minimax-h3-*.json`，分别覆盖
 
 提示词连接支持 Chat Completions 与 Responses，协议转换留在 Python 节点中。旧工作流缺省自动模式：只在 Chat Completions 明确返回 404/405 时改用同一连接的 Responses；鉴权、超时、限流和生成失败不触发协议切换。Responses 将规则与有序图文转换为相应输入，关闭远端状态保存，只接收完成后的文本并校验正负提示词。指定客户端限制通过受控错误提示呈现，不把上游原始响应或密钥暴露给画布。
 
+开发环境使用 `docker-compose.dev.yml` 在本机回环地址提供 PostgreSQL 和 SeaweedFS，分别使用持久化卷。Nuxt 在宿主机运行并可同时启用 PostgreSQL worker；ComfyUI 安装到 `vendor/ComfyUI`，由现有本地进程管理器托管。该开发配置不改变生产的进程与 GPU 服务边界。
+
 ## 6. 管理面与运维
 
 管理员控制面板提供概览、用户停启、额度调整、邀请码、价格版本、全部用户生成任务、异常任务核对/释放额度和审计记录。所有变更写 append-only 额度流水或审计日志，不修改历史流水。
 
-`docker-compose.production.yml` 定义 PostgreSQL、Redis、migration、Web、worker 与 ComfyUI。Web 与 worker 使用同一应用镜像，通过 `NUXT_WORKER_ENABLED` 分工。worker 正常关闭时停止 BullMQ consumer；outbox 定时补发数据库中未发布事件。
+`docker-compose.production.yml` 定义 PostgreSQL、migration、Web、worker 与 ComfyUI。Web 与 worker 使用同一应用镜像，通过 `NUXT_WORKER_ENABLED` 分工。worker 正常关闭时停止 pg-boss consumer；outbox 定时补发数据库中未发布事件。稳定 job ID 吸收重复派发，同一生成通过 singleton 队列策略与会话 advisory lock 串行处理。未知提交进入人工核对；终态只从已保存 URL 恢复归档，不再请求供应商。
 
 仍需由实际部署环境完成的运维项目包括 PostgreSQL 备份恢复演练、OSS 生命周期和旧 public-read 对象清单、告警接入、供应商账单对账、目标 GPU 上的镜像与模型验证。这些属于上线验收，不能只凭本地构建视为通过。
 

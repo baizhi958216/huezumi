@@ -14,7 +14,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, statusMessage: '生成结果不存在' })
 
   // Historical records may point to the original public Alibaba OSS URL while
-  // the current local development process is configured to use MinIO. Keep
+  // the current local development process is configured to use SeaweedFS. Keep
   // those imported archives playable without changing the active OSS config.
   if (record.videoArchived && record.videoUrl && /^https:\/\/[^/]+\.aliyuncs\.com\//i.test(record.videoUrl))
     return sendRedirect(event, record.videoUrl, 302)

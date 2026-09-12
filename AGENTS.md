@@ -21,6 +21,7 @@ pnpm install
 pnpm dev
 pnpm check        # 文档约束 + lint + typecheck
 pnpm check:full   # 上述检查 + production build
+pnpm test:postgres # 显式 PostgreSQL 队列 / 限流集成验证（需本机数据库）
 ```
 
 需要真实调用供应商时，复制 `.env.example` 为 `.env`；工作流专属的大模型连接也可以由用户填写到私有工作流配置中。不得提交 `.env`、公开包含 API Key 的工作流、用户素材或生成结果。
@@ -81,6 +82,8 @@ pnpm check:full   # 上述检查 + production build
 | 构建/部署配置         | `pnpm check:full`，必要时验证 Docker 构建                        |
 
 如果某项检查因外部凭据或环境不可用而未执行，交付时明确说明，不能把它描述为通过。
+
+任务队列、互斥或限流变化还需运行 `pnpm test:postgres`。该入口根据 `.env` 的数据库连接创建随机独立测试库，结束后删除；要求数据库帐号有创建数据库权限，不向真实供应商发请求。默认 `pnpm check` 不隐式连接数据库。
 
 ## 完成定义
 

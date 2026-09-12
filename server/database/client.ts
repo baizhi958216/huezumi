@@ -17,10 +17,15 @@ export function databaseUrl() {
   return value
 }
 
-export function useDatabase() {
+export function useDatabasePool() {
   if (!globalDatabase.__forkvdoDatabase) {
-    const pool = new Pool({ connectionString: databaseUrl(), max: 10 })
+    const pool = new Pool({ connectionString: databaseUrl(), max: 10, connectionTimeoutMillis: 5000, statement_timeout: 5000 })
     globalDatabase.__forkvdoDatabase = { pool, db: drizzle(pool, { schema }) }
   }
-  return globalDatabase.__forkvdoDatabase.db
+  return globalDatabase.__forkvdoDatabase.pool
+}
+
+export function useDatabase() {
+  useDatabasePool()
+  return globalDatabase.__forkvdoDatabase!.db
 }

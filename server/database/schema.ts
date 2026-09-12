@@ -222,3 +222,9 @@ export const auditLogs = pgTable('audit_logs', {
   detail: jsonb('detail').$type<Record<string, unknown>>().notNull().default({}),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, table => [index('audit_created_idx').on(table.createdAt)])
+
+export const rateLimitBuckets = pgTable('rate_limit_buckets', {
+  key: text('key').primaryKey(),
+  count: integer('count').notNull(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+}, table => [index('rate_limit_expiry_idx').on(table.expiresAt)])

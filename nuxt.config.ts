@@ -30,10 +30,9 @@ export default defineNuxtConfig({
     },
   },
   runtimeConfig: {
+    // 宿主机开发连接 docker-compose.dev.yml；连接信息由私有 .env 提供。
     databaseUrl: '',
-    redisUrl: '',
-    queueMode: '',
-    workerEnabled: false,
+    workerEnabled: false, // 本机 PostgreSQL 队列由 .env 启用，生产 Web 保持关闭。
     workerConcurrency: 4,
     registrationMode: 'invite',
     signupCredits: 0,
