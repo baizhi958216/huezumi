@@ -82,6 +82,7 @@ it('serializes the single image workflow with independent text and separate mode
   assert.equal(prompt['8']?.inputs.steps, 24)
   assert.equal(prompt['8']?.inputs.control_after_generate, undefined)
   assert.equal(prompt['3']?.inputs.connection_id, 'workflow')
+  assert.equal(prompt['10']?.inputs.api_protocol, 'auto')
   assert.equal(existsSync('workflows/anima-llm-prompt-generate.json'), false)
   assert.equal(existsSync('workflows/anima-llm-multi-image-edit.json'), false)
   for (const [id, sourceId, sourceSlot, targetId, targetSlot, type] of workflow.links) {
@@ -92,6 +93,28 @@ it('serializes the single image workflow with independent text and separate mode
     assert.ok(source?.links?.includes(id))
     assert.equal(target?.link, id)
   }
+})
+
+it('keeps legacy LLM connection values when the protocol widget is appended', () => {
+  const workflow: ComfyWorkflowJSON = JSON.parse(readFileSync('workflows/image-creation.json', 'utf8'))
+  const connection = workflow.nodes.find(node => node.type === 'ForkVdoLLMConfig')!
+  connection.widgets_values = ['https://example.invalid/v1', 'fixture-key', 'bearer', 'gpt-6-astra', true, 45]
+  const legacy = serializeGraphToApiPrompt(workflow, imageInfo)
+  assert.deepEqual(legacy.issues, [])
+  assert.deepEqual(legacy.prompt['10']?.inputs, {
+    base_url: 'https://example.invalid/v1',
+    api_key: 'fixture-key',
+    auth: 'bearer',
+    model_name: 'gpt-6-astra',
+    supports_vision: true,
+    timeout_seconds: 45,
+    api_protocol: 'auto',
+  })
+  connection.widgets_values.push('responses')
+  const explicit = serializeGraphToApiPrompt(workflow, imageInfo)
+  assert.deepEqual(explicit.issues, [])
+  assert.equal(explicit.prompt['10']?.inputs.api_protocol, 'responses')
+  assert.deepEqual(explicit.prompt['3']?.inputs.llm_config, ['10', 0])
 })
 
 it('uses forceInput sockets without shifting positional widget values', () => {

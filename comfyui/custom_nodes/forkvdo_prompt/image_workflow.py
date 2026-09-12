@@ -12,7 +12,7 @@ import torch
 import torch.nn.functional as F
 from PIL import Image, ImageOps
 
-from .nodes import _input_image_choices, _read_file_item
+from .nodes import API_PROTOCOLS, _input_image_choices, _read_file_item
 
 
 class ForkVdoLLMConfig:
@@ -21,21 +21,25 @@ class ForkVdoLLMConfig:
     @classmethod
     def INPUT_TYPES(cls):
         return {"required": {
-            "base_url": ("STRING", {"default": "", "tooltip": "OpenAI Chat Completions 兼容地址，例如 https://api.example.com/v1"}),
+            "base_url": ("STRING", {"default": "", "tooltip": "兼容 API 的基础地址，例如 https://api.example.com/v1；协议在 api_protocol 中选择"}),
             "api_key": ("STRING", {"default": "", "secret": True, "tooltip": "会随私有工作流保存；不要把包含密钥的工作流公开或分享"}),
             "auth": (["bearer", "none"], {"default": "bearer", "tooltip": "云端一般使用 bearer；本机免鉴权服务选择 none"}),
             "model_name": ("STRING", {"default": "", "tooltip": "供应商实际模型名称"}),
             "supports_vision": ("BOOLEAN", {"default": True, "tooltip": "上传参考图时必须启用，并且模型确实支持视觉输入"}),
             "timeout_seconds": ("INT", {"default": 120, "min": 5, "max": 600}),
+        }, "optional": {
+            "api_protocol": (list(API_PROTOCOLS), {"default": "auto", "tooltip": "auto 在 Chat Completions 返回 404/405 时尝试 Responses；仅支持指定客户端的服务还需相应客户端接入"}),
         }}
 
     RETURN_TYPES = ("FORKVDO_LLM_CONFIG",)
     RETURN_NAMES = ("config",)
     FUNCTION = "configure"
     CATEGORY = "forkvdo/connection"
-    DESCRIPTION = "把用户自己的 OpenAI 兼容接口、API Key 和模型写入工作流副本。包含密钥的工作流必须保持私有。"
+    DESCRIPTION = "配置兼容 Chat Completions 或 Responses 的接口、API Key 和模型。包含密钥的工作流必须保持私有。"
 
-    def configure(self, base_url, api_key, auth, model_name, supports_vision, timeout_seconds):
+    def configure(self, base_url, api_key, auth, model_name, supports_vision, timeout_seconds, api_protocol="auto"):
+        if api_protocol not in API_PROTOCOLS:
+            raise RuntimeError("大模型 API 协议无效，请重新选择")
         return ({
             "baseUrl": str(base_url or "").strip(),
             "apiKey": str(api_key or "").strip(),
@@ -43,6 +47,7 @@ class ForkVdoLLMConfig:
             "supportsVision": bool(supports_vision),
             "defaultModel": str(model_name or "").strip(),
             "timeoutSeconds": max(5, min(600, int(timeout_seconds))),
+            "apiProtocol": api_protocol,
         },)
 
 

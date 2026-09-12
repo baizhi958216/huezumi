@@ -269,7 +269,7 @@
           "STRING",
           {
             "default": "",
-            "tooltip": "OpenAI Chat Completions 兼容地址"
+            "tooltip": "兼容 API 的基础地址；协议在 api_protocol 中选择"
           }
         ],
         "api_key": [
@@ -309,6 +309,12 @@
             "min": 5,
             "max": 600
           }
+        ]
+      },
+      "optional": {
+        "api_protocol": [
+          ["auto", "chat_completions", "responses"],
+          { "default": "auto" }
         ]
       }
     },

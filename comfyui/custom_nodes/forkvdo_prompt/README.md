@@ -13,10 +13,10 @@
 
 ## 使用
 
-1. 更新节点包并重启 ComfyUI，在平台刷新服务/节点定义，从公开工作流载入“图片创作”。
+1. 更新节点包并重启 ComfyUI，在平台刷新服务/节点定义，从公开工作流载入“图片创作”。已有副本先保存当前修改，再重新载入，以显示新增的协议控件。
 2. **图片**：可不上传、上传一张或多张。一个集合提供八槽，更多图片可串联集合；连线优先于同槽文件。按实际非空素材顺序编号，图片尺寸可以不同；只接受静态图片。检查器支持单选替换指定槽、多选依次填空槽。
 3. **需求**：写最终画面要求，明确图1、图2是人物、配色、风格还是构图参考。
-4. **大模型**：在“③ 大模型连接”节点填写自己的 OpenAI Chat Completions 兼容地址、API Key、模型名和视觉能力，再将它连接到“④ 大模型”节点。连接配置会随工作流副本保存；含 Key 的工作流必须保持私有，导出 JSON 也会包含该 Key。`manual` 仍可直接使用需求文本，不联网、不分析参考图。大模型模式有图时需视觉模型。
+4. **大模型**：在“③ 大模型连接”节点填写兼容 Chat Completions 或 Responses 的地址、API Key、模型名和视觉能力，再将它连接到“④ 大模型”节点。`api_protocol` 默认自动识别，也可显式选择协议。连接配置会随工作流副本保存；含 Key 的工作流必须保持私有，导出 JSON 也会包含该 Key。`manual` 仍可直接使用需求文本，不联网、不分析参考图。大模型模式有图时需视觉模型。
 5. **正负提示词**：`append` 保留大模型结果并追加文本；`replace` 完全替换。反向词可以为空，正向词不能为空。运行后可查看和复制最终文本。要完全跳过 LLM，应选择 `manual`，只替换下游文本不会取消上游调用。
 6. **创作设置**：选择下表中的模式。所有模式一次生成一张图片，多图输入不是批量生图。
 7. **生图模型**：选择已安装且包含匹配编码器/VAE 的 checkpoint。模板默认本机已有的 `anythingv5nijimix_25BEST.safetensors`；其他机器需自行选择已有模型，不会自动下载。512×512 是模板起始尺寸，换用 SDXL 时自行调整适合模型的尺寸与参数。
@@ -45,11 +45,19 @@
 模板提供 `ForkVdoLLMConfig` 节点，适合用户在工作流副本中配置自己的连接：
 
 ```text
-大模型连接(base_url / api_key / auth / model_name / supports_vision)
+大模型连接(base_url / api_key / auth / model_name / supports_vision / api_protocol)
   └── config → 大模型.llm_config
 ```
 
-它使用 OpenAI Chat Completions 兼容协议，实际请求地址为 `<baseUrl>/chat/completions`。连接节点中的 API Key 会进入工作流 JSON；因此不要把该工作流设为公开，也不要把导出的 JSON 发送给不可信的人。
+Base URL 填 origin 或以 `/v1` 结尾的地址，程序只补一次 `/v1`。例如 `https://api.example.com` 和 `https://api.example.com/v1` 对应同一组 API 路径。
+
+| api_protocol     | 行为                                                                                              |
+| ---------------- | ------------------------------------------------------------------------------------------------- |
+| auto             | 默认先请求 `/v1/chat/completions`，仅在 HTTP 404/405 时尝试同一服务、Key 和模型的 `/v1/responses` |
+| chat_completions | 仅使用 Chat Completions，不自动切换协议                                                           |
+| responses        | 仅使用 Responses，适合仅开放此协议的模型                                                          |
+
+新协议控件追加在原有六个控件后；旧副本与旧 API prompt 缺省使用 `auto`，不需要重建工作流。连接节点中的 API Key 会进入工作流 JSON；因此不要把该工作流设为公开，也不要把导出的 JSON 发送给不可信的人。
 
 如果不希望把 Key 放入工作流，可继续使用下方的执行端环境连接。
 
@@ -60,6 +68,7 @@
   "cloud": {
     "baseUrl": "https://your-compatible-endpoint.example/v1",
     "apiKey": "replace-on-execution-host",
+    "apiProtocol": "auto",
     "supportsVision": true,
     "defaultModel": "your-vision-model",
     "maxImages": 8,
@@ -78,7 +87,15 @@
 
 连接 `auth=none` 明确允许免鉴权本地服务；其他连接必须有 apiKey。`supportsVision` 必须与实际模型能力一致。执行端连接仍只保存连接标识与模型名；工作流中的 `ForkVdoLLMConfig` 可以覆盖执行端连接并携带用户自己的密钥。`manual` 是保留连接标识。
 
-协议为 OpenAI Chat Completions 兼容的 `<baseUrl>/v1/chat/completions`。优先请求 JSON schema；HTTP 400 时重试一次不带 response_format 的请求。始终要求非空 positive_prompt；negative_prompt 缺失/null视为空。超时、鉴权失败、非法 JSON 或字段无效会阻止下游生成。
+两个协议均优先请求 JSON schema；Chat Completions 使用 `response_format`，Responses 使用 `text.format`。HTTP 400 时至多重试一次去掉对应结构化参数；明确的指定客户端限制不重试。Responses 使用 `instructions` 与有序 `input_text`/`input_image`，关闭远端状态保存，支持 JSON 响应和 SSE 的 `response.completed` 事件。不接受未完成的流、失败结果、推理块或工具调用作为提示词。
+
+始终要求非空 `positive_prompt`；`negative_prompt` 缺失/null 视为空。超时、鉴权失败、非法 JSON 或字段无效会阻止下游生成，不会因这些错误切换协议。错误信息区分 401 鉴权、403 权限/访问限制、404/405 协议或模型不支持、429 额度/限流与 5xx 上游不可用，不回显密钥或上游原文。
+
+### AnyRouter 排查
+
+[AnyRouter 使用指南](https://anyrouter.top/) 为 Codex 指定 `base_url = "https://anyrouter.top/v1"` 与 `wire_api = "responses"`。该地址本身无需去掉 `/v1`；节点可选 `responses`，默认 `auto` 也能处理 Chat Completions 的 404。
+
+协议兼容不等于服务允许任意客户端。2026-09-08 实测 `gpt-6-astra` 的 Chat Completions 请求返回 404，标准 Responses 请求返回 `invalid codex request`。这是服务对请求/客户端的限制，不能仅靠改模型、Key 或 URL 解决；出现指定客户端提示时，应使用供应商支持的客户端接入，或改用支持通用 API 请求的服务。当前节点提供通用 HTTP 协议，不运行 Codex CLI。`/v1/models` 成功只说明模型列表可访问，不能保证生成请求获准。
 
 本地托管模式在 `.env` 填 `NUXT_COMFYUI_LLM_CONNECTIONS_JSON`，Nuxt 启动 ComfyUI 时将它注入上述执行端变量。remote 模式直接在远端 ComfyUI 容器/主机设置。更改环境配置后重启执行进程。常规运行复用成功提示词，修改 `refresh_token` 再运行可强制更新；修改图片字节（包括同名文件替换）也会使缓存失效。
 

@@ -433,24 +433,27 @@ function onFileChange(event: Event) {
           运行后这里会显示生成结果
         </p>
         <div v-else class="comfy-outputs">
-          <a
+          <template
             v-for="file in outputs"
             :key="`${file.type}-${file.subfolder}-${file.filename}`"
-            :href="buildViewUrl(file)"
-            target="_blank"
-            rel="noopener"
-            class="comfy-outputs__item"
           >
-            <video
+            <a
               v-if="isVideoFile(file)"
-              :src="buildViewUrl(file)"
-              muted
-              loop
-              playsinline
-              class="comfy-outputs__media"
-            />
-            <img v-else :src="buildViewUrl(file)" :alt="file.filename" loading="lazy" class="comfy-outputs__media">
-          </a>
+              :href="buildViewUrl(file)"
+              target="_blank"
+              rel="noopener"
+              class="comfy-outputs__item"
+            >
+              <video
+                :src="buildViewUrl(file)"
+                muted
+                loop
+                playsinline
+                class="comfy-outputs__media"
+              />
+            </a>
+            <WorkflowOutputImage v-else :file="file" />
+          </template>
         </div>
       </section>
     </div>
