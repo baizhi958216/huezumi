@@ -147,3 +147,34 @@ it('recognizes seed controls from metadata and advances only the next-run seed',
   assert.equal(nextSeedValues(info.widgets, { ...values, control_after_generate: 'fixed' }).seed, 7)
   assert.equal(nextSeedValues(info.widgets, { ...values, seed: 0, control_after_generate: 'decrement' }).seed, 4294967295)
 })
+
+it('ships five local MiniMax H3 ComfyUI presets with valid media routes', () => {
+  const presets = [
+    ['workflows/minimax-h3-text-to-video.json', 'MiniMaxH3ImageToVideo'],
+    ['workflows/minimax-h3-reference-image.json', 'MiniMaxH3ReferenceToVideo'],
+    ['workflows/minimax-h3-character-consistency.json', 'MiniMaxH3ReferenceToVideo'],
+    ['workflows/minimax-h3-first-last-frame.json', 'MiniMaxH3ImageToVideo'],
+    ['workflows/minimax-h3-multi-material.json', 'MiniMaxH3ReferenceToVideo'],
+  ] as const
+
+  for (const [file, samplerType] of presets) {
+    const workflow: ComfyWorkflowJSON = JSON.parse(readFileSync(file, 'utf8'))
+    const nodeIds = new Set(workflow.nodes.map(node => node.id))
+    assert.match(workflow.name || '', /^MiniMax H3 · /)
+    assert.ok(workflow.nodes.some(node => node.type === samplerType))
+    assert.ok(workflow.nodes.some(node => node.type === 'SaveVideo'))
+    assert.ok(workflow.links.every(link => nodeIds.has(link[1]) && nodeIds.has(link[3])))
+  }
+
+  const character: ComfyWorkflowJSON = JSON.parse(readFileSync('workflows/minimax-h3-character-consistency.json', 'utf8'))
+  assert.equal(character.nodes.find(node => node.type === 'MiniMaxH3ReferenceToVideo')?.inputs?.filter(input => input.name.startsWith('ref_images.')).length, 3)
+
+  const firstLast: ComfyWorkflowJSON = JSON.parse(readFileSync('workflows/minimax-h3-first-last-frame.json', 'utf8'))
+  assert.deepEqual(firstLast.nodes.find(node => node.type === 'MiniMaxH3ImageToVideo')?.inputs?.filter(input => input.name.endsWith('_frame')).map(input => input.name), ['first_frame', 'last_frame'])
+
+  const multi: ComfyWorkflowJSON = JSON.parse(readFileSync('workflows/minimax-h3-multi-material.json', 'utf8'))
+  const multiInputNames = multi.nodes.find(node => node.type === 'MiniMaxH3ReferenceToVideo')?.inputs?.map(input => input.name) || []
+  assert.ok(multiInputNames.includes('ref_videos.ref_video_0'))
+  assert.ok(multiInputNames.includes('ref_video_audios.ref_video_audio_0'))
+  assert.ok(multiInputNames.includes('ref_audios.ref_audio_0'))
+})
