@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { ComfyUIStatus, ComfyWorkflowSummary, ComfyWorkflowVisibility } from '#shared/types/comfyui'
+import type { DropdownMenuItem } from '@nuxt/ui'
 import type { ComfyFlowNode } from '~/utils/comfy-graph'
 
 const props = defineProps<{
@@ -34,6 +35,12 @@ const emit = defineEmits<{
 
 const name = defineModel<string>('name', { required: true })
 const visibility = defineModel<ComfyWorkflowVisibility>('visibility', { required: true })
+
+const moreActions: DropdownMenuItem[] = [
+  { label: '新建工作流', icon: 'i-lucide-file-plus-2', onSelect: () => emit('create') },
+  { label: '导入 JSON', icon: 'i-lucide-upload', onSelect: () => emit('importJson') },
+  { label: '导出 JSON', icon: 'i-lucide-download', onSelect: () => emit('exportJson') },
+]
 
 const stateMeta = computed(() => {
   if (props.serviceAction === 'starting')
@@ -92,32 +99,16 @@ function formatTime(isoStr: string) {
     return isoStr
   }
 }
-
-const { isDark, toggleTheme } = useThemeTransition()
 </script>
 
 <template>
   <header class="comfy-toolbar">
-    <!-- 左侧：品牌与全局页面导航 -->
+    <!-- 左侧只标识当前工具；全站导航由布局头部统一提供。 -->
     <div class="comfy-toolbar__left">
-      <NuxtLink to="/" class="comfy-toolbar__brand focus-ring" title="返回首页">
-        <BrandLogo compact />
-      </NuxtLink>
-      <span class="comfy-toolbar__divider" aria-hidden="true" />
-      <nav class="comfy-toolbar__nav" aria-label="页面切换">
-        <NuxtLink to="/studio" class="comfy-toolbar__nav-link" title="前往创作台">
-          <UIcon name="i-lucide-clapperboard" class="size-3.5" />
-          <span>创作台</span>
-        </NuxtLink>
-        <NuxtLink to="/projects" class="comfy-toolbar__nav-link" title="前往作品库">
-          <UIcon name="i-lucide-library" class="size-3.5" />
-          <span>作品库</span>
-        </NuxtLink>
-        <div class="comfy-toolbar__nav-link is-active" title="当前位于工作流">
-          <UIcon name="i-lucide-workflow" class="size-3.5" />
-          <span>工作流</span>
-        </div>
-      </nav>
+      <span class="comfy-toolbar__page-label">
+        <UIcon name="i-lucide-workflow" class="size-3.5" />
+        工作流编辑器
+      </span>
     </div>
 
     <!-- 中间：工作流名称与 ComfyUI 状态药丸 -->
@@ -165,6 +156,7 @@ const { isDark, toggleTheme } = useThemeTransition()
             type="button"
             class="comfy-toolbar__status-btn"
             :title="serviceAction === 'starting' ? '正在启动 ComfyUI' : '启动 ComfyUI'"
+            aria-label="启动 ComfyUI"
             :disabled="busy"
             @click="emit('start')"
           >
@@ -175,6 +167,7 @@ const { isDark, toggleTheme } = useThemeTransition()
             type="button"
             class="comfy-toolbar__status-btn"
             :title="serviceAction === 'stopping' ? '正在停止 ComfyUI' : '停止 ComfyUI'"
+            aria-label="停止 ComfyUI"
             :disabled="busy || stopping"
             @click="onStop()"
           >
@@ -184,6 +177,7 @@ const { isDark, toggleTheme } = useThemeTransition()
             type="button"
             class="comfy-toolbar__status-btn"
             :title="serviceAction === 'refreshing' ? '正在刷新服务状态' : '刷新服务状态'"
+            aria-label="刷新 ComfyUI 状态"
             :disabled="busy || stopping"
             @click="emit('refresh')"
           >
@@ -226,32 +220,12 @@ const { isDark, toggleTheme } = useThemeTransition()
           </span>
         </UButton>
 
-        <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-file-plus-2" @click="emit('create')">
-          新建
-        </UButton>
-
-        <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-upload" @click="emit('importJson')">
-          导入
-        </UButton>
-
-        <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-download" @click="emit('exportJson')">
-          导出
-        </UButton>
+        <UDropdownMenu :items="moreActions" :content="{ align: 'end' }" :ui="{ content: 'w-44' }">
+          <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-ellipsis" aria-label="更多工作流操作" />
+        </UDropdownMenu>
       </div>
 
       <span class="comfy-toolbar__divider" aria-hidden="true" />
-
-      <ClientOnly>
-        <UButton
-          color="neutral"
-          variant="ghost"
-          size="xs"
-          :icon="isDark ? 'i-lucide-sun' : 'i-lucide-moon'"
-          :title="isDark ? '切换到浅色模式' : '切换到深色模式'"
-          class="comfy-toolbar__icon-btn"
-          @click="toggleTheme"
-        />
-      </ClientOnly>
 
       <!-- 运行中状态胶囊（实时提示节点与进度，参考 ComfyUI） -->
       <div v-if="running" class="comfy-toolbar__running-pill">

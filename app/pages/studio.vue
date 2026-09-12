@@ -324,7 +324,7 @@ onBeforeUnmount(polling.pause)
 </script>
 
 <template>
-  <main class="min-h-[calc(100svh-72px)] overflow-x-hidden bg-muted/35 p-3 md:p-4 xl:h-[calc(100svh-72px)]">
+  <div class="min-h-[calc(100svh-var(--app-header-offset))] overflow-x-hidden bg-muted/35 p-3 md:p-4 xl:h-[calc(100svh-var(--app-header-offset))]">
     <div class="mx-auto grid h-full max-w-[1600px] gap-4 xl:grid-cols-[400px_1fr] 2xl:grid-cols-[420px_1fr]">
       <StudioConfigPanel
         v-model:provider-id="providerId"
@@ -376,5 +376,5 @@ onBeforeUnmount(polling.pause)
         @refresh="refreshTaskExplicitly"
       />
     </div>
-  </main>
+  </div>
 </template>

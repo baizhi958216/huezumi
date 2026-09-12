@@ -89,7 +89,7 @@ async function handleGeneration(target: AdminGeneration, action: 'refresh' | 're
 </script>
 
 <template>
-  <main v-if="user?.role === 'admin'" class="mx-auto max-w-7xl px-4 pb-16 sm:px-6">
+  <div v-if="user?.role === 'admin'" class="mx-auto max-w-7xl px-4 pb-16 sm:px-6">
     <div class="mb-6 flex flex-wrap items-end justify-between gap-4">
       <div>
         <p class="type-label text-xs text-primary">
@@ -250,5 +250,5 @@ async function handleGeneration(target: AdminGeneration, action: 'refresh' | 're
         </div>
       </div>
     </UCard>
-  </main>
+  </div>
 </template>

@@ -140,7 +140,7 @@ function formatBytes(value: number) {
 </script>
 
 <template>
-  <main v-if="user" class="mx-auto max-w-5xl px-4 pb-16 sm:px-6">
+  <div v-if="user" class="mx-auto max-w-5xl px-4 pb-16 sm:px-6">
     <div class="mb-6">
       <p class="type-label text-xs text-primary">
         ACCOUNT
@@ -244,7 +244,7 @@ function formatBytes(value: number) {
         </p>
       </UCard>
     </div>
-  </main>
+  </div>
   <UModal v-model:open="passwordModalOpen" :ui="{ content: 'sm:max-w-[420px] w-full' }">
     <template #content="{ close }">
       <div class="space-y-5 p-6">

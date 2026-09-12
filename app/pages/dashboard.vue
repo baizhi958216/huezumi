@@ -85,7 +85,7 @@ const visibleModels = computed(() => (activeSection.value === 'models' ? models.
 </script>
 
 <template>
-  <main v-if="user" class="mx-auto max-w-7xl px-4 pb-16 pt-4 sm:px-6 sm:pt-6 lg:px-8">
+  <div v-if="user" class="mx-auto max-w-7xl px-4 pb-16 pt-4 sm:px-6 sm:pt-6 lg:px-8">
     <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
       <div>
         <p class="type-label text-xs text-primary">
@@ -108,13 +108,14 @@ const visibleModels = computed(() => (activeSection.value === 'models' ? models.
       </div>
     </div>
 
-    <div class="mt-7 flex flex-wrap gap-2 border-b border-default pb-3">
+    <div class="mt-7 flex w-fit max-w-full flex-wrap gap-1 rounded-lg border border-default bg-muted/70 p-1" aria-label="空间内容筛选">
       <button
         v-for="item in sections"
         :key="item.id"
         type="button"
-        class="inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm transition"
-        :class="activeSection === item.id ? 'bg-primary text-white shadow-sm' : 'text-muted hover:bg-elevated hover:text-highlighted'"
+        class="focus-ring inline-flex min-h-9 items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition"
+        :class="activeSection === item.id ? 'bg-elevated text-highlighted shadow-soft ring-1 ring-inset ring-default' : 'text-muted hover:bg-elevated/70 hover:text-highlighted'"
+        :aria-pressed="activeSection === item.id"
         @click="selectSection(item.id)"
       >
         <UIcon :name="item.icon" class="size-4" />
@@ -323,5 +324,5 @@ const visibleModels = computed(() => (activeSection.value === 'models' ? models.
         刷新数据
       </UButton>
     </div>
-  </main>
+  </div>
 </template>

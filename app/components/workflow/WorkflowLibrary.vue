@@ -114,7 +114,7 @@ function onDragStart(event: DragEvent, type: string) {
       <div class="comfy-library__mode-switch" role="tablist" aria-label="资源类型">
         <button
           type="button"
-          class="comfy-library__mode-btn"
+          class="comfy-library__mode-btn focus-ring"
           :class="{ 'is-active': mode === 'workflows' }"
           role="tab"
           :aria-selected="mode === 'workflows'"
@@ -125,7 +125,7 @@ function onDragStart(event: DragEvent, type: string) {
         </button>
         <button
           type="button"
-          class="comfy-library__mode-btn"
+          class="comfy-library__mode-btn focus-ring"
           :class="{ 'is-active': mode === 'nodes' }"
           role="tab"
           :aria-selected="mode === 'nodes'"
@@ -147,7 +147,7 @@ function onDragStart(event: DragEvent, type: string) {
         <div class="comfy-library__scope-switch" role="tablist" aria-label="工作流范围">
           <button
             type="button"
-            class="comfy-library__scope-btn"
+            class="comfy-library__scope-btn focus-ring"
             :class="{ 'is-active': workflowScope === 'mine' }"
             role="tab"
             :aria-selected="workflowScope === 'mine'"
@@ -158,7 +158,7 @@ function onDragStart(event: DragEvent, type: string) {
           </button>
           <button
             type="button"
-            class="comfy-library__scope-btn"
+            class="comfy-library__scope-btn focus-ring"
             :class="{ 'is-active': workflowScope === 'public' }"
             role="tab"
             :aria-selected="workflowScope === 'public'"
