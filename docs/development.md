@@ -92,6 +92,15 @@ Web 进程设置 `NUXT_WORKER_ENABLED=false`；worker 进程使用相同构建�
 pnpm data:migrate -- --owner-email=legacy-owner@example.com --data-dir=.data
 ```
 
+如果旧作品记录已经丢失、但结果视频仍在旧阿里云 OSS 的 `forkvdo/outputs/` 下，可先执行只读预览，再导入到指定帐号。脚本只创建缺失的历史记录，不删除或覆盖 OSS 对象；由于 OSS 对象不含提示词和模型元数据，恢复记录会明确标记这些字段未恢复。
+
+```bash
+pnpm data:restore-oss -- --owner-email=owner@example.com --dry-run
+pnpm data:restore-oss -- --owner-email=owner@example.com
+```
+
+脚本默认读取 `.env` 中第一次出现的 `NUXT_OSS_*` 配置，适用于本地配置同时保留旧阿里云和当前 MinIO 覆盖项的情况；也可用 `FORKVDO_LEGACY_OSS_*` 环境变量显式覆盖。导入前应确认当前帐号就是历史作品的归属帐号，并保留数据库备份。
+
 迁移脚本按现有 ID 幂等导入，不会猜测历史数据归属。
 
 ## 私有 OSS
@@ -150,11 +159,37 @@ docker compose -f docker-compose.production.yml up -d --build
 
 内置 [图片创作工作流](../workflows/image-creation.json) 将大模型连接、生图、原图编辑和遮罩局部重绘合为十个节点。它替代两个 Anima 大模型模板，用户已保存的旧工作流不删除。完整的节点、模式、安装和模型兼容说明见 [节点包指南](../comfyui/custom_nodes/forkvdo_prompt/README.md)。
 
-- 更新包后重启 ComfyUI，再刷新节点定义。默认 checkpoint 是本机已有模型；其他环境需在模型节点重新选择已安装的兼容 SD1.5/SDXL checkpoint。
+- 更新包后重启 ComfyUI，再刷新节点定义；已有副本先保存修改，再重新载入以显示新增控件。默认 checkpoint 是本机已有模型；其他环境需在模型节点重新选择已安装的兼容 SD1.5/SDXL checkpoint。
 - 单张/多张图片进入图片集合；需求通过独立文本节点连入大模型；正负提示词可追加或替换。多参考图只帮助 LLM 理解，编辑时仅指定原图进入扩散模型。
-- 大模型支持两种方式：模板中的“③ 大模型连接”节点填写用户自己的 OpenAI Chat Completions 兼容地址、API Key、模型和视觉能力；或者由执行端配置私有 `NUXT_COMFYUI_LLM_CONNECTIONS_JSON` / `FORKVDO_LLM_CONNECTIONS_JSON`。连接节点中的 Key 会保存到工作流 JSON，含 Key 的工作流必须保持私有，导出时也会包含 Key。
+- 大模型支持两种方式：模板中的“③ 大模型连接”节点填写兼容 Chat Completions / Responses 的地址、API Key、模型和视觉能力；或者由执行端配置私有 `NUXT_COMFYUI_LLM_CONNECTIONS_JSON` / `FORKVDO_LLM_CONNECTIONS_JSON`。`api_protocol`（环境连接使用 `apiProtocol`）可选 `auto`、`chat_completions`、`responses`；缺省在 Chat Completions 返回 404/405 时尝试 Responses，保留旧工作流控件顺序。连接节点中的 Key 会保存到工作流 JSON，含 Key 的工作流必须保持私有，导出时也会包含 Key。
+- Responses 支持有序参考图与 JSON/SSE 完成结果；不把断流或失败内容交给生图节点。部分中转服务只允许指定客户端：例如 AnyRouter 的 GPT 模型要求 Responses，但仍可能以 `invalid codex request` 拒绝通用 HTTP 请求。节点会明确提示这种限制，不伪装客户端或自动更换用户模型。具体排查见[节点包指南](../comfyui/custom_nodes/forkvdo_prompt/README.md#anyrouter-排查)。
 - 模板默认改为使用工作流连接；如果不配置连接，可切换 `manual`，直接使用需求文本。`refresh_token` 变化或上传图片内容变化使提示词缓存失效。
 - 局部重绘必须上传与原图同尺寸的黑白遮罩，白改黑留；黑色区域以原图像素合回。整图编辑不保证人物完全一致。不同架构模型需匹配的 loader/专用生成链路，平台不自动下载或承诺任意模型兼容。
+- 工作流右侧输出图片按原始比例完整显示；点击图片在弹窗中查看大图，支持关闭按钮、点击遮罩和 Escape 返回。图片仍通过原有鉴权代理读取，加载失败时可关闭重试或在新窗口打开原图。
+
+### ComfyUI MiniMax H3 本地视频预设
+
+项目内置五个 H3 工作流，工作流库会自动发现它们：
+
+- [纯文生 T2VA](../workflows/minimax-h3-text-to-video.json)
+- [单参考图 Ref2VA](../workflows/minimax-h3-reference-image.json)
+- [人物一致性（多角度）](../workflows/minimax-h3-character-consistency.json)
+- [首尾帧 FL2VA](../workflows/minimax-h3-first-last-frame.json)
+- [多素材（图片 + 视频 + 音频）Ref2VA](../workflows/minimax-h3-multi-material.json)
+
+这些图要求较新的 ComfyUI 核心节点（`MiniMaxH3ImageToVideo`、`MiniMaxH3ReferenceToVideo`、`GetVideoComponents`）和 MiniMax H3 本地权重。默认参数为 960×544、124 帧、24 fps：适合 M5 Pro 48 GB 先做预览；确认构图后可把宽高切换到官方 768p（例如 1344×768），并按需要关闭 Turbo LoRA、改用 8/20 步质量档。模型文件放在 ComfyUI 的 `models/` 对应目录，文件名可直接从节点里的候选项核对：
+
+```text
+models/diffusion_models/minimax_h3_fl2va_pruned_int8_convrot.safetensors
+models/diffusion_models/minimax_h3_ref2va_pruned_int8_convrot.safetensors
+models/text_encoders/qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors
+models/vae/minimax_h3_video_vae_fp16.safetensors
+models/vae/minimax_h3_audio_vae_fp32.safetensors
+models/loras/minimax_h3_fl2v_turbo_8step_v1.0_comfyui_bf16.safetensors
+models/loras/minimax_h3_ref2v_turbo_4step_v0.1_comfyui_bf16.safetensors
+```
+
+预设不自动下载权重或第三方节点；若 `/object_info` 中没有 H3 节点，画布会将其显示为缺失节点，需先更新本地 ComfyUI。Ref2VA 提示词按接入顺序使用 `<Picture 1..9>`、`<Video 1..3>`、`<Audio 1..3>`；多素材预设中的参考视频先由 `GetVideoComponents` 拆成视频帧和配套音频。详细边界与验收记录见 [H3 工作流规格](../spec/2026-09-12-minimax-h3-comfy-workflows.md)。
 
 节点测试不依赖 GPU 或真实凭据，使用已有 ComfyUI Python 环境：
 
@@ -165,7 +200,7 @@ pnpm check:full
 
 ## 供应商配置
 
-各供应商 API Key 仍从私有 Nuxt runtime config 读取，详见 `.env.example`。素材先写个人空间，worker 提交前将 `/api/files/:id` 换成有时效的 OSS 签名地址。供应商输出由 worker 归档后才作为平台长期结果。
+各供应商 API Key 仍从私有 Nuxt runtime config 读取，详见 `.env.example`。素材先写个人空间，报价和 worker 提交前都将 `/api/files/:id` 换成有时效的 OSS 签名地址，再校验供应商要求的公网 HTTPS；供应商输出由 worker 归档后才作为平台长期结果。
 
 ## 验证
 

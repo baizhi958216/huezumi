@@ -28,7 +28,7 @@ PostgreSQL 是业务状态和账目的事实源。OSS 只保存媒体字节；Re
 
 `generations`、`assets`、`workflows`、`comfy_executions` 均保存 `owner_id`。普通列表、详情和文件读取在服务端验证 owner；工作流读取允许 owner 或 `visibility=public`，公开工作流的更新和删除仍只允许 owner；管理 API 验证 admin。停用帐号时撤销其现有 session。修改请求执行同源检查，认证和生成入口另有 Redis/进程内限流。
 
-OSS 对象使用 private ACL，数据库保存 object key。浏览器经平台鉴权后获得短期 302 签名地址；供应商提交前也由服务端把平台资产 URL 换成短期签名 URL。开发环境可用 `.data` 保存新上传字节，生产环境拒绝该回退。
+OSS 对象使用 private ACL，数据库保存 object key。浏览器经平台鉴权后获得短期 302 签名地址；报价和供应商提交前也由服务端把平台资产 URL 换成短期签名 URL，再执行要求公网 HTTPS 的能力校验。开发环境可用 `.data` 保存新上传字节，生产环境拒绝该回退。
 
 ## 3. 生成与计费流程
 
@@ -57,6 +57,10 @@ Drizzle schema 位于 `server/database/schema.ts`，SQL migration 位于 `drizzl
 当前任意 ComfyUI 工作流只向管理员开放。所有 `/api/comfyui/**` HTTP 端点和 WebSocket 都验证管理员 session 与来源；浏览器始终通过 Nuxt 代理访问。这样共享队列、全局 interrupt、节点文件候选项和执行事件不会暴露给普通用户。以后向普通用户开放时，需要先实现审核模板、节点白名单、资源预算和每次执行的 owner 输出映射。
 
 图片创作模板位于 `workflows/image-creation.json`，将生图、原图编辑、遮罩重绘和用户自定义大模型连接组合在一张图中。执行逻辑位于 `comfyui/custom_nodes/forkvdo_prompt/`：提示词输出为通用 STRING，生成节点接标准 MODEL/CLIP/VAE，复用 ComfyUI 编码、采样和解码；不扩展平台生成/计费契约。工作流连接节点中的 API Key 随私有工作流保存，公开工作流禁止携带 Key。画布按 `/object_info` 的上传、强制连线、种子控件元数据渲染，文本执行输出统一展示，不识别具体节点类名。多参考图用于 LLM 理解，编辑只将指定原图送入扩散链路；局部重绘使用遮罩并合回未修改像素。
+
+MiniMax H3 本地视频预设位于 `workflows/minimax-h3-*.json`，分别覆盖纯文生、单参考图、人物多角度一致性、首尾帧和图/视频/音频多素材 Ref2VA。预设复用 ComfyUI 官方 `MiniMaxH3ImageToVideo` / `MiniMaxH3ReferenceToVideo` 与标准视频采样节点，默认 960×544、124 帧和 Turbo LoRA；权重与第三方节点不随仓库分发，实际可用节点和模型候选项以运行期 `/object_info` 为准。
+
+提示词连接支持 Chat Completions 与 Responses，协议转换留在 Python 节点中。旧工作流缺省自动模式：只在 Chat Completions 明确返回 404/405 时改用同一连接的 Responses；鉴权、超时、限流和生成失败不触发协议切换。Responses 将规则与有序图文转换为相应输入，关闭远端状态保存，只接收完成后的文本并校验正负提示词。指定客户端限制通过受控错误提示呈现，不把上游原始响应或密钥暴露给画布。
 
 ## 6. 管理面与运维
 

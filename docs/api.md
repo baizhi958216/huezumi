@@ -37,7 +37,7 @@
 
 ## 私有文件
 
-`POST /api/files` 接收字段名为 `file` 的 multipart 上传。视频最大 100 MiB，其他素材最大 20 MiB，同时受用户存储上限约束。生产环境未配置 OSS 时返回 503；开发环境可回退到 `.data`。
+`POST /api/files` 接收字段名为 `file` 的 multipart 上传。视频最大 100 MiB，其他素材最大 20 MiB，同时受用户存储上限约束。生产环境未配置 OSS 时返回 503；开发环境可回退到 `.data`。上传响应中的 `url` 仍是平台素材路径，报价和正式提交前会由服务端解析为短期 OSS 签名 HTTPS URL，再执行供应商的公网 HTTPS 校验。
 
 `GET /api/files/:id` 验证 owner 或管理员。OSS 资产返回短期签名地址的 302；本地开发资产直接返回字节。私有响应使用 `no-store`。生成结果通过 `GET /api/generations/:id/video` 使用相同所有权和签名流程。
 
