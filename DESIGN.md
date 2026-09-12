@@ -46,7 +46,7 @@ OSS 对象使用 private ACL，数据库保存 object key。浏览器经平台�
 
 ## 4. PostgreSQL、迁移与兼容
 
-Drizzle schema 位于 `server/database/schema.ts`，SQL migration 位于 `drizzle/`。部署先运行 `pnpm db:migrate`，应用进程不自行改 schema。任务记录含 `schema_version`，工作流图保留自身 version。
+Drizzle schema 位于 `server/database/schema.ts`，SQL migration 位于 `drizzle/`。部署先运行 `pnpm db:migrate`，应用进程不自行改 schema。该命令同时维护 pg-boss 的独立 `pgboss` schema；`rate_limit_buckets` 由 Drizzle 管理。队列失败重试、死信与恢复策略见 [ADR-004](docs/decisions/004-postgres-queue.md)。任务记录含 `schema_version`，工作流图保留自身 version。
 
 `pnpm data:migrate -- --owner-email=<email>` 可把旧 `.data` 生成记录和上传元数据导入一个已存在的受控帐号。迁移不会自动把未知 owner 的历史数据暴露给新用户。旧的 Nitro generation service 已退出运行调用链，仅作为迁移前历史实现保留。
 

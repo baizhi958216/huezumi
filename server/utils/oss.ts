@@ -21,7 +21,7 @@ function trimSlashes(value: string) {
 }
 
 function normalizeRegion(value: string, endpoint: string) {
-  // ali-oss 默认按阿里云地域拼接 oss-；S3 兼容服务（例如 MinIO）使用原始地域名。
+  // ali-oss 默认按阿里云地域拼接 oss-；S3 兼容服务（例如 SeaweedFS）使用原始地域名。
   const isAlibabaEndpoint = !endpoint || /aliyuncs\.com|aliyun\.com/i.test(endpoint)
   if (!isAlibabaEndpoint)
     return value || 'us-east-1'

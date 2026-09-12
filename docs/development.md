@@ -2,65 +2,63 @@
 
 ## 本地环境
 
-需要 Node.js 22、pnpm 10、PostgreSQL。使用 Redis 队列时还需要 Redis；不配置 Redis的开发环境默认采用 inline 后台执行。
+需要 Node.js 22.12 或更新版本、pnpm 10、Docker Compose。Nuxt 和项目内的 ComfyUI 使用宿主机进程；PostgreSQL 和 SeaweedFS 使用开发 Compose。
 
 ```bash
 pnpm install
-cp .env.example .env
-set -a; source .env; set +a
-pnpm db:migrate
-pnpm admin:create -- --email=admin@example.com --password='replace-with-a-long-password' --name=管理员
+# 仅首次创建；已有 .env 请合并配置，保留供应商密钥
+cp -n .env.example .env
+docker compose -f docker-compose.dev.yml up -d
+# 等待 postgres / seaweedfs healthy
+docker compose -f docker-compose.dev.yml ps -a
+# CLI 不会自动加载 .env；用 Node 加载，避免 shell 解析 JSON 等配置
+node --env-file=.env --import tsx scripts/db-migrate.ts
+node --env-file=.env --import tsx scripts/admin-create.ts --email=admin@example.com --password='replace-with-a-long-password' --name=管理员
 pnpm dev
 ```
 
-所有帐号和任务 API 都需要 PostgreSQL。首次管理员只能通过 `admin:create` 创建。默认注册模式是 `invite`，登录后在控制面板生成邀请码；开发时可设置 `NUXT_REGISTRATION_MODE=open`。
+所有帐号和任务 API 都需要 PostgreSQL。首次管理员通过 `admin:create` 对应脚本创建；已有管理员无需重复创建（重复执行会重置该帐号密码）。默认注册模式是 `invite`，登录后在控制面板生成邀请码；开发时可设置 `NUXT_REGISTRATION_MODE=open`。
 
 ### 本机热更新开发
 
-本机开发把 PostgreSQL 和可选的 MinIO 放进 Docker；Nuxt 和 ComfyUI 使用宿主机进程，因此 Vue/Nitro 修改可以由 `pnpm dev` 实时重载。仓库若已包含 `vendor/ComfyUI`，ComfyUI 会复用其中的 Python 虚拟环境；Apple Silicon 可由 PyTorch 使用 MPS。
-
-```bash
-docker compose -f docker-compose.dev.yml up -d postgres
-set -a; source .env; set +a
-pnpm db:migrate
-pnpm dev
-```
-
-`.env` 至少需要对应本机连接配置：
+`.env.example` 默认使用以下本机连接配置。修改密码或端口时，同时更新 Compose 变量和对应的 Nuxt 地址；密码含 URL 特殊字符时，数据库 URL 中的密码需要百分号编码。
 
 ```dotenv
 POSTGRES_PASSWORD=change-me-local-only
 POSTGRES_HOST_PORT=55432
 NUXT_DATABASE_URL=postgresql://forkvdo:change-me-local-only@127.0.0.1:55432/forkvdo
-NUXT_QUEUE_MODE=inline
-NUXT_WORKER_ENABLED=false
+NUXT_WORKER_ENABLED=true
 NUXT_COMFYUI_MODE=local
 NUXT_COMFYUI_DIR=./vendor/ComfyUI
 NUXT_COMFYUI_PYTHON=./vendor/ComfyUI/.venv/bin/python
 ```
 
-启动 Nuxt 后，工作流页面的“启动 ComfyUI”会通过项目后端拉起 `vendor/ComfyUI`；也可以手动执行同等命令：
+本机由同一个 Nuxt 进程提供 Web/API 和 PostgreSQL worker，生产仍将 Web 与 worker 分开。所有环境的队列均持久化到 PostgreSQL；不再提供 Redis 或进程内 inline 调度。仅启动 Web 时将 `NUXT_WORKER_ENABLED=false`，任务等待独立 worker 消费。
+
+两个服务仅映射到 `127.0.0.1`：PostgreSQL `55432`、SeaweedFS S3 API `9100`、控制台 `9101`。PostgreSQL 和 SeaweedFS 各用独立 volume；`docker compose -f docker-compose.dev.yml stop` 停止服务但保留数据，不要使用 `down -v` 清除已有开发数据。
+
+启动 Nuxt 后，管理员进入 `/workflow`：首次点“安装 ComfyUI”并安装依赖，后端克隆到 `vendor/ComfyUI`、创建 `.venv`；完成后点“启动 ComfyUI”。项目自定义节点会在启动时挂载，浏览器通过鉴权代理访问。安装需要 Git、Python 和网络，PyTorch 首次下载可能较久。已有仓库和虚拟环境会被复用；模型权重需要另外放入 `vendor/ComfyUI/models/`，不会自动下载。
+
+也可以按照 [ComfyUI 官方手动安装指南](https://docs.comfy.org/installation/manual_install) 提前安装到上述目录。Apple Silicon 使用宿主机 PyTorch 的 MPS，实际可用性以 `/system_stats` 为准；无模型时只能验证服务与节点，不能执行需要权重的生成。
+
+### 本地对象存储（SeaweedFS）
+
+开发 Compose 使用固定版本 `chrislusf/seaweedfs:4.46` 的 `weed mini`，在单个容器内运行对象存储和管理界面，自动创建启用认证的 bucket，不再依赖 MinIO / mc。选择理由与 RustFS 对比见 [ADR-003](./decisions/003-seaweedfs-local-storage.md)。
 
 ```bash
-vendor/ComfyUI/.venv/bin/python vendor/ComfyUI/main.py \
-  --listen 127.0.0.1 --port 8188 --disable-auto-launch
+docker compose -f docker-compose.dev.yml up -d --wait seaweedfs
 ```
 
-本机已有其他 PostgreSQL 服务时，开发 Compose 默认使用 `55432`，不会占用 `5432`。
-
-### 本地对象存储（MinIO）
-
-开发环境可以用 Compose 中的 MinIO 代替阿里云 OSS，上传素材和结果只保存在本机 Docker volume，不产生云端流量。先启动服务：
-
-```bash
-docker compose -f docker-compose.dev.yml up -d minio minio-init
-```
-
-在 `.env` 中加入以下配置（账号需要与 Compose 中的 `LOCAL_OSS_*` 一致）：
+`.env` 中的 Nuxt 凭据必须与 Compose 的 `LOCAL_OSS_*` 一致，空凭据会在 Compose 配置阶段报错：
 
 ```dotenv
+LOCAL_OSS_ACCESS_KEY_ID=forkvdo-local
+LOCAL_OSS_ACCESS_KEY_SECRET=replace-with-a-long-local-secret
+LOCAL_OSS_BUCKET=forkvdo
+LOCAL_OSS_API_PORT=9100
+LOCAL_OSS_CONSOLE_PORT=9101
 NUXT_OSS_ACCESS_KEY_ID=forkvdo-local
-NUXT_OSS_ACCESS_KEY_SECRET=forkvdo-local-secret-change-me
+NUXT_OSS_ACCESS_KEY_SECRET=replace-with-a-long-local-secret
 NUXT_OSS_BUCKET=forkvdo
 NUXT_OSS_REGION=us-east-1
 NUXT_OSS_ENDPOINT=http://127.0.0.1:9100
@@ -68,7 +66,13 @@ NUXT_OSS_SECURE=false
 NUXT_OSS_PUBLIC_BASE_URL=
 ```
 
-MinIO 管理控制台是 <http://127.0.0.1:9101>。Nuxt 在宿主机运行时必须使用 `127.0.0.1:9100`；只有把 Nuxt 也放进 Compose，才改用服务名 `http://minio:9000`。本地配置不会覆盖生产环境的阿里云 OSS 配置，后者仍使用 HTTPS 和阿里云地域名。
+管理界面是 <http://127.0.0.1:9101>，使用同一组 `LOCAL_OSS_ACCESS_KEY_ID` / `LOCAL_OSS_ACCESS_KEY_SECRET` 登录。S3 API 是 <http://127.0.0.1:9100>；两个端口仅绑定本机。容器内 S3 / Admin 端口为 9000 / 9001，master / filer 等内部接口不映射到宿主机，WebDAV、Iceberg 与 Lance 已关闭。健康检查通过 `/healthz` 验证 S3 服务就绪。
+
+对象和 SeaweedFS 内部元数据都在 `forkvdo-seaweedfs-dev` volume（实际名称带 Compose 项目前缀）。备份应在停写并停止服务后复制整个卷；只备份业务 PostgreSQL 不包含素材。修改初始化凭据后，应在管理界面同步已有身份并验证旧凭据是否已撤销，不能把环境变量变更当成凭据轮换。
+
+从旧 MinIO 切换：先停写并检查原 bucket；非空时启动 SeaweedFS 临时端口，通过 S3 SDK / AWS CLI 复制全部对象，保留 key、Content-Type、Cache-Control 等元数据并校验大小和内容，再切换端点。两者底层格式不兼容，不得挂载同一个数据卷。旧容器可停止、移除，但保留旧 volume；不要运行 `down -v`。本次本机切换前已确认旧 bucket 为空。
+
+本地 HTTP 地址不能供要求公网 HTTPS 的云供应商读取。真实供应商素材测试需单独配置可访问的 HTTPS 存储；阿里云 OSS 配置与现有 SDK 适配继续支持。
 
 ## 数据库、队列与 worker
 
@@ -76,15 +80,27 @@ MinIO 管理控制台是 <http://127.0.0.1:9101>。Nuxt 在宿主机运行时必
 
 ```dotenv
 NUXT_DATABASE_URL=postgresql://forkvdo:password@127.0.0.1:5432/forkvdo
-NUXT_REDIS_URL=redis://127.0.0.1:6379
-NUXT_QUEUE_MODE=redis
 NUXT_WORKER_ENABLED=false
 NUXT_WORKER_CONCURRENCY=4
 NUXT_USER_MAX_ACTIVE_GENERATIONS=3
 NUXT_PLATFORM_DAILY_CREDIT_BUDGET=100000
 ```
 
-Web 进程设置 `NUXT_WORKER_ENABLED=false`；worker 进程使用相同构建和配置并设置为 `true`。worker 同时消费 BullMQ 和每三秒扫描 transactional outbox。开发环境 `NUXT_QUEUE_MODE=inline` 会在 Web 进程异步执行，不能作为多实例生产配置。
+Web 进程设置 `NUXT_WORKER_ENABLED=false`；worker 进程使用相同构建和配置并设置为 `true`。worker 消费 pg-boss 队列，并每三秒扫描 transactional outbox。任务延迟轮询 12 秒，最多尝试 5 次，指数退避；死信处理将未终结的生成转入人工核对。同一生成通过队列 singleton 策略和 PostgreSQL advisory lock 串行执行；锁占用会重试。
+
+`db:migrate` 同时显式创建 / 升级 `pgboss` schema；应用运行期不会自动改 schema。已完成 job 保留 7 天，排队 / 重试 job 默认最多保留 14 天，pg-boss 定期维护；长期停机后应核对并恢复未完成生成。失败队列记录也保存在 PostgreSQL。限流计数保存在 `rate_limit_buckets`，采用原子 UPSERT、到期重置，每分钟最多清理 1000 个过期条目。业务数据库连接 / SQL 等待限制为 5 秒，失败时认证入口返回受控 503。
+
+从旧 Redis / inline 版本迁移，先停掉全部旧 Web / worker 并备份数据库，再执行：
+
+```bash
+node --env-file=.env --import tsx scripts/db-migrate.ts
+node --env-file=.env --import tsx scripts/recover-generation-queue.ts --dry-run
+# 确认所有旧 worker 已停止，再将预览中的任务恢复到 PostgreSQL
+node --env-file=.env --import tsx scripts/recover-generation-queue.ts --apply
+pnpm dev
+```
+
+恢复脚本根据数据库重建 queued 和已提交任务的轮询；遗留 submitting 只进入 review，不自动再次调用供应商。已成功但未归档的记录仅使用已保存 URL 重试归档。旧 `NUXT_QUEUE_MODE`、`NUXT_REDIS_URL` 和 `REDIS_HOST_PORT` 应从环境配置中移除。旧服务停止后可移除容器，保留旧数据卷；本机首次配置没有历史生成任务。架构取舍见 [ADR-004](./decisions/004-postgres-queue.md)。
 
 修改 `server/database/schema.ts` 后运行 `pnpm db:generate`，检查生成 SQL，再运行 `pnpm db:migrate`。迁移旧 `.data` 前先建受控 owner 帐号并备份：
 
@@ -99,7 +115,7 @@ pnpm data:restore-oss -- --owner-email=owner@example.com --dry-run
 pnpm data:restore-oss -- --owner-email=owner@example.com
 ```
 
-脚本默认读取 `.env` 中第一次出现的 `NUXT_OSS_*` 配置，适用于本地配置同时保留旧阿里云和当前 MinIO 覆盖项的情况；也可用 `FORKVDO_LEGACY_OSS_*` 环境变量显式覆盖。导入前应确认当前帐号就是历史作品的归属帐号，并保留数据库备份。
+脚本默认读取 `.env` 中第一次出现的 `NUXT_OSS_*` 配置，适用于本地配置同时保留旧阿里云和当前本地 S3 覆盖项的情况；也可用 `FORKVDO_LEGACY_OSS_*` 环境变量显式覆盖。导入前应确认当前帐号就是历史作品的归属帐号，并保留数据库备份。
 
 迁移脚本按现有 ID 幂等导入，不会猜测历史数据归属。
 
@@ -207,8 +223,9 @@ pnpm check:full
 ```bash
 pnpm check
 pnpm check:full
+pnpm test:postgres
 ```
 
-`check` 执行仓库文档约束、计费/幂等纯函数测试、ESLint 和 TypeScript；`check:full` 再执行 production build。真实数据库并发、Redis 故障恢复、OSS 私有访问、供应商账单和 GPU 作业需要在对应环境单独验收，并记录结果。
+`check` 执行仓库文档约束、计费/幂等纯函数测试、ESLint 和 TypeScript；`check:full` 再执行 production build。`test:postgres` 创建随机独立测试库，验证队列、恢复、限流和终态边界，结束后删除，要求本机数据库帐号有创建数据库权限；默认 check 跳过该集成文件。OSS 私有访问、供应商账单和 GPU 作业需要在对应环境单独验收，并记录结果。
 
 提交前执行 `git diff --check` 和 `git status --short`，确认没有 `.env`、`.data`、构建产物、用户素材或密钥。

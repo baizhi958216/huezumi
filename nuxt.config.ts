@@ -65,7 +65,7 @@ export default defineNuxtConfig({
     // MiniMax / 可灵 / Seedance 均可通过对应 *_BASE_URL 覆盖默认接入点
     minimaxBaseUrl: '',
     klingBaseUrl: '',
-    // OSS 兼容对象存储：可接阿里云 OSS 或本地 MinIO
+    // OSS 兼容对象存储：可接阿里云 OSS 或本地 SeaweedFS
     ossAccessKeyId: '',
     ossAccessKeySecret: '',
     ossBucket: '',

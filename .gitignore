@@ -12,3 +12,6 @@ _tmp_*
 # 本地克隆的第三方仓库（ComfyUI 等），体积大且与平台代码无关
 /vendor
 /vendor/
+
+# Python custom-node import caches
+__pycache__/

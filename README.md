@@ -30,17 +30,19 @@
 
 ## 开始使用
 
-本地运行需要 Node.js 22、pnpm 10 和 PostgreSQL。
+本地运行需要 Node.js 22.12 或更新版本、pnpm 10 和 Docker Compose。PostgreSQL、SeaweedFS 在 Docker 中运行；Nuxt 与项目内的 ComfyUI 在宿主机运行。
 
 ```bash
 pnpm install
-cp .env.example .env
-pnpm db:migrate
-pnpm admin:create -- --email=admin@example.com --password='replace-with-a-long-password'
+cp -n .env.example .env
+docker compose -f docker-compose.dev.yml up -d
+# 确认两个服务健康后执行
+node --env-file=.env --import tsx scripts/db-migrate.ts
+node --env-file=.env --import tsx scripts/admin-create.ts --email=admin@example.com --password='replace-with-a-long-password'
 pnpm dev
 ```
 
-所有环境变量都写在 `.env.example` 里。
+所有环境变量都写在 `.env.example` 里。已有 `.env` 请按[本机开发指南](./docs/development.md#本机热更新开发)合并配置。管理员进入工作流页面安装、启动 ComfyUI；模型需要另行安装。
 
 阿里云百炼示例最小配置：
 
