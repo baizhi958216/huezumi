@@ -1,3 +1,4 @@
+import { resolveProviderMediaUrls } from '../../services/assets'
 import { createQuote } from '../../services/billing'
 import { assertRequestSupported } from '../../services/providers'
 import { getCapability } from '../../services/providers/catalog'
@@ -12,6 +13,7 @@ export default defineEventHandler(async (event) => {
   const capability = getCapability(parsed.data.provider)
   if (!capability)
     throw createError({ statusCode: 400, statusMessage: '供应商不存在' })
-  assertRequestSupported(capability, parsed.data)
+  const providerRequest = await resolveProviderMediaUrls(user.id, parsed.data)
+  assertRequestSupported(capability, providerRequest)
   return await createQuote(user.id, parsed.data)
 })

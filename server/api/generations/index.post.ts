@@ -4,6 +4,7 @@ import { and, eq, gt, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { useDatabase } from '../../database/client'
 import { generations, ledgerEntries, outboxEvents, quotes } from '../../database/schema'
+import { resolveProviderMediaUrls } from '../../services/assets'
 import { publishOutbox } from '../../services/generation-queue'
 import { rowToGeneration } from '../../services/generation-store'
 import { assertRequestSupported } from '../../services/providers'
@@ -24,7 +25,8 @@ export default defineEventHandler(async (event): Promise<PublicGenerationRecord>
   const capability = getCapability(parsed.data.provider)
   if (!capability)
     throw createError({ statusCode: 400, statusMessage: `供应商 ${parsed.data.provider} 不存在` })
-  assertRequestSupported(capability, parsed.data)
+  const providerRequest = await resolveProviderMediaUrls(user.id, parsed.data)
+  assertRequestSupported(capability, providerRequest)
 
   const db = useDatabase()
   const hash = requestHash(parsed.data)

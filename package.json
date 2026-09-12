@@ -9,6 +9,7 @@
     "db:migrate": "tsx scripts/db-migrate.ts",
     "admin:create": "tsx scripts/admin-create.ts",
     "data:migrate": "tsx scripts/migrate-legacy.ts",
+    "data:restore-oss": "tsx scripts/restore-oss-archives.ts",
     "check": "node harness/run.mjs",
     "check:full": "node harness/run.mjs --full",
     "dev": "nuxt dev",
