@@ -5,7 +5,7 @@ import { getAppNavigation, isAppNavigationActive } from '~/utils/app-navigation'
 
 const route = useRoute()
 const { user, loaded, registrationMode } = useAuth()
-const { isDark, toggleTheme } = useThemeTransition()
+const { isDark, captureThemePointer, toggleTheme } = useThemeTransition()
 
 // Resolve the session in the shared layout so the server and first client
 // render produce the same role-aware navigation structure.
@@ -75,7 +75,8 @@ const mobileNavigation = computed<DropdownMenuItem[]>(() => [
               :icon="isDark ? 'i-lucide-sun' : 'i-lucide-moon'"
               :aria-label="isDark ? '切换到浅色模式' : '切换到深色模式'"
               class="app-header__icon-button"
-              @click="toggleTheme"
+              @pointerdown.capture="captureThemePointer"
+              @click="toggleTheme($event)"
             />
           </UTooltip>
           <template #fallback>

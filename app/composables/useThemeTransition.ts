@@ -2,8 +2,17 @@ export function useThemeTransition() {
   const colorMode = useColorMode()
   const isDark = computed(() => colorMode.value === 'dark')
   let isTransitioning = false
+  let pointerOrigin: { x: number, y: number } | undefined
+
+  function captureThemePointer(event: PointerEvent) {
+    pointerOrigin = { x: event.clientX, y: event.clientY }
+  }
 
   async function toggleTheme(event?: MouseEvent) {
+    const origin = event?.detail === 0
+      ? undefined
+      : pointerOrigin ?? (event ? { x: event.clientX, y: event.clientY } : undefined)
+    pointerOrigin = undefined
     const nextDark = !isDark.value
     const nextPreference = nextDark ? 'dark' : 'light'
 
@@ -24,12 +33,12 @@ export function useThemeTransition() {
 
     isTransitioning = true
 
-    // 获取点击发生时的视口坐标作为扩散起点
-    let x = event?.clientX
-    let y = event?.clientY
+    // 指针按下时记录坐标，避免按钮组件转发的 click 事件丢失原始位置。
+    let x = origin?.x
+    let y = origin?.y
 
-    // 若非真实鼠标指针坐标（如键盘回车/空格触发），使用触发元素中心或视口中心
-    if (typeof x !== 'number' || typeof y !== 'number' || (x === 0 && y === 0)) {
+    // 键盘触发时从按钮中心扩散；没有触发元素时使用视口中心。
+    if (x === undefined || y === undefined) {
       const target = (event?.currentTarget || event?.target) as HTMLElement | null
       if (target && typeof target.getBoundingClientRect === 'function') {
         const rect = target.getBoundingClientRect()
@@ -92,6 +101,7 @@ export function useThemeTransition() {
   return {
     colorMode,
     isDark,
+    captureThemePointer,
     toggleTheme,
   }
 }
