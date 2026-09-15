@@ -83,8 +83,8 @@ export interface ComfyInputOptions {
   image_upload?: boolean
   audio_upload?: boolean
   video_upload?: boolean
-  /** 新版 ComfyUI 对 COMBO 使用 options 数组承载候选值。 */
-  options?: string[]
+  /** 新版 ComfyUI 对 COMBO 使用 options 数组承载候选值；动态 COMBO 的条目是带 key 的对象。 */
+  options?: unknown[]
   multiselect?: boolean
   /** 任意额外键：ComfyUI 允许节点作者自定义提示信息 */
   [key: string]: unknown
@@ -159,6 +159,21 @@ export const CONTROL_AFTER_GENERATE_NODES = ['KSampler', 'KSamplerAdvanced', 'Pr
 export const CONTROL_AFTER_GENERATE_OPTIONS = ['randomize', 'fixed', 'increment', 'decrement'] as const
 
 const WIDGET_TYPES = new Set(['INT', 'FLOAT', 'STRING', 'BOOLEAN'])
+const COMBO_TYPES = new Set(['COMBO', 'COMFY_DYNAMICCOMBO_V3'])
+
+function getComboChoices(options: ComfyInputOptions): string[] {
+  if (!Array.isArray(options.options))
+    return []
+  return options.options.flatMap((option) => {
+    if (typeof option === 'string' || typeof option === 'number')
+      return [String(option)]
+    if (option && typeof option === 'object' && 'key' in option) {
+      const key = (option as { key?: unknown }).key
+      return typeof key === 'string' || typeof key === 'number' ? [String(key)] : []
+    }
+    return []
+  })
+}
 
 function getUploadType(options: ComfyInputOptions): ComfyUploadType | undefined {
   if (options.image_upload)
@@ -217,13 +232,13 @@ export function buildNodeTypeInfo(name: string, def: ComfyNodeDef): ComfyNodeTyp
         })
         continue
       }
-      // 新版 ComfyUI 的 LoadAudio/LoadVideo 使用字符串 COMBO，并把候选项放在 options.options。
-      if (type === 'COMBO') {
+      // 新版 ComfyUI 的媒体节点使用字符串 COMBO；动态 COMBO v3 的候选项是带 key 的对象。
+      if (COMBO_TYPES.has(type)) {
         widgets.push({
           name: inputName,
           kind: 'COMBO',
           options,
-          choices: Array.isArray(options.options) ? options.options.map(String) : [],
+          choices: getComboChoices(options),
           uploadType: getUploadType(options),
           serialize: true,
           group,

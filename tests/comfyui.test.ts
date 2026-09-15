@@ -65,6 +65,69 @@ it('recognizes upload-enabled COMBO inputs from current ComfyUI definitions', ()
   assert.deepEqual(video.widgets[0]?.choices, ['demo.mp4'])
 })
 
+it('serializes ComfyUI dynamic combo v3 values required by SaveVideo', () => {
+  const saveVideoInfo: ComfyObjectInfo = {
+    SaveVideo: {
+      input: {
+        required: {
+          video: ['VIDEO', {}],
+          filename_prefix: ['STRING', { default: 'video/ComfyUI' }],
+          format: ['COMFY_DYNAMICCOMBO_V3', {
+            options: [
+              { key: 'auto', inputs: { required: {} } },
+              { key: 'mp4', inputs: { required: {} } },
+            ],
+          }],
+        },
+        optional: {
+          codec: ['COMFY_DYNAMICCOMBO_V3', {
+            options: [{ key: 'auto', inputs: { required: {} } }],
+          }],
+        },
+      },
+      output: ['VIDEO'],
+      name: 'SaveVideo',
+    },
+  }
+  const workflow: ComfyWorkflowJSON = {
+    last_node_id: 1,
+    last_link_id: 0,
+    nodes: [{
+      id: 1,
+      type: 'SaveVideo',
+      pos: [0, 0],
+      size: [260, 120],
+      order: 0,
+      mode: 0,
+      inputs: [{ name: 'video', type: 'VIDEO', link: null }],
+      widgets_values: ['video/MiniMax_H3', 'auto', 'auto'],
+    }],
+    links: [],
+  }
+
+  const info = buildNodeTypeInfo('SaveVideo', saveVideoInfo.SaveVideo!)
+  assert.deepEqual(info.widgets.map(widget => widget.name), ['filename_prefix', 'format', 'codec'])
+  assert.deepEqual(info.inputs.map(input => input.name), ['video'])
+  assert.deepEqual(info.widgets.find(widget => widget.name === 'format')?.choices, ['auto', 'mp4'])
+
+  const result = serializeGraphToApiPrompt(workflow, saveVideoInfo)
+  assert.deepEqual(result.issues, [])
+  assert.deepEqual(result.prompt['1']?.inputs, {
+    filename_prefix: 'video/MiniMax_H3',
+    format: 'auto',
+    codec: 'auto',
+  })
+
+  workflow.nodes[0]!.widgets_values = ['video/Legacy_H3']
+  const legacy = serializeGraphToApiPrompt(workflow, saveVideoInfo)
+  assert.deepEqual(legacy.issues, [])
+  assert.deepEqual(legacy.prompt['1']?.inputs, {
+    filename_prefix: 'video/Legacy_H3',
+    format: 'auto',
+    codec: 'auto',
+  })
+})
+
 const imageInfo: ComfyObjectInfo = JSON.parse(readFileSync(new URL('./fixtures/comfy-image-nodes.json', import.meta.url), 'utf8'))
 
 it('serializes the single image workflow with independent text and separate model inputs', () => {
