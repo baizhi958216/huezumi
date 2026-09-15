@@ -183,6 +183,14 @@ docker compose -f docker-compose.production.yml up -d --build
 - 局部重绘必须上传与原图同尺寸的黑白遮罩，白改黑留；黑色区域以原图像素合回。整图编辑不保证人物完全一致。不同架构模型需匹配的 loader/专用生成链路，平台不自动下载或承诺任意模型兼容。
 - 工作流右侧输出图片按原始比例完整显示；点击图片在弹窗中查看大图，支持关闭按钮、点击遮罩和 Escape 返回。图片仍通过原有鉴权代理读取，加载失败时可关闭重试或在新窗口打开原图。
 
+### 百炼 Wan 3.0 API 视频工作流
+
+内置 [Wan 3.0 多模态参考视频工作流](../workflows/bailian-wan3-multimodal-reference.json) 默认带独立正向、反向提示词节点，以及参考图、参考视频、参考音频节点。两条提示词连线接入生成节点；参考素材可以留空、断开或删除，全部留空时是文生视频。生成节点后接“视频输出 · 生成后预览”节点，完成后在右侧输出区显示可播放 MP4，并可打开原文件；旧四/五节点副本仍可使用生成节点内的提示词并预览。画布提供随机种子、480P/720P/1080P、比例、时长及声音、智能改写、水印、等待时长。Wan 3.0 API 没有独立反向提示词参数，因此反向文本会追加到正向提示词，作为“避免出现”约束。
+
+本地 ComfyUI 由 Nuxt 启动时读取 `NUXT_DASHSCOPE_API_KEY`、`NUXT_DASHSCOPE_WORKSPACE_ID`、`NUXT_DASHSCOPE_REGION`，并只传给执行进程。生产 remote ComfyUI 在 Compose 中使用 `DASHSCOPE_API_KEY`、`DASHSCOPE_WORKSPACE_ID`、`DASHSCOPE_REGION`；在其他部署方式中直接设置执行进程的 `FORKVDO_DASHSCOPE_*` 环境变量。密钥不会写入工作流 JSON。地域、业务空间、模型和 Key 需要一致；默认模型是 `wan3.0-video-prime`，可改为 `wan3.0-video`。修改配置后重启 ComfyUI。
+
+已选素材会先上传到百炼模型绑定的临时 OSS，再提交异步任务。临时素材 48 小时过期，结果链接 24 小时过期，节点会立即下载结果并留在 ComfyUI output。参考视频/音频长度、视频帧率和“输入视频总时长 + 输出时长 ≤30 秒”等细项由百炼校验；重复手动运行会创建新的收费任务。此工作流仍只开放给管理员，真实执行会产生百炼费用。详见 [规格](../spec/2026-09-16-bailian-wan3-comfy-workflow.md)。
+
 ### ComfyUI MiniMax H3 本地视频预设
 
 项目内置五个 H3 工作流，工作流库会自动发现它们：
@@ -206,6 +214,8 @@ models/loras/minimax_h3_ref2v_turbo_4step_v0.1_comfyui_bf16.safetensors
 ```
 
 预设不自动下载权重或第三方节点；若 `/object_info` 中没有 H3 节点，画布会将其显示为缺失节点，需先更新本地 ComfyUI。Ref2VA 提示词按接入顺序使用 `<Picture 1..9>`、`<Video 1..3>`、`<Audio 1..3>`；多素材预设中的参考视频先由 `GetVideoComponents` 拆成视频帧和配套音频。详细边界与验收记录见 [H3 工作流规格](../spec/2026-09-12-minimax-h3-comfy-workflows.md)。
+
+当前 ComfyUI 的 `SaveVideo` 使用动态下拉控件 v3 声明 `format` 与 `codec`；平台按运行期 `/object_info` 显示并序列化这些字段。旧工作流副本没有保存新增控件值时使用当前节点的首个合法选项（通常为 `auto`）。
 
 节点测试不依赖 GPU 或真实凭据，使用已有 ComfyUI Python 环境：
 

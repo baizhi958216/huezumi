@@ -2009,6 +2009,34 @@
   object-fit: cover;
 }
 
+.comfy-outputs__item--video {
+  grid-column: 1 / -1;
+  aspect-ratio: auto;
+  padding: 0.375rem;
+}
+
+.comfy-outputs__item--video:hover {
+  transform: none;
+}
+
+.comfy-outputs__item--video .comfy-outputs__media {
+  display: block;
+  height: auto;
+  max-height: 20rem;
+  aspect-ratio: 16 / 9;
+  object-fit: contain;
+  background: #000;
+  border-radius: var(--radius-sm);
+}
+
+.comfy-outputs__open {
+  display: inline-block;
+  padding: 0.375rem 0.125rem 0.125rem;
+  color: var(--ui-text-toned);
+  font-size: 0.75rem;
+  text-decoration: underline;
+}
+
 /* ---- 提示词专用检查器 ---- */
 .comfy-inspector__prompt-box {
   display: flex;

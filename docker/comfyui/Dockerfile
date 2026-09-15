@@ -11,6 +11,8 @@ RUN git clone --depth 1 --branch "${COMFYUI_REF}" https://github.com/comfyanonym
   && pip install --no-cache-dir -r /opt/ComfyUI/requirements.txt \
   && chown -R comfy:comfy /opt/ComfyUI
 
+COPY --chown=comfy:comfy comfyui/custom_nodes/forkvdo_prompt /opt/ComfyUI/custom_nodes/forkvdo_prompt
+
 USER comfy
 WORKDIR /opt/ComfyUI
 EXPOSE 8188

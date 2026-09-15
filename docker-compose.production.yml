@@ -52,6 +52,10 @@ services:
       args:
         COMFYUI_REF: ${COMFYUI_REF:-v0.3.59}
     gpus: all
+    environment:
+      FORKVDO_DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:-}
+      FORKVDO_DASHSCOPE_WORKSPACE_ID: ${DASHSCOPE_WORKSPACE_ID:-}
+      FORKVDO_DASHSCOPE_REGION: ${DASHSCOPE_REGION:-cn-beijing}
     volumes:
       - ${COMFYUI_MODELS_DIR:?set COMFYUI_MODELS_DIR}:/opt/ComfyUI/models:ro
       - comfy-input:/opt/ComfyUI/input

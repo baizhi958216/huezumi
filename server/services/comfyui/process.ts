@@ -143,6 +143,9 @@ export async function startComfy(): Promise<ComfyUIStatus> {
       ...process.env,
       PYTHONUNBUFFERED: '1',
       FORKVDO_LLM_CONNECTIONS_JSON: config.llmConnectionsJson || process.env.FORKVDO_LLM_CONNECTIONS_JSON || '',
+      FORKVDO_DASHSCOPE_API_KEY: process.env.FORKVDO_DASHSCOPE_API_KEY || process.env.NUXT_DASHSCOPE_API_KEY || '',
+      FORKVDO_DASHSCOPE_WORKSPACE_ID: process.env.FORKVDO_DASHSCOPE_WORKSPACE_ID || process.env.NUXT_DASHSCOPE_WORKSPACE_ID || '',
+      FORKVDO_DASHSCOPE_REGION: process.env.FORKVDO_DASHSCOPE_REGION || process.env.NUXT_DASHSCOPE_REGION || 'cn-beijing',
     },
   })
 

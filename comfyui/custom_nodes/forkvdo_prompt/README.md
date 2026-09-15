@@ -101,11 +101,16 @@ Base URL 填 origin 或以 `/v1` 结尾的地址，程序只补一次 `/v1`。�
 
 ## 安装和验证
 
-本地模式由项目将此目录软链接到 ComfyUI 的 `custom_nodes/forkvdo_prompt`。远端挂载或复制**整个目录**，然后重启 ComfyUI；该目录使用 ComfyUI 已有的 Python、Torch、NumPy、Pillow，不需新增包。安装后 `/object_info` 应出现7种 forkvdo节点。
+本地模式由项目将此目录软链接到 ComfyUI 的 `custom_nodes/forkvdo_prompt`。远端挂载或复制**整个目录**，然后重启 ComfyUI；该目录使用 ComfyUI 已有的 Python、Torch、NumPy、Pillow、Requests，不需新增包。安装后 `/object_info` 应出现原有节点及 5 种百炼节点。
 
 ```bash
 PYTHONDONTWRITEBYTECODE=1 vendor/ComfyUI/.venv/bin/python comfyui/custom_nodes/forkvdo_prompt/test_workflow.py
+PYTHONDONTWRITEBYTECODE=1 vendor/ComfyUI/.venv/bin/python comfyui/custom_nodes/forkvdo_prompt/test_bailian_video.py
 pnpm check:full
 ```
 
 Python 测试使用临时合成素材、模拟 LLM，不联网、不加载模型。真实 GPU/模型验收另外执行。主平台没有新增生成请求、数据库或计费规则。
+
+### 百炼 Wan 3.0 视频节点
+
+公开预设复用两个 `ForkVdoText` 节点，分别编写正向和反向提示词并连到生成节点；生成节点原有文本控件保留给旧副本和断开连线后的编辑。`ForkVdoBailianImage`、`ForkVdoBailianVideo`、`ForkVdoBailianAudio` 是可选文件节点，空槽输出 `None`。`ForkVdoBailianWan3Video` 使用执行进程的 `FORKVDO_DASHSCOPE_API_KEY`、`FORKVDO_DASHSCOPE_WORKSPACE_ID`、`FORKVDO_DASHSCOPE_REGION`，将已选素材上传到百炼模型绑定的临时 OSS，异步生成后立即保存 MP4；它把视频文件名送给 `ForkVdoBailianVideoOutput`，由独立输出节点登记画布右侧预览。旧工作流没有输出节点时，生成节点自身仍登记视频。连接和 API Key 不从画布读取；反向提示词作为正向文本的“避免出现”约束发送，因为 Wan 3.0 API 没有独立反向字段。每次明确运行会创建新的收费任务。
