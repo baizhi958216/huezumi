@@ -3,6 +3,7 @@ import type { ComfyObjectInfo, ComfyUploadType, ComfyWorkflowJSON, ComfyWorkflow
 import type { Connection } from '@vue-flow/core'
 import type { ComfyFlowEdge, ComfyFlowNode, ComfyNodeData } from '~/utils/comfy-graph'
 import { canConnectTypes, serializeGraphToApiPrompt } from '#shared/types/comfyui'
+import { workflowGraphFromHistory } from '#shared/utils/comfy-history-workflow'
 import { useNodesInitialized, useVueFlow, VueFlow } from '@vue-flow/core'
 import { useIntervalFn } from '@vueuse/core'
 import { useComfyEvents, useComfyOutputs, useComfyServer } from '~/composables/useComfyServer'
@@ -18,6 +19,8 @@ import '@vue-flow/core/dist/style.css'
 import '@vue-flow/core/dist/theme-default.css'
 
 definePageMeta({ title: '工作流 · forkvdo' })
+
+const route = useRoute()
 
 const { data: workflowSession } = await useFetch<{ user: { role: string } | null }>('/api/auth/session')
 if (workflowSession.value?.user?.role !== 'admin')
@@ -95,6 +98,7 @@ const serviceFeedback = ref<string | null>(null)
 let serviceFeedbackTimer: ReturnType<typeof setTimeout> | undefined
 const issues = ref<string[]>([])
 const runError = ref<string | null>(null)
+const originalWorkflowState = ref<'loading' | 'loaded' | 'error' | null>(null)
 const clientId = ref<string>('')
 const isMobile = ref(false)
 const showLibrary = ref(true)
@@ -332,6 +336,35 @@ async function openSaved(id: string) {
   }
   catch (error) {
     runError.value = messageOf(error)
+  }
+}
+
+async function openOriginalWorkflow(promptId: string) {
+  originalWorkflowState.value = 'loading'
+  try {
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(promptId))
+      throw new Error('执行 ID 无效')
+    const entry = await fetchHistoryEntry(promptId)
+    const graph = workflowGraphFromHistory(entry)
+    if (!graph)
+      throw new Error('本次执行没有可读取的工作流快照')
+    const result = importWorkflow(graph, typeIndex.value)
+    currentWorkflowId.value = undefined
+    workflowName.value = graph.name || '原始工作流'
+    workflowVisibility.value = 'private'
+    setNodes(result.nodes)
+    events.executedOutputs.value = {}
+    setEdges(result.edges)
+    issues.value = result.missing.map(type => `工作流使用了当前环境没有的节点类型：${type}`)
+    outputsState.outputs.value = []
+    runError.value = null
+    await nextTick()
+    pendingFit.value = true
+    originalWorkflowState.value = 'loaded'
+  }
+  catch (error) {
+    runError.value = `原始工作流读取失败：${messageOf(error)}`
+    originalWorkflowState.value = 'error'
   }
 }
 
@@ -630,6 +663,9 @@ onMounted(async () => {
   if (status.value?.state === 'running')
     await loadObjectInfo()
 
+  if (route.query.sourcePromptId !== undefined)
+    await openOriginalWorkflow(typeof route.query.sourcePromptId === 'string' ? route.query.sourcePromptId : '')
+
   statusPolling.resume()
   completionPolling.resume()
 })
@@ -676,6 +712,14 @@ onBeforeUnmount(() => {
 
     <div v-if="status?.mode === 'remote'" class="comfy-shell__notice">
       已连接远程 ComfyUI：<code>{{ status.baseUrl }}</code>。本地启动/停止按钮已禁用。
+    </div>
+
+    <div v-if="originalWorkflowState" class="comfy-shell__notice" role="status">
+      {{ originalWorkflowState === 'loading'
+        ? '正在读取本次视频的原始工作流…'
+        : originalWorkflowState === 'loaded'
+          ? '已载入本次视频生成时的画布快照；保存会创建私有副本。'
+          : runError }}
     </div>
 
     <div class="comfy-shell__grid" :class="{ 'comfy-shell__grid--collapsed': !showLibrary && !showInspector }">

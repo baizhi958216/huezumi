@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import type { GenerationRecord } from '#shared/types/generation'
+import type { WorkflowProjectRecord } from '#shared/types/workflow-project'
 import type { MediaTypeFilter, RatioFilter, SortBy, StatusFilter, ViewMode } from '~/types/projects'
 import { useIntervalFn } from '@vueuse/core'
 
 const { data: records, refresh, status } = await useFetch<GenerationRecord[]>('/api/generations')
+const { data: workflowRecords, refresh: refreshWorkflows, status: workflowStatus, error: workflowError } = await useFetch<WorkflowProjectRecord[]>('/api/projects/workflows')
 const searchQuery = ref('')
 const statusFilter = ref<StatusFilter>('ALL')
 const ratioFilter = ref<RatioFilter>('ALL')
@@ -15,9 +17,9 @@ const sortBy = ref<SortBy>('newest')
 const counts = computed(() => {
   const list = records.value ?? []
   return {
-    total: list.length,
+    total: list.length + (workflowRecords.value?.length ?? 0),
     active: list.filter(item => ['PENDING', 'RUNNING'].includes(item.status)).length,
-    succeeded: list.filter(item => item.status === 'SUCCEEDED').length,
+    succeeded: list.filter(item => item.status === 'SUCCEEDED').length + (workflowRecords.value?.length ?? 0),
     failed: list.filter(item => item.status === 'FAILED').length,
     archived: list.filter(item => item.videoArchived).length,
   }
@@ -28,7 +30,19 @@ useIntervalFn(async () => {
     await refresh()
 }, 4000)
 
-const availableProviders = computed(() => [...new Set((records.value ?? []).map(item => item.provider).filter(Boolean))].sort())
+const availableProviders = computed(() => [...new Set([
+  ...(records.value ?? []).map(item => item.provider).filter(Boolean),
+  ...(workflowRecords.value?.length ? ['comfyui'] : []),
+])].sort())
+
+const latestCreatedAt = computed(() => [records.value?.[0]?.createdAt, workflowRecords.value?.[0]?.createdAt]
+  .filter((value): value is string => Boolean(value))
+  .sort()
+  .at(-1))
+
+async function refreshAll() {
+  await Promise.all([refresh(), refreshWorkflows()])
+}
 
 const filteredRecords = computed(() => {
   let list = records.value ?? []
@@ -67,6 +81,32 @@ const filteredRecords = computed(() => {
       .some(value => value?.toLowerCase().includes(query)))
   }
 
+  return [...list].sort((a, b) => sortBy.value === 'oldest' ? a.createdAt.localeCompare(b.createdAt) : b.createdAt.localeCompare(a.createdAt))
+})
+
+const filteredWorkflowRecords = computed(() => {
+  let list = workflowRecords.value ?? []
+  if (['ACTIVE', 'FAILED', 'ARCHIVED'].includes(statusFilter.value))
+    return []
+  if (ratioFilter.value === 'VERTICAL')
+    list = list.filter(item => ['9:16', '3:4'].includes(item.ratio))
+  else if (ratioFilter.value === 'HORIZONTAL')
+    list = list.filter(item => ['16:9', '4:3', '21:9', 'adaptive'].includes(item.ratio))
+  else if (ratioFilter.value === 'SQUARE')
+    list = list.filter(item => item.ratio === '1:1')
+  if (providerFilter.value !== 'ALL' && providerFilter.value !== 'comfyui')
+    return []
+  if (mediaTypeFilter.value === 'IMAGE')
+    list = list.filter(item => item.mediaTypes.includes('image'))
+  else if (mediaTypeFilter.value === 'VIDEO')
+    list = list.filter(item => item.mediaTypes.includes('video'))
+  else if (mediaTypeFilter.value === 'AUDIO')
+    list = list.filter(item => item.mediaTypes.includes('audio'))
+  else if (mediaTypeFilter.value === 'TEXT_ONLY')
+    list = list.filter(item => item.mediaTypes.length === 0)
+  const query = searchQuery.value.trim().toLowerCase()
+  if (query)
+    list = list.filter(item => [item.prompt, item.name, item.model, item.promptId].some(value => value.toLowerCase().includes(query)))
   return [...list].sort((a, b) => sortBy.value === 'oldest' ? a.createdAt.localeCompare(b.createdAt) : b.createdAt.localeCompare(a.createdAt))
 })
 
@@ -115,9 +155,9 @@ async function refreshRecord(record: GenerationRecord) {
       <ProjectsHeader
         v-model:status-filter="statusFilter"
         :counts="counts"
-        :latest-created-at="records?.[0]?.createdAt"
-        :loading="status === 'pending'"
-        @refresh="refresh"
+        :latest-created-at="latestCreatedAt"
+        :loading="status === 'pending' || workflowStatus === 'pending'"
+        @refresh="refreshAll"
       />
 
       <ProjectsFilterBar
@@ -132,6 +172,12 @@ async function refreshRecord(record: GenerationRecord) {
         @reset="resetFilters"
       />
 
+      <p v-if="workflowError" role="alert" class="mt-4 rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-toned">
+        工作流作品暂时无法加载；请确认 ComfyUI 正在运行，然后刷新作品库。
+      </p>
+
+      <ProjectsWorkflowGallery v-if="filteredWorkflowRecords.length" :records="filteredWorkflowRecords" :view="viewMode" />
+
       <template v-if="filteredRecords.length">
         <ProjectsGallery
           :records="filteredRecords"
@@ -140,7 +186,7 @@ async function refreshRecord(record: GenerationRecord) {
           @select="openDetail"
         />
       </template>
-      <ProjectsEmpty v-else :filtered="Boolean(records?.length)" @reset="resetFilters" />
+      <ProjectsEmpty v-else-if="!filteredWorkflowRecords.length && !workflowError" :filtered="Boolean(records?.length || workflowRecords?.length)" @reset="resetFilters" />
     </div>
 
     <GenerationDetailModal

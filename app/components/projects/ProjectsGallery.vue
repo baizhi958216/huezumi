@@ -17,7 +17,7 @@ const emit = defineEmits<{
 <template>
   <section class="pb-10 pt-4 sm:pt-5">
     <div class="mb-3 flex items-center justify-between text-xs text-dimmed">
-      <span>{{ filtered ? '筛选结果' : '全部作品' }}（{{ records.length }}）</span>
+      <span>{{ filtered ? '平台作品筛选结果' : '平台生成作品' }}（{{ records.length }}）</span>
       <span class="hidden sm:inline">
         {{ view === 'list' ? '按创建时间排列' : view === 'masonry' ? '自适应瀑布流展示' : '等高标准画框展示' }}
       </span>

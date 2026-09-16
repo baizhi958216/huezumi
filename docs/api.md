@@ -35,6 +35,8 @@
 
 `GET /api/generations` 返回当前用户任务，按创建时间倒序。`GET /api/generations/:id` 返回当前用户单条任务。两者只读 PostgreSQL，不调用供应商。`POST /api/generations/:id/refresh` 只把已有供应商任务加入查询队列，不会重新提交生成。
 
+作品库另调用 `GET /api/projects/workflows`：管理员只看到自己 `comfy_executions` 对应的成功视频输出，普通用户返回空列表。该接口读取 ComfyUI 历史并归一化为独立的工作流作品视图，`hasOriginalWorkflow` 仅表示本次执行历史是否含有效画布快照，不返回图或私有连接值。打开原始画布时，编辑器使用已有的 owner 鉴权 `GET /api/comfyui/history/:promptId` 读取执行快照，不创建 `GenerationRecord` 或平台账本记录；视频仍经管理员鉴权的 `/api/comfyui/view` 播放。ComfyUI 历史或 output 卷被清理后，作品可能无法继续从此路径预览。
+
 返回记录的 `billing` 包含预估、实际扣费、价格版本与结算状态。对象存储 key、供应商密钥和上游原始错误不进入响应。
 
 ## 私有文件

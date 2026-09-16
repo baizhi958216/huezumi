@@ -62,6 +62,8 @@ MiniMax H3 本地视频预设位于 `workflows/minimax-h3-*.json`，分别覆盖
 
 百炼 Wan 3.0 画布预设位于 `workflows/bailian-wan3-multimodal-reference.json`。正向、反向提示词各由一个通用文本节点提供，连线到生成节点；旧副本仍可直接使用生成节点内的文本。项目 ComfyUI 节点从执行进程的私有环境读取百炼连接，将可选的图、视频、音频文件上传到模型绑定的临时 OSS，提交异步视频任务并轮询，完成后保存到 ComfyUI output 目录，再接独立的视频输出节点供画布右侧预览。生成节点本身仍登记视频，兼容此前保存的四节点副本；同一文件在右侧只显示一次。此路径绕开平台生成报价与计费契约，仍只允许管理员执行；工作流 JSON 不保存 API Key。Wan 3.0 未声明独立反向提示词字段，画布把反向文本写成提示词中的避免约束。
 
+作品库将管理员自己的 ComfyUI 执行成功视频作为独立工作流作品显示，执行归属来自 `comfy_executions`，展示元数据来自对应历史；同一文件在生成与输出节点登记两次时只显示一个作品。作品卡片显示封面，点击后在弹窗中播放。执行历史含有效 `extra_pnginfo.workflow` 时，弹窗可打开生成时的原始画布快照；作品列表只暴露快照可用性，编辑器经 owner 鉴权的历史 API 读取，保存时作为私有副本。播放仍依赖受管的 ComfyUI output 卷和管理员鉴权代理，不写入需要报价与额度结算的 `generations` 表。历史或输出卷被清理后无法从该视图恢复；长期归档属于后续存储设计。
+
 提示词连接支持 Chat Completions 与 Responses，协议转换留在 Python 节点中。旧工作流缺省自动模式：只在 Chat Completions 明确返回 404/405 时改用同一连接的 Responses；鉴权、超时、限流和生成失败不触发协议切换。Responses 将规则与有序图文转换为相应输入，关闭远端状态保存，只接收完成后的文本并校验正负提示词。指定客户端限制通过受控错误提示呈现，不把上游原始响应或密钥暴露给画布。
 
 开发环境使用 `docker-compose.dev.yml` 在本机回环地址提供 PostgreSQL 和 SeaweedFS，分别使用持久化卷。Nuxt 在宿主机运行并可同时启用 PostgreSQL worker；ComfyUI 安装到 `vendor/ComfyUI`，由现有本地进程管理器托管。该开发配置不改变生产的进程与 GPU 服务边界。
