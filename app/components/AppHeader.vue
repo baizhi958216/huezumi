@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { AuthSessionResponse } from '#shared/types/auth'
 import type { DropdownMenuItem } from '@nuxt/ui'
-import { getAppNavigation, isAppNavigationActive } from '~/utils/app-navigation'
+import { getAppNavigation, getStudioNavigation, isAppNavigationActive } from '~/utils/app-navigation'
 
 const route = useRoute()
 const { user, loaded, registrationMode } = useAuth()
@@ -17,6 +17,10 @@ if (session.value) {
 }
 
 const navigation = computed(() => getAppNavigation(user.value?.role))
+const studioNavigation = computed<DropdownMenuItem[]>(() => getStudioNavigation(user.value?.role).map(item => ({
+  ...item,
+  active: route.path === item.to,
+})))
 const mobileNavigation = computed<DropdownMenuItem[]>(() => [
   {
     label: '首页',
@@ -24,10 +28,16 @@ const mobileNavigation = computed<DropdownMenuItem[]>(() => [
     icon: 'i-lucide-house',
     active: route.path === '/',
   },
-  ...navigation.value.map(item => ({
-    ...item,
-    active: isAppNavigationActive(route.path, item.to),
-  })),
+  ...navigation.value.map(item => item.to === '/studio'
+    ? {
+        ...item,
+        active: isAppNavigationActive(route.path, item.to),
+        children: studioNavigation.value,
+      }
+    : {
+        ...item,
+        active: isAppNavigationActive(route.path, item.to),
+      }),
 ])
 </script>
 
@@ -41,17 +51,33 @@ const mobileNavigation = computed<DropdownMenuItem[]>(() => [
       <span class="app-header__divider" aria-hidden="true" />
 
       <nav class="app-header__nav" aria-label="主导航">
-        <NuxtLink
-          v-for="item in navigation"
-          :key="item.to"
-          :to="item.to"
-          class="app-header__nav-link focus-ring"
-          :class="{ 'is-active': isAppNavigationActive(route.path, item.to) }"
-          :aria-current="isAppNavigationActive(route.path, item.to) ? 'page' : undefined"
-        >
-          <UIcon :name="item.icon" class="app-header__nav-icon" />
-          <span>{{ item.label }}</span>
-        </NuxtLink>
+        <template v-for="item in navigation" :key="item.to">
+          <div v-if="item.to === '/studio'" class="app-header__studio-nav" :class="{ 'is-active': isAppNavigationActive(route.path, item.to) }">
+            <NuxtLink
+              :to="item.to"
+              class="app-header__nav-link app-header__studio-link focus-ring"
+              :aria-current="isAppNavigationActive(route.path, item.to) ? 'page' : undefined"
+            >
+              <UIcon :name="item.icon" class="app-header__nav-icon" />
+              <span>{{ item.label }}</span>
+            </NuxtLink>
+            <UDropdownMenu :items="studioNavigation" :content="{ align: 'start' }" :ui="{ content: 'w-48' }">
+              <button type="button" class="app-header__studio-toggle focus-ring" aria-label="切换创作类型">
+                <UIcon name="i-lucide-chevron-down" class="size-3.5" />
+              </button>
+            </UDropdownMenu>
+          </div>
+          <NuxtLink
+            v-else
+            :to="item.to"
+            class="app-header__nav-link focus-ring"
+            :class="{ 'is-active': isAppNavigationActive(route.path, item.to) }"
+            :aria-current="isAppNavigationActive(route.path, item.to) ? 'page' : undefined"
+          >
+            <UIcon :name="item.icon" class="app-header__nav-icon" />
+            <span>{{ item.label }}</span>
+          </NuxtLink>
+        </template>
       </nav>
 
       <div class="app-header__actions">

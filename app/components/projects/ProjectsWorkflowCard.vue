@@ -110,7 +110,7 @@ watch(open, (isOpen) => {
           <div class="flex flex-wrap items-center gap-x-5 gap-y-2">
             <NuxtLink
               v-if="record.hasOriginalWorkflow"
-              :to="{ path: '/workflow', query: { sourcePromptId: record.promptId } }"
+              :to="{ path: '/studio/workflow', query: { sourcePromptId: record.promptId } }"
               target="_blank"
               rel="noopener"
               class="inline-flex items-center gap-1 text-sm text-primary hover:underline focus-visible:outline-2 focus-visible:outline-primary"

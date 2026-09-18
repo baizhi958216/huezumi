@@ -18,7 +18,6 @@ const userItem: AppNavigationItem = {
 }
 
 const adminItems: AppNavigationItem[] = [
-  { label: '工作流', to: '/workflow', icon: 'i-lucide-workflow' },
   { label: '控制面板', to: '/admin', icon: 'i-lucide-shield-check' },
 ]
 
@@ -27,6 +26,16 @@ export function getAppNavigation(role: AppNavigationRole): AppNavigationItem[] {
     ...publicItems,
     ...(role ? [userItem] : []),
     ...(role === 'admin' ? adminItems : []),
+  ]
+}
+
+export function getStudioNavigation(role: AppNavigationRole): AppNavigationItem[] {
+  return [
+    { label: '文案剧本', to: '/studio', icon: 'i-lucide-file-pen-line' },
+    { label: '视频生成', to: '/studio/video', icon: 'i-lucide-video' },
+    ...(role === 'admin'
+      ? [{ label: '图片与工作流', to: '/studio/workflow', icon: 'i-lucide-workflow' }]
+      : []),
   ]
 }
 

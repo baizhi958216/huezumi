@@ -424,6 +424,51 @@
   color: var(--color-signal-600);
 }
 
+.app-header__studio-nav {
+  display: inline-flex;
+  align-items: stretch;
+  border-radius: var(--radius-sm);
+  transition: background-color 160ms ease;
+}
+
+.app-header__studio-link {
+  border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+  padding-right: 0.45rem;
+}
+
+.app-header__studio-toggle {
+  display: inline-flex;
+  width: 1.75rem;
+  min-height: 2.25rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  color: var(--ui-text-dimmed);
+  transition:
+    color 160ms ease,
+    background-color 160ms ease;
+}
+
+.app-header__studio-nav:hover,
+.app-header__studio-nav.is-active {
+  background: var(--ui-bg-muted);
+}
+
+.app-header__studio-nav.is-active {
+  background: color-mix(in srgb, var(--color-signal-500) 9%, var(--ui-bg-elevated));
+}
+
+.app-header__studio-nav.is-active .app-header__studio-link,
+.app-header__studio-nav.is-active .app-header__nav-icon,
+.app-header__studio-nav.is-active .app-header__studio-toggle {
+  color: var(--color-signal-700);
+}
+
+.app-header__studio-toggle:hover {
+  background: color-mix(in srgb, var(--ui-text-highlighted) 5%, transparent);
+  color: var(--ui-text-highlighted);
+}
+
 .app-header__actions {
   margin-left: auto;
   display: flex;
@@ -459,6 +504,16 @@
 
 .dark .app-header__nav-link.is-active .app-header__nav-icon {
   color: var(--color-signal-400);
+}
+
+.dark .app-header__studio-nav.is-active {
+  background: color-mix(in srgb, var(--color-signal-500) 13%, var(--ui-bg-elevated));
+}
+
+.dark .app-header__studio-nav.is-active .app-header__studio-link,
+.dark .app-header__studio-nav.is-active .app-header__nav-icon,
+.dark .app-header__studio-nav.is-active .app-header__studio-toggle {
+  color: var(--color-signal-300);
 }
 
 @supports not (backdrop-filter: blur(1px)) {
@@ -576,13 +631,25 @@
 }
 
 /* ---- 页面外壳 ---- */
+.creation-content {
+  width: calc(100% - 1.5rem);
+  max-width: 100rem;
+  margin-inline: auto;
+}
+
 .comfy-shell {
   display: flex;
   flex-direction: column;
   height: calc(100dvh - var(--app-header-offset));
-  padding: 0.5rem 0.75rem 0.75rem;
+  padding: 0.5rem 0 0.75rem;
   gap: 0.5rem;
   overflow: hidden;
+}
+
+@media (min-width: 768px) {
+  .creation-content {
+    width: calc(100% - 2rem);
+  }
 }
 
 .comfy-shell__notice {

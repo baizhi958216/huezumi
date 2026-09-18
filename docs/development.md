@@ -37,7 +37,7 @@ NUXT_COMFYUI_PYTHON=./vendor/ComfyUI/.venv/bin/python
 
 两个服务仅映射到 `127.0.0.1`：PostgreSQL `55432`、SeaweedFS S3 API `9100`、控制台 `9101`。PostgreSQL 和 SeaweedFS 各用独立 volume；`docker compose -f docker-compose.dev.yml stop` 停止服务但保留数据，不要使用 `down -v` 清除已有开发数据。
 
-启动 Nuxt 后，管理员进入 `/workflow`：首次点“安装 ComfyUI”并安装依赖，后端克隆到 `vendor/ComfyUI`、创建 `.venv`；完成后点“启动 ComfyUI”。项目自定义节点会在启动时挂载，浏览器通过鉴权代理访问。安装需要 Git、Python 和网络，PyTorch 首次下载可能较久。已有仓库和虚拟环境会被复用；模型权重需要另外放入 `vendor/ComfyUI/models/`，不会自动下载。
+启动 Nuxt 后，管理员进入创作台的 `/studio/workflow`：首次点“安装 ComfyUI”并安装依赖，后端克隆到 `vendor/ComfyUI`、创建 `.venv`；完成后点“启动 ComfyUI”。项目自定义节点会在启动时挂载，浏览器通过鉴权代理访问。安装需要 Git、Python 和网络，PyTorch 首次下载可能较久。已有仓库和虚拟环境会被复用；模型权重需要另外放入 `vendor/ComfyUI/models/`，不会自动下载。
 
 也可以按照 [ComfyUI 官方手动安装指南](https://docs.comfy.org/installation/manual_install) 提前安装到上述目录。Apple Silicon 使用宿主机 PyTorch 的 MPS，实际可用性以 `/system_stats` 为准；无模型时只能验证服务与节点，不能执行需要权重的生成。
 
@@ -241,3 +241,7 @@ pnpm test:postgres
 `check` 执行仓库文档约束、计费/幂等纯函数测试、ESLint 和 TypeScript；`check:full` 再执行 production build。`test:postgres` 创建随机独立测试库，验证队列、恢复、限流和终态边界，结束后删除，要求本机数据库帐号有创建数据库权限；默认 check 跳过该集成文件。OSS 私有访问、供应商账单和 GPU 作业需要在对应环境单独验收，并记录结果。
 
 提交前执行 `git diff --check` 和 `git status --short`，确认没有 `.env`、`.data`、构建产物、用户素材或密钥。
+
+## 文本创作连接
+
+创作台默认页 `/studio` 使用服务端私有 `NUXT_TEXT_LLM_CONNECTIONS_JSON`。结构与 ComfyUI 的连接 JSON 相同，至少包含 `baseUrl`、`defaultModel` 和 `apiKey`；本地免鉴权连接需显式设置 `auth: "none"`。支持 `auto`、`chat_completions` 和 `responses`。未设置专用变量时会复用 `NUXT_COMFYUI_LLM_CONNECTIONS_JSON`，浏览器不会获得端点或密钥。

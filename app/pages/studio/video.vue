@@ -324,8 +324,8 @@ onBeforeUnmount(polling.pause)
 </script>
 
 <template>
-  <div class="min-h-[calc(100svh-var(--app-header-offset))] overflow-x-hidden bg-muted/35 p-3 md:p-4 xl:h-[calc(100svh-var(--app-header-offset))]">
-    <div class="mx-auto grid h-full max-w-[1600px] gap-4 xl:grid-cols-[400px_1fr] 2xl:grid-cols-[420px_1fr]">
+  <div class="min-h-[calc(100svh-var(--app-header-offset))] overflow-x-hidden bg-muted/35 py-3 md:py-4 xl:h-[calc(100svh-var(--app-header-offset))]">
+    <div class="creation-content grid h-full gap-4 xl:grid-cols-[400px_1fr] 2xl:grid-cols-[420px_1fr]">
       <StudioConfigPanel
         v-model:provider-id="providerId"
         v-model:model="model"

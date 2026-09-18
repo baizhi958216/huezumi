@@ -80,6 +80,8 @@ MiniMax H3 本地视频预设位于 `workflows/minimax-h3-*.json`，分别覆盖
 
 ## 7. 工程事实源
 
+文本创作使用独立的 `creative_projects`、`creative_documents` 与 `creative_document_versions`。正文版本是不可变派生输入，人物与场景结构和正文一同保存；现有视频 `GenerationRequest` 不承载文章字段。创作台默认在 `/studio` 打开文案剧本，视频和管理员图片工作流分别位于 `/studio/video`、`/studio/workflow`。文本生成通过私有 OpenAI 兼容连接同步生成首版内容，连接只向浏览器公开名称和模型。当前文本 MVP 尚未接入报价、额度和异步 worker，对外计费开放前必须完成该边界。
+
 - `server/database/schema.ts` 与 `drizzle/`：业务数据和迁移。
 - `shared/types/` 与运行时 schema：浏览器/API 契约。
 - `server/services/providers/`：供应商能力和协议。
