@@ -7,34 +7,36 @@ import { resolveProviderMediaUrls } from './assets'
 import { releaseGenerationCredits, settleGenerationCredits } from './billing'
 import { enqueueGeneration, withGenerationLock } from './generation-queue'
 import { archiveRemoteOutput, OutputArchiveError } from './output-archive'
+import { failRunJob, runTextJob } from './platform/text-worker'
+import { syncVideoWork, syncWorkflowRun } from './platform/works'
 import { getVideoProvider } from './providers'
+import { configuredVideoProvider } from './providers/configured'
 
-const POLL_DELAY_MS = 12_000
-
+const POLL_DELAY_MS = 12000
 export async function runGenerationJob(job: GenerationJob) {
   return await withGenerationLock(job.generationId, async () => {
+    if (job.kind === 'text')
+      return await runTextJob(job.generationId)
+    if (job.kind === 'workflow')
+      return await syncWorkflowRun(job.generationId)
     if (job.kind === 'submit')
       return await submitGeneration(job.generationId)
     return await pollGeneration(job.generationId)
   })
 }
-
 export async function handleFailedGeneration(job: GenerationJob) {
   await withGenerationLock(job.generationId, async () => {
+    if (job.kind === 'text' || job.kind === 'workflow')
+      return await failRunJob(job.generationId)
     await useDatabase().update(generations).set({
       status: 'UNKNOWN',
       dispatchStatus: 'reconciling',
       settlementStatus: 'review',
       error: '后台任务多次执行失败，已转入人工核对。',
       updatedAt: new Date(),
-    }).where(and(
-      eq(generations.id, job.generationId),
-      inArray(generations.status, ['PENDING', 'RUNNING', 'UNKNOWN']),
-      inArray(generations.settlementStatus, ['reserved', 'review']),
-    ))
+    }).where(and(eq(generations.id, job.generationId), inArray(generations.status, ['PENDING', 'RUNNING', 'UNKNOWN']), inArray(generations.settlementStatus, ['reserved', 'review'])))
   })
 }
-
 async function submitGeneration(id: string) {
   const db = useDatabase()
   const [row] = await db.update(generations).set({ dispatchStatus: 'submitting', updatedAt: new Date() }).where(and(eq(generations.id, id), eq(generations.dispatchStatus, 'queued'))).returning()
@@ -51,7 +53,7 @@ async function submitGeneration(id: string) {
   }
   try {
     const providerRequest = await resolveProviderMediaUrls(row.ownerId, row.request)
-    const result = await getVideoProvider(row.request.provider).submit(providerRequest)
+    const result = await (row.connectionVersionId ? await configuredVideoProvider(row.connectionVersionId) : await getVideoProvider(row.request.provider)).submit(providerRequest)
     await db.update(generations).set({
       providerTaskId: result.taskId,
       // submit 契约只有 task ID；获取完整结果前保持非终态。
@@ -77,15 +79,18 @@ async function submitGeneration(id: string) {
     }).where(eq(generations.id, id))
   }
 }
-
 async function pollGeneration(id: string) {
   const db = useDatabase()
   const [row] = await db.select().from(generations).where(eq(generations.id, id)).limit(1)
-  if (!row?.providerTaskId || row.settlementStatus === 'review' || row.status === 'FAILED' || (row.status === 'SUCCEEDED' && row.videoArchived))
+  if (row?.status === 'SUCCEEDED' && row.videoArchived) {
+    await syncVideoWork(id)
+    return
+  }
+  if (!row?.providerTaskId || row.settlementStatus === 'review' || row.status === 'FAILED')
     return
   const latest: ProviderTaskResult = row.status === 'SUCCEEDED'
     ? { status: 'SUCCEEDED', videoUrl: row.videoUrl || undefined, usage: row.usage || undefined }
-    : await getVideoProvider(row.request.provider).getTask(row.providerTaskId)
+    : await (row.connectionVersionId ? await configuredVideoProvider(row.connectionVersionId) : await getVideoProvider(row.request.provider)).getTask(row.providerTaskId)
   if (latest.status === 'PENDING' || latest.status === 'RUNNING') {
     await db.update(generations).set({ status: latest.status, usage: latest.usage, updatedAt: new Date() }).where(eq(generations.id, id))
     await enqueueGeneration({ kind: 'poll', generationId: id }, { delay: POLL_DELAY_MS, jobId: `poll-${id}-${Date.now()}` })
@@ -108,7 +113,6 @@ async function pollGeneration(id: string) {
     await db.update(generations).set({ status: 'UNKNOWN', dispatchStatus: 'reconciling', settlementStatus: 'review', updatedAt: new Date() }).where(eq(generations.id, id))
     return
   }
-
   let videoUrl = latest.videoUrl
   let videoArchived = false
   let outputArchive: Record<string, unknown> = { status: 'not_started' }
@@ -117,7 +121,7 @@ async function pollGeneration(id: string) {
     try {
       const archived = await archiveRemoteOutput(id, latest.videoUrl, row.ownerId)
       videoArchived = true
-      outputArchive = { status: 'archived', attemptedAt, completedAt: new Date().toISOString(), objectKey: archived.objectKey }
+      outputArchive = { status: 'archived', attemptedAt, completedAt: new Date().toISOString(), objectKey: archived.objectKey, size: archived.size, contentType: archived.contentType }
       videoUrl = `/api/generations/${id}/video`
     }
     catch (error) {
@@ -139,4 +143,5 @@ async function pollGeneration(id: string) {
     usage: latest.usage,
     updatedAt: new Date(),
   }).where(eq(generations.id, id))
+  await syncVideoWork(id)
 }

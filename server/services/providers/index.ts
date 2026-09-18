@@ -1,111 +1,21 @@
 import type { GenerationRequest, ProviderCapability } from '#shared/types/generation'
 import type { VideoProvider } from './base'
 import { getMediaValidationIssue, resolveModelCapability } from '#shared/types/generation'
-import { getCapability, providerCapabilities } from './catalog'
-import { DashScopeProvider } from './dashscope'
-import { KlingProvider } from './kling'
-import { MiniMaxProvider } from './minimax'
-import { RollDekProvider } from './rolldek'
-import { RunwayProvider } from './runway'
-import { SeedanceProvider } from './seedance'
+import { listConnections } from '../platform/connections'
+import { providerCapabilities } from './catalog'
+import { configuredVideoProvider } from './configured'
 
 export { providerCapabilities }
-
-type RuntimeConfig = ReturnType<typeof useRuntimeConfig>
-
-/** 检查某家供应商是否已配置凭据（决定作品台与首页显示"在线"还是"待接入"） */
-export function hasCredentials(id: string, config: RuntimeConfig): boolean {
-  switch (id) {
-    case 'dashscope':
-      return Boolean(config.dashscopeApiKey)
-    case 'minimax':
-      return Boolean(config.minimaxApiKey)
-    case 'kling':
-      return Boolean(config.klingAccessKey && config.klingSecretKey)
-    case 'seedance':
-      return Boolean(config.seedanceApiKey)
-    case 'rolldek':
-      return Boolean(config.rolldekApiKey)
-    case 'runway':
-      return Boolean(config.runwayApiKey)
-    default:
-      return false
-  }
+export async function listProviderCatalog(): Promise<ProviderCapability[]> {
+  const connections = await listConnections()
+  return providerCapabilities.map(c => ({ ...c, enabled: connections.some(item => item.provider === c.id && item.enabled && !item.revoked) }))
 }
-
-/** 目录 + 运行时凭据探测，返回给前端的最终能力列表 */
-export function listProviderCatalog(): ProviderCapability[] {
-  const config = useRuntimeConfig()
-  return providerCapabilities.map(capability => ({
-    ...capability,
-    enabled: hasCredentials(capability.id, config),
-  }))
+export async function getVideoProvider(id: string): Promise<VideoProvider> {
+  const connection = (await listConnections()).find(c => c.provider === id && c.enabled && !c.revoked)
+  if (!connection)
+    throw createError({ statusCode: 503, statusMessage: '供应商连接尚未配置' })
+  return await configuredVideoProvider(connection.revisionId)
 }
-
-function resolveDashScopeBaseUrl(config: RuntimeConfig) {
-  if (config.dashscopeBaseUrl)
-    return String(config.dashscopeBaseUrl).replace(/\/$/, '')
-
-  const workspaceId = String(config.dashscopeWorkspaceId)
-  const region = String(config.dashscopeRegion || 'cn-beijing')
-  if (!workspaceId)
-    return 'https://dashscope.aliyuncs.com/api/v1'
-
-  return `https://${workspaceId}.${region}.maas.aliyuncs.com/api/v1`
-}
-
-/** 新增供应商时：实现 VideoProvider → 在此注册工厂即可，其余链路零改动 */
-function createProvider(id: string, config: RuntimeConfig): VideoProvider {
-  switch (id) {
-    case 'dashscope':
-      return new DashScopeProvider({
-        apiKey: String(config.dashscopeApiKey),
-        baseUrl: resolveDashScopeBaseUrl(config),
-        model: String(config.dashscopeModel || 'wan3.0-video-prime'),
-      })
-    case 'minimax':
-      return new MiniMaxProvider({
-        apiKey: String(config.minimaxApiKey),
-        baseUrl: String(config.minimaxBaseUrl || 'https://api.minimaxi.com/v1').replace(/\/$/, ''),
-        groupId: config.minimaxGroupId ? String(config.minimaxGroupId) : undefined,
-      })
-    case 'kling':
-      return new KlingProvider({
-        accessKey: String(config.klingAccessKey),
-        secretKey: String(config.klingSecretKey),
-        baseUrl: String(config.klingBaseUrl || 'https://api-beijing.klingai.com/v1').replace(/\/$/, ''),
-      })
-    case 'seedance':
-      return new SeedanceProvider({
-        apiKey: String(config.seedanceApiKey),
-        baseUrl: String(config.seedanceBaseUrl || 'https://ark.cn-beijing.volces.com/api/v3').replace(/\/$/, ''),
-        model: String(config.seedanceModel || 'doubao-seedance-1-5-pro-251215'),
-      })
-    case 'rolldek':
-      return new RollDekProvider({
-        apiKey: String(config.rolldekApiKey),
-        baseUrl: String(config.rolldekBaseUrl || 'https://rolldek.com').replace(/\/$/, ''),
-      })
-    case 'runway':
-      return new RunwayProvider({
-        apiKey: String(config.runwayApiKey),
-        baseUrl: String(config.runwayBaseUrl || 'https://api.dev.runwayml.com').replace(/\/$/, ''),
-        model: String(config.runwayModel || 'gen4.5'),
-      })
-    default:
-      throw createError({ statusCode: 400, statusMessage: `供应商 ${id} 尚未接入` })
-  }
-}
-
-export function getVideoProvider(id: string): VideoProvider {
-  const config = useRuntimeConfig()
-  if (!getCapability(id))
-    throw createError({ statusCode: 400, statusMessage: `供应商 ${id} 不存在` })
-  if (!hasCredentials(id, config))
-    throw createError({ statusCode: 503, statusMessage: `供应商 ${id} 缺少 API 凭据，请先在服务端配置对应环境变量` })
-  return createProvider(id, config)
-}
-
 /**
  * 按供应商能力声明校验统一请求。
  * UI 由同一份能力驱动，正常情况下不会触发；此处是防绕过的最终闸门。
@@ -115,19 +25,14 @@ export function assertRequestSupported(capability: ProviderCapability, request: 
   const selectedModel = request.model
     ? capability.models.find(model => model.id === request.model)
     : capability.models[0]
-
   if (request.model && !selectedModel)
     throw fail(`${capability.name} 不支持模型「${request.model}」`)
-
   const effectiveCapability = resolveModelCapability(capability, selectedModel?.id, request.resolution)
   const capabilityName = selectedModel ? `${capability.name} / ${selectedModel.name}` : capability.name
-
   if (!effectiveCapability.modes.includes(request.mode))
     throw fail(`${capabilityName} 不支持该生成模式`)
-
   if (!request.prompt.trim() && !effectiveCapability.supportsMediaOnly)
     throw fail(`${capabilityName} 要求填写提示词`)
-
   if (effectiveCapability.requiresHttpsMediaUrls) {
     for (const item of request.media) {
       try {
@@ -139,7 +44,6 @@ export function assertRequestSupported(capability: ProviderCapability, request: 
       }
     }
   }
-
   const mediaIssue = getMediaValidationIssue(effectiveCapability, request.media)
   if (mediaIssue?.kind === 'unsupported')
     throw fail(`${capabilityName} 不支持素材类型「${mediaIssue.type}」`)
@@ -151,17 +55,13 @@ export function assertRequestSupported(capability: ProviderCapability, request: 
     throw fail(`「${mediaIssue.type}」素材时长需在 ${mediaIssue.min}–${mediaIssue.max} 秒之间`)
   if (mediaIssue?.kind === 'combination')
     throw fail(mediaIssue.limit.message)
-
   const types = request.media.map(item => item.type)
   if (types.includes('last_frame') && !types.includes('first_frame'))
     throw fail('使用尾帧时必须同时提供首帧')
-
   if (!effectiveCapability.resolutions.includes(request.resolution))
     throw fail(`${capabilityName} 不支持 ${request.resolution} 清晰度，可选：${effectiveCapability.resolutions.join(' / ')}`)
-
   if (effectiveCapability.ratios.length && !effectiveCapability.ratios.includes(request.ratio))
     throw fail(`${capabilityName} 不支持 ${request.ratio} 画幅，可选：${effectiveCapability.ratios.join(' / ')}`)
-
   if (request.duration === -1 && !effectiveCapability.duration.smart)
     throw fail(`${capabilityName} 不支持智能时长`)
   if (request.duration > 0) {
@@ -170,7 +70,6 @@ export function assertRequestSupported(capability: ProviderCapability, request: 
     if (!effectiveCapability.duration.steps && (request.duration < effectiveCapability.duration.min || request.duration > effectiveCapability.duration.max))
       throw fail(`${capabilityName} 时长需在 ${effectiveCapability.duration.min}–${effectiveCapability.duration.max} 秒之间`)
   }
-
   if (request.audio && !effectiveCapability.supportsAudio)
     throw fail(`${capabilityName} 暂不支持同步生成音频`)
   if (request.negativePrompt && !effectiveCapability.supportsNegativePrompt)

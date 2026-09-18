@@ -3,11 +3,16 @@ import type { PgBoss as TaskQueue } from 'pg-boss'
 import { createHash } from 'node:crypto'
 import { PgBoss } from 'pg-boss'
 
-export interface GenerationJob { kind: 'submit' | 'poll', generationId: string }
+export interface GenerationJob {
+  kind: 'submit' | 'poll' | 'text' | 'workflow'
+  generationId: string
+}
 export const QUEUE_NAME = 'forkvdo-generations'
 export const DEAD_LETTER_QUEUE = 'forkvdo-generation-failures'
-
-export async function openTaskQueue(connectionString: string, options: { migrate?: boolean, schema?: string } = {}) {
+export async function openTaskQueue(connectionString: string, options: {
+  migrate?: boolean
+  schema?: string
+} = {}) {
   const boss = new PgBoss({
     connectionString,
     schema: options.schema || 'pgboss',
@@ -39,21 +44,21 @@ export async function openTaskQueue(connectionString: string, options: { migrate
     throw error
   }
 }
-
 /** pg-boss 的 id 必须是 UUID；稳定摘要让 outbox 重投复用同一任务。 */
 export function taskId(value: string) {
   const hex = createHash('sha256').update(value).digest('hex')
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-8${hex.slice(13, 16)}-a${hex.slice(17, 20)}-${hex.slice(20, 32)}`
 }
-
-export async function sendGenerationJob(boss: TaskQueue, job: GenerationJob, options: { delay?: number, jobId?: string } = {}) {
+export async function sendGenerationJob(boss: TaskQueue, job: GenerationJob, options: {
+  delay?: number
+  jobId?: string
+} = {}) {
   return await boss.send(QUEUE_NAME, job, {
     ...(options.jobId ? { id: taskId(options.jobId) } : {}),
     singletonKey: job.generationId,
     startAfter: new Date(Date.now() + (options.delay ?? 0)),
   })
 }
-
 export async function withPostgresGenerationLock<T>(pool: Pool, generationId: string, task: () => Promise<T>): Promise<T> {
   const client = await pool.connect()
   let acquired = false
@@ -63,10 +68,9 @@ export async function withPostgresGenerationLock<T>(pool: Pool, generationId: st
   }
   client.on('error', onError)
   try {
-    const { rows } = await client.query<{ acquired: boolean }>(
-      'select pg_try_advisory_lock(hashtextextended($1, 0)) as acquired',
-      [`forkvdo:generation:${generationId}`],
-    )
+    const { rows } = await client.query<{
+      acquired: boolean
+    }>('select pg_try_advisory_lock(hashtextextended($1, 0)) as acquired', [`forkvdo:generation:${generationId}`])
     acquired = rows[0]?.acquired === true
     if (!acquired)
       throw new Error('Generation is already being processed; retry later')

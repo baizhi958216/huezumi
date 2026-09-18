@@ -69,8 +69,8 @@ export async function settleGenerationCredits(generationId: string, userId: stri
     if (result.rowCount !== 1)
       throw new Error('wallet missing')
     await tx.execute(sql`
-      insert into ledger_entries (user_id, generation_id, type, amount_credits, idempotency_key, reason)
-      values (${userId}, ${generationId}, 'charge', ${-charged}, ${`generation:${generationId}:charge`}, '生成任务结算')
+      insert into ledger_entries (user_id, generation_id, run_id, type, amount_credits, idempotency_key, reason)
+      values (${userId}, ${generationId}, (select id from runs where generation_id=${generationId}), 'charge', ${-charged}, ${`generation:${generationId}:charge`}, '生成任务结算')
       on conflict (idempotency_key) do nothing
     `)
     return true
@@ -91,8 +91,8 @@ export async function releaseGenerationCredits(generationId: string, userId: str
       where user_id = ${userId}
     `)
     await tx.execute(sql`
-      insert into ledger_entries (user_id, generation_id, type, amount_credits, idempotency_key, reason)
-      values (${userId}, ${generationId}, 'release', ${reserved}, ${`generation:${generationId}:release`}, ${reason})
+      insert into ledger_entries (user_id, generation_id, run_id, type, amount_credits, idempotency_key, reason)
+      values (${userId}, ${generationId}, (select id from runs where generation_id=${generationId}), 'release', ${reserved}, ${`generation:${generationId}:release`}, ${reason})
       on conflict (idempotency_key) do nothing
     `)
     return true

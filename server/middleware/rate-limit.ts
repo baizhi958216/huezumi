@@ -5,8 +5,8 @@ export default defineEventHandler(async (event) => {
     return
   if (event.path === '/api/auth/login' || event.path === '/api/auth/register')
     await enforceRateLimit(event, 'auth', 10, 60)
-  else if (event.path === '/api/generations')
+  else if (event.path.split('?')[0] === '/api/runs')
     await enforceRateLimit(event, 'generation', 20, 60)
-  else if (event.path === '/api/text-creation/generate')
+  else if (event.path.split('?')[0] === '/api/billing/quotes')
     await enforceRateLimit(event, 'text-generation', 12, 60)
 })

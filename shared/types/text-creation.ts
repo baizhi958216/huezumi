@@ -50,6 +50,7 @@ export interface TextDocumentSummary {
 }
 
 export interface TextDocumentVersionRecord {
+  kind?: TextCreationKind
   id: string
   documentId: string
   projectId: string

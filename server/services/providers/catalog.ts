@@ -8,7 +8,7 @@ import type { GenerationMode, MediaType, ModelSpec, ProviderCapability, Resoluti
  * 2. 新建 adapters/<id>.ts 实现 VideoProvider（submit + getTask）；
  * 3. 在本文件追加一份 ProviderCapability 声明；
  * 4. 在 ./index.ts 的工厂函数中按 env 凭据注册。
- * 前端（创作台 / 首页能力矩阵）全部由 /api/providers 驱动，零改动。
+ * 创作台通过 /api/catalog/models 选择已配置连接；首页用 /api/providers 展示适配能力。
  */
 
 /** 首帧 / 尾帧素材的通用限制 */
