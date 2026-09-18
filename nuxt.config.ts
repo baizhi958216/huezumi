@@ -88,6 +88,8 @@ export default defineNuxtConfig({
     comfyuiCustomNodeSourceDir: '',
     // JSON remains private and is passed only to a local ComfyUI child process.
     comfyuiLlmConnectionsJson: '',
+    // 文本创作优先使用独立连接；未设置时兼容复用 ComfyUI 的私有连接 JSON。
+    textLlmConnectionsJson: '',
     comfyuiStartTimeoutMs: 180000,
     comfyuiProbeTimeoutMs: 1500,
     public: {

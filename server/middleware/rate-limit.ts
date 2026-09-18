@@ -7,4 +7,6 @@ export default defineEventHandler(async (event) => {
     await enforceRateLimit(event, 'auth', 10, 60)
   else if (event.path === '/api/generations')
     await enforceRateLimit(event, 'generation', 20, 60)
+  else if (event.path === '/api/text-creation/generate')
+    await enforceRateLimit(event, 'text-generation', 12, 60)
 })

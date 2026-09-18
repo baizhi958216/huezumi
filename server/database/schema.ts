@@ -1,5 +1,6 @@
 import type { ComfyWorkflowJSON } from '#shared/types/comfyui'
 import type { GenerationRequest, GenerationStatus } from '#shared/types/generation'
+import type { TextCreationContent, TextCreationKind, TextCreationRequest } from '#shared/types/text-creation'
 import type { PriceFormula } from '#shared/utils/pricing'
 import { bigint, boolean, index, integer, jsonb, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core'
 
@@ -13,6 +14,7 @@ export const modelAssetSource = pgEnum('model_asset_source', ['upload', 'civitai
 export const modelAssetKind = pgEnum('model_asset_kind', ['checkpoint', 'lora', 'vae', 'clip', 'unet', 'controlnet', 'embedding', 'upscale', 'other'])
 export const modelAssetStatus = pgEnum('model_asset_status', ['pending', 'ready', 'failed', 'quarantined'])
 export const modelAssetVisibility = pgEnum('model_asset_visibility', ['private', 'shared', 'platform'])
+export const creativeProjectStatus = pgEnum('creative_project_status', ['draft', 'active', 'completed', 'archived'])
 
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -132,6 +134,43 @@ export const assets = pgTable('assets', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   deletedAt: timestamp('deleted_at', { withTimezone: true }),
 }, table => [index('assets_owner_idx').on(table.ownerId, table.createdAt)])
+
+/** 创作项目是文章、人物、图片与镜头后续汇合的稳定所有权边界。 */
+export const creativeProjects = pgTable('creative_projects', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  schemaVersion: integer('schema_version').notNull().default(1),
+  ownerId: uuid('owner_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  status: creativeProjectStatus('status').notNull().default('active'),
+  lastActiveStage: text('last_active_stage').notNull().default('article'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, table => [index('creative_projects_owner_idx').on(table.ownerId, table.updatedAt)])
+
+/** 文档保存稳定身份；currentVersionId 仅作快速指针，版本表保留不可变正文。 */
+export const creativeDocuments = pgTable('creative_documents', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  schemaVersion: integer('schema_version').notNull().default(1),
+  ownerId: uuid('owner_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  projectId: uuid('project_id').notNull().references(() => creativeProjects.id, { onDelete: 'cascade' }),
+  kind: text('kind').$type<TextCreationKind>().notNull(),
+  title: text('title').notNull(),
+  currentVersionId: uuid('current_version_id'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, table => [index('creative_documents_owner_idx').on(table.ownerId, table.updatedAt), index('creative_documents_project_idx').on(table.projectId, table.updatedAt)])
+
+export const creativeDocumentVersions = pgTable('creative_document_versions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  documentId: uuid('document_id').notNull().references(() => creativeDocuments.id, { onDelete: 'cascade' }),
+  version: integer('version').notNull(),
+  source: text('source').$type<'ai' | 'manual'>().notNull(),
+  provider: text('provider'),
+  model: text('model'),
+  promptSnapshot: jsonb('prompt_snapshot').$type<TextCreationRequest>(),
+  content: jsonb('content').$type<TextCreationContent>().notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, table => [uniqueIndex('creative_document_version_unique').on(table.documentId, table.version), index('creative_document_versions_document_idx').on(table.documentId, table.createdAt)])
 
 /**
  * 用户模型资产的元数据。模型原文件和部署状态后续由 model_asset_files / agent 管理，

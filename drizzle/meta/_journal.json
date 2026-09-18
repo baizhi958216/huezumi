@@ -43,6 +43,13 @@
       "when": 1789197411635,
       "tag": "0005_crazy_impossible_man",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1789615726421,
+      "tag": "0006_goofy_silk_fever",
+      "breakpoints": true
     }
   ]
 }

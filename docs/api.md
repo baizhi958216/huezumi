@@ -80,3 +80,13 @@
 ## 契约演进
 
 修改 API 时同步共享类型、Zod schema、spec 与本文。数据库结构通过 `drizzle/` migration 演进；持久化 generation payload 带 `schemaVersion`，不兼容变更必须提供兼容读取或迁移。
+
+## 文本创作
+
+- `GET /api/text-creation/providers`：返回已配置连接的安全摘要，不包含端点或密钥。
+- `POST /api/text-creation/generate`：生成故事、短剧剧本或营销文案，并原子保存项目、文档和新版本。
+- `GET /api/text-creation/documents`：返回当前用户最近文档摘要。
+- `GET /api/text-creation/documents/:id/versions`：返回本人文档的不可变版本。
+- `POST /api/text-creation/documents/:id/versions`：把当前编辑内容保存为新的手动版本。
+
+文本写接口要求登录、同源请求并执行运行时 schema 校验。当前文本 MVP 不报价、不扣减额度。
