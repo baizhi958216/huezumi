@@ -1,26 +1,37 @@
 <script setup lang="ts">
 import type { AccountLedgerEntry, AccountOverview, ModelAssetSummary } from '#shared/types/account'
-import type { GenerationRecord } from '#shared/types/generation'
+import type { Page, WorkSummary } from '#shared/types/platform'
+import { runKindLabel } from '~/utils/run-labels'
 
 type DashboardSection = 'overview' | 'billing' | 'models' | 'works'
 
 const { user } = useAuth()
 const { data: session } = await useFetch('/api/auth/session')
-if (!session.value?.user)
+if (!session.value?.user) {
   await navigateTo('/')
-else
+}
+else {
   user.value = session.value.user
+}
 
 const { data: overview, status, error: overviewError, refresh } = await useFetch<AccountOverview>('/api/account/overview')
-const { data: ledger, error: ledgerError } = await useFetch<AccountLedgerEntry[]>('/api/billing/ledger')
-const { data: models, error: modelsError } = await useFetch<ModelAssetSummary[]>('/api/models')
-const { data: works } = await useFetch<GenerationRecord[]>('/api/generations')
+
+const ledger = ref<AccountLedgerEntry[]>()
+const models = ref<ModelAssetSummary[]>()
+const works = ref<WorkSummary[]>()
+const ledgerError = ref<unknown>()
+const modelsError = ref<unknown>()
+
 const route = useRoute()
 const router = useRouter()
 
-const sections: Array<{ id: DashboardSection, label: string, icon: string }> = [
-  { id: 'overview', label: '概览', icon: 'i-lucide-layout-dashboard' },
-  { id: 'billing', label: '额度明细', icon: 'i-lucide-coins' },
+const sections: Array<{
+  id: DashboardSection
+  label: string
+  icon: string
+}> = [
+  { id: 'overview', label: '空间概览', icon: 'i-lucide-layout-dashboard' },
+  { id: 'billing', label: '额度流水', icon: 'i-lucide-coins' },
   { id: 'models', label: '我的模型', icon: 'i-lucide-cpu' },
   { id: 'works', label: '我的作品', icon: 'i-lucide-images' },
 ]
@@ -53,88 +64,169 @@ function sourceLabel(source: ModelAssetSummary['source']) {
 }
 
 function kindLabel(kind: ModelAssetSummary['kind']) {
-  return { checkpoint: 'Checkpoint', lora: 'LoRA', vae: 'VAE', clip: 'CLIP', unet: 'UNet', controlnet: 'ControlNet', embedding: 'Embedding', upscale: '放大模型', other: '其他' }[kind]
+  return {
+    checkpoint: 'Checkpoint',
+    lora: 'LoRA',
+    vae: 'VAE',
+    clip: 'CLIP',
+    unet: 'UNet',
+    controlnet: 'ControlNet',
+    embedding: 'Embedding',
+    upscale: '放大模型',
+    other: '其他',
+  }[kind]
 }
 
 function modelStatusLabel(status: ModelAssetSummary['status']) {
   return { pending: '待处理', ready: '可用', failed: '处理失败', quarantined: '待审核' }[status]
 }
 
-function workStatusLabel(status: GenerationRecord['status']) {
-  return ({ PENDING: '排队中', RUNNING: '生成中', SUCCEEDED: '已完成', FAILED: '失败', UNKNOWN: '状态未知' } as Record<string, string>)[status] || status
-}
-
-function workStatusClass(status: GenerationRecord['status']) {
-  if (status === 'SUCCEEDED')
-    return 'text-emerald-600 dark:text-emerald-400'
-  if (status === 'FAILED')
-    return 'text-red-500'
-  return 'text-amber-600 dark:text-amber-400'
-}
-
 const stats = computed(() => [
-  { label: '可用额度', value: overview.value?.credits.available ?? 0, hint: `预留 ${overview.value?.credits.reserved ?? 0}`, icon: 'i-lucide-coins', tone: 'text-amber-500' },
-  { label: '本月消耗', value: overview.value?.credits.monthSpent ?? 0, hint: `累计 ${overview.value?.credits.totalSpent ?? 0}`, icon: 'i-lucide-trending-down', tone: 'text-primary' },
-  { label: '作品', value: overview.value?.counts.works ?? 0, hint: `${overview.value?.counts.activeWorks ?? 0} 个进行中`, icon: 'i-lucide-images', tone: 'text-sky-500' },
-  { label: '模型资产', value: overview.value?.counts.models ?? 0, hint: formatBytes(overview.value?.storage.modelUsedBytes ?? 0), icon: 'i-lucide-cpu', tone: 'text-violet-500' },
+  {
+    label: '可用额度',
+    value: overview.value?.credits.available ?? 0,
+    hint: `预留 ${overview.value?.credits.reserved ?? 0}`,
+    icon: 'i-lucide-coins',
+    color: 'text-amber-500',
+  },
+  {
+    label: '本月消耗',
+    value: overview.value?.credits.monthSpent ?? 0,
+    hint: `累计 ${overview.value?.credits.totalSpent ?? 0}`,
+    icon: 'i-lucide-trending-down',
+    color: 'text-primary',
+  },
+  {
+    label: '创作作品',
+    value: overview.value?.counts.works ?? 0,
+    hint: `${overview.value?.counts.activeWorks ?? 0} 个渲染中`,
+    icon: 'i-lucide-film',
+    color: 'text-sky-500',
+  },
+  {
+    label: '模型资产',
+    value: overview.value?.counts.models ?? 0,
+    hint: formatBytes(overview.value?.storage.modelUsedBytes ?? 0),
+    icon: 'i-lucide-cpu',
+    color: 'text-violet-500',
+  },
 ])
+
+const storagePercent = computed(() => {
+  if (!overview.value?.storage?.limitBytes)
+    return 0
+  return Math.min(100, Math.round((overview.value.storage.totalUsedBytes / overview.value.storage.limitBytes) * 100))
+})
 
 const visibleWorks = computed(() => (activeSection.value === 'works' ? works.value : overview.value?.recentWorks) ?? [])
 const visibleLedger = computed(() => (activeSection.value === 'billing' ? ledger.value : overview.value?.recentLedger) ?? [])
 const visibleModels = computed(() => (activeSection.value === 'models' ? models.value : overview.value?.recentModels) ?? [])
+
+const cursors = reactive<Record<string, string | null>>({})
+const listLoading = ref(false)
+
+async function loadSection(section: DashboardSection, more = false) {
+  if (section === 'overview' || listLoading.value)
+    return
+  listLoading.value = true
+  try {
+    const query = more && cursors[section] ? { cursor: cursors[section] } : {}
+    if (section === 'billing') {
+      const page = await $fetch<Page<AccountLedgerEntry>>('/api/billing/ledger', { query })
+      ledger.value = more ? [...(ledger.value || []), ...page.items] : page.items
+      cursors[section] = page.nextCursor
+    }
+    if (section === 'models') {
+      const page = await $fetch<Page<ModelAssetSummary>>('/api/model-assets', { query })
+      models.value = more ? [...(models.value || []), ...page.items] : page.items
+      cursors[section] = page.nextCursor
+    }
+    if (section === 'works') {
+      const page = await $fetch<Page<WorkSummary>>('/api/works', { query })
+      works.value = more ? [...(works.value || []), ...page.items] : page.items
+      cursors[section] = page.nextCursor
+    }
+  }
+  catch (error) {
+    if (section === 'billing')
+      ledgerError.value = error
+    else
+      modelsError.value = error
+  }
+  finally {
+    listLoading.value = false
+  }
+}
+
+watch(activeSection, section => loadSection(section), { immediate: true })
 </script>
 
 <template>
-  <div v-if="user" class="mx-auto max-w-7xl px-4 pb-16 pt-4 sm:px-6 sm:pt-6 lg:px-8">
-    <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+  <div v-if="user" class="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6 sm:py-8">
+    <!-- Header Area -->
+    <header class="flex flex-col gap-4 border-b border-default/70 pb-5 sm:flex-row sm:items-center sm:justify-between">
       <div>
-        <p class="type-label text-xs text-primary">
-          MY SPACE
-        </p>
-        <h1 class="mt-2 text-3xl font-semibold tracking-tight">
-          我的空间
-        </h1>
-        <p class="mt-2 text-sm text-muted">
-          管理额度、模型资产和生成作品。
+        <div class="flex items-center gap-2.5">
+          <h1 class="text-xl font-bold tracking-tight text-highlighted sm:text-2xl">
+            我的空间
+          </h1>
+          <UBadge color="neutral" variant="subtle" size="sm" class="font-normal">
+            {{ user.displayName || user.email }}
+          </UBadge>
+        </div>
+        <p class="mt-1 text-xs text-muted">
+          管理个人创作产物、账户额度流水、私有模型资产及存储用量
         </p>
       </div>
-      <div class="flex flex-wrap gap-2">
-        <UButton to="/studio" icon="i-lucide-plus" color="primary">
+
+      <div class="flex items-center gap-2">
+        <UButton
+          color="neutral"
+          variant="ghost"
+          size="sm"
+          icon="i-lucide-refresh-cw"
+          :loading="status === 'pending'"
+          @click="refresh()"
+        >
+          刷新
+        </UButton>
+        <UButton
+          to="/studio"
+          color="primary"
+          size="sm"
+          icon="i-lucide-sparkles"
+        >
           开始创作
         </UButton>
-        <UButton to="/account" icon="i-lucide-settings-2" color="neutral" variant="soft">
-          个人设置
-        </UButton>
       </div>
-    </div>
+    </header>
 
-    <div class="mt-7 flex w-fit max-w-full flex-wrap gap-1 rounded-lg border border-default bg-muted/70 p-1" aria-label="空间内容筛选">
+    <!-- Segmented Navigation Control -->
+    <nav class="flex w-fit max-w-full items-center gap-1 rounded-lg border border-default/70 bg-muted/60 p-1" aria-label="空间内容分类">
       <button
         v-for="item in sections"
         :key="item.id"
         type="button"
-        class="focus-ring inline-flex min-h-9 items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition"
-        :class="activeSection === item.id ? 'bg-elevated text-highlighted shadow-soft ring-1 ring-inset ring-default' : 'text-muted hover:bg-elevated/70 hover:text-highlighted'"
+        class="focus-ring inline-flex min-h-8 items-center gap-2 rounded-md px-3 py-1 text-xs font-medium transition"
+        :class="activeSection === item.id
+          ? 'bg-elevated text-highlighted shadow-xs ring-1 ring-inset ring-default/80'
+          : 'text-muted hover:bg-elevated/60 hover:text-highlighted'"
         :aria-pressed="activeSection === item.id"
         @click="selectSection(item.id)"
       >
-        <UIcon :name="item.icon" class="size-4" />
+        <UIcon :name="item.icon" class="size-3.5" />
         {{ item.label }}
       </button>
-    </div>
+    </nav>
 
-    <div v-if="status === 'pending'" class="py-16 text-center text-sm text-muted">
-      正在加载你的空间…
-    </div>
-
+    <!-- Error State -->
     <UAlert
-      v-else-if="overviewError"
-      class="mt-6"
+      v-if="overviewError"
       color="error"
       variant="subtle"
       icon="i-lucide-database-zap"
       title="暂时无法加载空间数据"
-      description="请确认数据库 migration 已完成后重试。此次页面检查未触发模型上传、下载或 OSS 请求。"
+      description="请确认数据库迁移已完成后重试。"
     >
       <template #actions>
         <UButton size="sm" color="error" variant="soft" @click="refresh()">
@@ -143,186 +235,343 @@ const visibleModels = computed(() => (activeSection.value === 'models' ? models.
       </template>
     </UAlert>
 
-    <template v-else-if="!overviewError">
-      <div class="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <UCard v-for="item in stats" :key="item.label" class="overflow-hidden">
-          <div class="flex items-start justify-between gap-3">
-            <div>
-              <p class="text-sm text-muted">
-                {{ item.label }}
-              </p>
-              <p class="mt-2 text-2xl font-semibold tracking-tight">
-                {{ item.value }}
-              </p>
-              <p class="mt-1 text-xs text-dimmed">
-                {{ item.hint }}
-              </p>
-            </div>
-            <span class="flex size-9 items-center justify-center rounded-xl bg-elevated" :class="item.tone">
-              <UIcon :name="item.icon" class="size-5" />
+    <template v-else>
+      <!-- Key Metrics Strip: cohesive, zero bulky drop-shadows -->
+      <div class="grid grid-cols-2 divide-y divide-default/70 rounded-xl border border-default/70 bg-elevated/50 backdrop-blur-xs sm:grid-cols-4 sm:divide-y-0 sm:divide-x">
+        <div v-for="item in stats" :key="item.label" class="p-4 transition hover:bg-elevated/80 sm:p-5">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-medium text-dimmed">{{ item.label }}</span>
+            <span class="flex size-7 items-center justify-center rounded-lg bg-muted/60" :class="item.color">
+              <UIcon :name="item.icon" class="size-4" />
             </span>
           </div>
-        </UCard>
+          <p class="mt-2 font-mono text-2xl font-semibold tracking-tight text-highlighted">
+            {{ item.value }}
+          </p>
+          <p class="mt-1 text-[11px] text-dimmed">
+            {{ item.hint }}
+          </p>
+        </div>
       </div>
 
-      <div class="mt-5 grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
-        <UCard v-if="activeSection === 'overview' || activeSection === 'billing'">
-          <template #header>
-            <div class="flex items-center justify-between gap-3">
-              <div>
-                <strong>额度流水</strong>
-                <p class="mt-1 text-xs text-muted">
-                  只统计实际结算，预留和释放不会重复计费。
-                </p>
+      <!-- Tabbed Views with Smooth Micro-Animation Transition -->
+      <Transition name="tab-fade" mode="out-in">
+        <!-- 1. OVERVIEW VIEW -->
+        <div v-if="activeSection === 'overview'" key="overview" class="space-y-6">
+          <div class="grid gap-6 lg:grid-cols-[1.3fr_1fr]">
+            <!-- Recent Works Column -->
+            <div class="rounded-xl border border-default/70 bg-elevated/40 backdrop-blur-xs">
+              <div class="flex items-center justify-between border-b border-default/70 px-5 py-4">
+                <div>
+                  <h2 class="text-sm font-semibold text-highlighted">
+                    近期作品
+                  </h2>
+                  <p class="text-xs text-dimmed">
+                    最近生成与导出的音视频及文本内容
+                  </p>
+                </div>
+                <UButton
+                  to="/projects"
+                  color="neutral"
+                  variant="ghost"
+                  size="xs"
+                  trailing-icon="i-lucide-arrow-right"
+                >
+                  作品库
+                </UButton>
               </div>
-              <UButton v-if="activeSection === 'overview'" color="neutral" variant="link" size="sm" trailing-icon="i-lucide-arrow-right" @click="selectSection('billing')">
-                查看全部
-              </UButton>
+
+              <div v-if="visibleWorks.length" class="divide-y divide-default/60">
+                <div
+                  v-for="work in visibleWorks.slice(0, 5)"
+                  :key="work.id"
+                  class="flex items-center gap-3.5 px-5 py-3.5 transition hover:bg-muted/30"
+                >
+                  <div class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted/70 text-dimmed">
+                    <UIcon
+                      :name="work.kind === 'video' ? 'i-lucide-film' : work.kind === 'text' ? 'i-lucide-book-open' : 'i-lucide-image'"
+                      class="size-4"
+                      :class="work.kind === 'video' ? 'text-primary' : work.kind === 'text' ? 'text-sky-500' : 'text-dimmed'"
+                    />
+                  </div>
+                  <div class="min-w-0 flex-1">
+                    <p class="truncate text-xs font-medium text-highlighted" :title="work.title || work.id">
+                      {{ work.title || '未命名作品' }}
+                    </p>
+                    <p class="mt-0.5 text-[11px] text-dimmed">
+                      {{ runKindLabel[work.kind] || work.kind }} · {{ formatDate(work.createdAt) }}
+                    </p>
+                  </div>
+                  <UBadge size="xs" :color="work.availability === 'available' ? 'neutral' : 'warning'" variant="subtle" class="shrink-0">
+                    {{ work.availability === 'available' ? '可用' : '待恢复' }}
+                  </UBadge>
+                </div>
+              </div>
+              <div v-else class="py-12 text-center text-xs text-muted">
+                还没有生成作品，去创作台开启第一条灵感吧。
+              </div>
             </div>
-          </template>
-          <UAlert v-if="ledgerError" color="warning" variant="subtle" icon="i-lucide-alert-triangle" title="额度流水暂不可用" description="额度明细接口返回异常，请稍后重试。" />
-          <div v-else-if="visibleLedger.length" class="divide-y divide-default">
-            <div v-for="entry in visibleLedger.slice(0, activeSection === 'billing' ? 100 : 6)" :key="entry.id" class="flex items-center justify-between gap-4 py-3 text-sm">
-              <div class="min-w-0">
-                <p class="truncate font-medium">
-                  {{ entry.reason || entry.type }}
-                </p>
-                <p class="mt-1 text-xs text-dimmed">
-                  {{ formatDate(entry.createdAt) }}
-                </p>
+
+            <!-- Right Column: Storage & Recent Ledger -->
+            <div class="space-y-6">
+              <!-- Storage Health Strip -->
+              <div class="rounded-xl border border-default/70 bg-elevated/40 p-5 backdrop-blur-xs">
+                <div class="flex items-center justify-between">
+                  <div>
+                    <h2 class="text-sm font-semibold text-highlighted">
+                      存储用量
+                    </h2>
+                    <p class="text-xs text-dimmed">
+                      已占用 {{ formatBytes(overview?.storage.totalUsedBytes ?? 0) }} / 上限 {{ formatBytes(overview?.storage.limitBytes ?? 0) }}
+                    </p>
+                  </div>
+                  <span class="font-mono text-xs font-semibold text-highlighted">
+                    {{ storagePercent }}%
+                  </span>
+                </div>
+
+                <!-- Progress Bar -->
+                <div class="mt-3.5 h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                  <div
+                    class="h-full rounded-full transition-all duration-300"
+                    :class="storagePercent > 85 ? 'bg-signal-500' : 'bg-primary'"
+                    :style="{ width: `${storagePercent}%` }"
+                  />
+                </div>
+
+                <div class="mt-4 grid grid-cols-2 gap-3 border-t border-default/60 pt-3 text-xs">
+                  <div>
+                    <span class="text-dimmed">作品与素材：</span>
+                    <span class="font-medium text-highlighted">{{ formatBytes(overview?.storage.mediaUsedBytes ?? 0) }}</span>
+                  </div>
+                  <div>
+                    <span class="text-dimmed">模型资产：</span>
+                    <span class="font-medium text-highlighted">{{ formatBytes(overview?.storage.modelUsedBytes ?? 0) }}</span>
+                  </div>
+                </div>
               </div>
-              <span class="shrink-0 font-semibold" :class="entry.amountCredits >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'">
-                {{ entry.amountCredits >= 0 ? '+' : '' }}{{ entry.amountCredits }}
-              </span>
+
+              <!-- Recent Ledger Summary -->
+              <div class="rounded-xl border border-default/70 bg-elevated/40 backdrop-blur-xs">
+                <div class="flex items-center justify-between border-b border-default/70 px-5 py-4">
+                  <div>
+                    <h2 class="text-sm font-semibold text-highlighted">
+                      近期额度流水
+                    </h2>
+                    <p class="text-xs text-dimmed">
+                      实际扣减与充值记录
+                    </p>
+                  </div>
+                  <UButton
+                    color="neutral"
+                    variant="ghost"
+                    size="xs"
+                    trailing-icon="i-lucide-arrow-right"
+                    @click="selectSection('billing')"
+                  >
+                    全部明细
+                  </UButton>
+                </div>
+
+                <div v-if="visibleLedger.length" class="divide-y divide-default/60">
+                  <div
+                    v-for="entry in visibleLedger.slice(0, 4)"
+                    :key="entry.id"
+                    class="flex items-center justify-between gap-3 px-5 py-3 text-xs"
+                  >
+                    <div class="min-w-0">
+                      <p class="truncate font-medium text-highlighted">
+                        {{ entry.reason || entry.type }}
+                      </p>
+                      <p class="text-[11px] text-dimmed">
+                        {{ formatDate(entry.createdAt) }}
+                      </p>
+                    </div>
+                    <span
+                      class="font-mono text-xs font-semibold tabular-nums shrink-0"
+                      :class="entry.amountCredits >= 0 ? 'text-emerald-500' : 'text-signal-500'"
+                    >
+                      {{ entry.amountCredits >= 0 ? '+' : '' }}{{ entry.amountCredits }} 额度
+                    </span>
+                  </div>
+                </div>
+                <div v-else class="py-8 text-center text-xs text-muted">
+                  暂无额度流水
+                </div>
+              </div>
             </div>
           </div>
-          <p v-else class="py-10 text-center text-sm text-muted">
-            暂无额度流水
-          </p>
-        </UCard>
+        </div>
 
-        <UCard v-if="activeSection === 'overview' || activeSection === 'models'">
-          <template #header>
-            <div class="flex items-center justify-between gap-3">
-              <div>
-                <strong>我的模型</strong>
-                <p class="mt-1 text-xs text-muted">
-                  私有模型和微调产物会显示在这里。
+        <!-- 2. BILLING VIEW -->
+        <div v-else-if="activeSection === 'billing'" key="billing" class="rounded-xl border border-default/70 bg-elevated/40 backdrop-blur-xs">
+          <div class="flex flex-col gap-2 border-b border-default/70 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 class="text-sm font-semibold text-highlighted">
+                额度明细记录
+              </h2>
+              <p class="text-xs text-dimmed">
+                展示账户完整的充值、赠送及任务生成结算流水，预留与释放不计入最终结算
+              </p>
+            </div>
+            <UBadge color="neutral" variant="subtle" size="xs">
+              可用余额 {{ overview?.credits.available ?? 0 }}
+            </UBadge>
+          </div>
+
+          <UAlert v-if="ledgerError" color="warning" variant="subtle" class="m-5" icon="i-lucide-alert-triangle" title="额度流水暂不可用" description="接口返回异常，请稍后刷新重试。" />
+
+          <div v-else-if="visibleLedger.length" class="divide-y divide-default/60">
+            <div
+              v-for="entry in visibleLedger"
+              :key="entry.id"
+              class="flex items-center justify-between gap-4 px-5 py-3.5 text-xs transition hover:bg-muted/30"
+            >
+              <div class="min-w-0 flex-1">
+                <p class="font-medium text-highlighted">
+                  {{ entry.reason || entry.type }}
+                </p>
+                <p class="mt-0.5 text-[11px] text-dimmed">
+                  流水单号: <span class="font-mono">{{ entry.id }}</span> · {{ formatDate(entry.createdAt) }}
                 </p>
               </div>
-              <UButton v-if="activeSection === 'overview'" color="neutral" variant="link" size="sm" trailing-icon="i-lucide-arrow-right" @click="selectSection('models')">
-                管理模型
+              <span
+                class="font-mono text-sm font-semibold tabular-nums shrink-0"
+                :class="entry.amountCredits >= 0 ? 'text-emerald-500' : 'text-signal-500'"
+              >
+                {{ entry.amountCredits >= 0 ? '+' : '' }}{{ entry.amountCredits }} 额度
+              </span>
+            </div>
+
+            <div v-if="cursors.billing" class="p-4 text-center">
+              <UButton :loading="listLoading" variant="soft" color="neutral" size="sm" @click="loadSection('billing', true)">
+                加载更多流水
               </UButton>
             </div>
-          </template>
-          <UAlert v-if="modelsError" color="warning" variant="subtle" icon="i-lucide-alert-triangle" title="模型列表暂不可用" description="模型管理数据表尚未完成初始化，请稍后重试。" />
-          <div v-else-if="visibleModels.length" class="space-y-2">
-            <div v-for="model in visibleModels.slice(0, activeSection === 'models' ? 100 : 5)" :key="model.id" class="flex items-center gap-3 rounded-xl border border-default p-3">
+          </div>
+          <div v-else class="py-16 text-center text-xs text-muted">
+            暂无额度变动流水
+          </div>
+        </div>
+
+        <!-- 3. MODELS VIEW -->
+        <div v-else-if="activeSection === 'models'" key="models" class="rounded-xl border border-default/70 bg-elevated/40 backdrop-blur-xs">
+          <div class="flex items-center justify-between border-b border-default/70 px-5 py-4">
+            <div>
+              <h2 class="text-sm font-semibold text-highlighted">
+                我的模型资产
+              </h2>
+              <p class="text-xs text-dimmed">
+                支持管理个人上传的 Checkpoint、LoRA 及微调产物
+              </p>
+            </div>
+            <UButton size="xs" color="neutral" variant="soft" disabled title="模型上传通道准备中">
+              导入模型（即将支持）
+            </UButton>
+          </div>
+
+          <UAlert v-if="modelsError" color="warning" variant="subtle" class="m-5" icon="i-lucide-alert-triangle" title="模型列表暂不可用" description="数据表准备中，请稍后刷新重试。" />
+
+          <div v-else-if="visibleModels.length" class="grid gap-3 p-5 sm:grid-cols-2 lg:grid-cols-3">
+            <div
+              v-for="model in visibleModels"
+              :key="model.id"
+              class="flex items-center gap-3 rounded-lg border border-default/70 bg-elevated/60 p-3.5 transition hover:border-default hover:bg-elevated"
+            >
               <span class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-violet-500/10 text-violet-500">
                 <UIcon name="i-lucide-cpu" class="size-4" />
               </span>
               <div class="min-w-0 flex-1">
-                <p class="truncate text-sm font-medium" :title="model.name">
+                <p class="truncate text-xs font-medium text-highlighted" :title="model.name">
                   {{ model.name }}
                 </p>
-                <p class="mt-1 text-xs text-dimmed">
+                <p class="mt-1 text-[11px] text-dimmed">
                   {{ kindLabel(model.kind) }} · {{ sourceLabel(model.source) }} · {{ formatBytes(model.sizeBytes) }}
                 </p>
               </div>
-              <span class="shrink-0 text-xs" :class="model.status === 'ready' ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'">
+              <UBadge size="xs" :color="model.status === 'ready' ? 'success' : 'warning'" variant="subtle" class="shrink-0">
                 {{ modelStatusLabel(model.status) }}
-              </span>
+              </UBadge>
+            </div>
+
+            <div v-if="cursors.models" class="col-span-full pt-2 text-center">
+              <UButton :loading="listLoading" variant="soft" color="neutral" size="sm" @click="loadSection('models', true)">
+                加载更多模型
+              </UButton>
             </div>
           </div>
-          <div v-else class="rounded-xl border border-dashed border-default px-4 py-9 text-center">
-            <UIcon name="i-lucide-box" class="size-8 text-dimmed" />
-            <p class="mt-3 text-sm font-medium">
-              还没有模型资产
-            </p>
-            <p class="mt-1 text-xs leading-5 text-muted">
-              用户上传、Civitai 导入和微调产物登记后，会在这里统一管理。
-            </p>
-            <UButton class="mt-4" size="sm" color="neutral" variant="soft" disabled title="模型传输功能尚未接入，当前不会产生 OSS 流量">
-              导入模型（即将支持）
-            </UButton>
-          </div>
-        </UCard>
-      </div>
 
-      <UCard v-if="activeSection === 'overview' || activeSection === 'works'" class="mt-5">
-        <template #header>
-          <div class="flex items-center justify-between gap-3">
+          <div v-else class="py-16 text-center">
+            <div class="mx-auto flex size-12 items-center justify-center rounded-xl bg-muted/60 text-dimmed">
+              <UIcon name="i-lucide-cpu" class="size-6" />
+            </div>
+            <h3 class="mt-3 text-sm font-medium text-highlighted">
+              还没有模型资产
+            </h3>
+            <p class="mx-auto mt-1 max-w-sm text-xs text-dimmed">
+              用户上传、Civitai 导入和模型微调产物登记后，将在这里统一管理
+            </p>
+          </div>
+        </div>
+
+        <!-- 4. WORKS VIEW -->
+        <div v-else-if="activeSection === 'works'" key="works" class="rounded-xl border border-default/70 bg-elevated/40 backdrop-blur-xs">
+          <div class="flex items-center justify-between border-b border-default/70 px-5 py-4">
             <div>
-              <strong>我的作品</strong>
-              <p class="mt-1 text-xs text-muted">
-                生成记录和结果预览统一在作品库中管理。
+              <h2 class="text-sm font-semibold text-highlighted">
+                我的作品列表
+              </h2>
+              <p class="text-xs text-dimmed">
+                完整的生成作品库请前往专门的「作品库」管理页面
               </p>
             </div>
-            <UButton to="/projects" color="neutral" variant="link" size="sm" trailing-icon="i-lucide-arrow-right">
+            <UButton
+              to="/projects"
+              color="primary"
+              size="xs"
+              trailing-icon="i-lucide-arrow-up-right"
+            >
               打开作品库
             </UButton>
           </div>
-        </template>
-        <div v-if="visibleWorks.length" class="divide-y divide-default">
-          <div v-for="work in visibleWorks.slice(0, activeSection === 'works' ? 100 : 6)" :key="work.id" class="flex items-center gap-4 py-3">
-            <div class="min-w-0 flex-1">
-              <p class="truncate text-sm font-medium" :title="work.prompt || work.id">
-                {{ work.prompt || '未命名作品' }}
-              </p>
-              <p class="mt-1 text-xs text-dimmed">
-                {{ work.provider }} · {{ work.model || '默认模型' }} · {{ formatDate(work.createdAt) }}
-              </p>
+
+          <div v-if="visibleWorks.length" class="divide-y divide-default/60">
+            <div
+              v-for="work in visibleWorks"
+              :key="work.id"
+              class="flex items-center gap-3.5 px-5 py-3.5 text-xs transition hover:bg-muted/30"
+            >
+              <div class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted/70 text-dimmed">
+                <UIcon
+                  :name="work.kind === 'video' ? 'i-lucide-film' : work.kind === 'text' ? 'i-lucide-book-open' : 'i-lucide-image'"
+                  class="size-4"
+                  :class="work.kind === 'video' ? 'text-primary' : work.kind === 'text' ? 'text-sky-500' : 'text-dimmed'"
+                />
+              </div>
+              <div class="min-w-0 flex-1">
+                <p class="truncate font-medium text-highlighted" :title="work.title || work.id">
+                  {{ work.title || '未命名作品' }}
+                </p>
+                <p class="mt-0.5 text-[11px] text-dimmed">
+                  {{ runKindLabel[work.kind] || work.kind }} · {{ formatDate(work.createdAt) }}
+                </p>
+              </div>
+              <UBadge size="xs" :color="work.availability === 'available' ? 'neutral' : 'warning'" variant="subtle" class="shrink-0">
+                {{ work.availability === 'available' ? '可用' : '待恢复' }}
+              </UBadge>
             </div>
-            <span class="shrink-0 text-xs" :class="workStatusClass(work.status)">
-              {{ workStatusLabel(work.status) }}
-            </span>
-            <span v-if="work.billing?.chargedCredits !== undefined" class="hidden shrink-0 text-xs text-muted sm:inline">
-              {{ work.billing.chargedCredits }} 额度
-            </span>
-          </div>
-        </div>
-        <p v-else class="py-10 text-center text-sm text-muted">
-          还没有生成作品，去创作台开始第一条内容吧。
-        </p>
-      </UCard>
 
-      <UCard v-if="activeSection === 'overview'" class="mt-5">
-        <template #header>
-          <strong>存储用量</strong>
-        </template>
-        <div class="grid gap-4 sm:grid-cols-3">
-          <div>
-            <p class="text-xs text-muted">
-              作品与素材
-            </p>
-            <p class="mt-1 font-semibold">
-              {{ formatBytes(overview?.storage.mediaUsedBytes ?? 0) }}
-            </p>
+            <div v-if="cursors.works" class="p-4 text-center">
+              <UButton :loading="listLoading" variant="soft" color="neutral" size="sm" @click="loadSection('works', true)">
+                加载更多作品
+              </UButton>
+            </div>
           </div>
-          <div>
-            <p class="text-xs text-muted">
-              模型资产
-            </p>
-            <p class="mt-1 font-semibold">
-              {{ formatBytes(overview?.storage.modelUsedBytes ?? 0) }}
-            </p>
-          </div>
-          <div>
-            <p class="text-xs text-muted">
-              总用量 / 上限
-            </p>
-            <p class="mt-1 font-semibold">
-              {{ formatBytes(overview?.storage.totalUsedBytes ?? 0) }} / {{ formatBytes(overview?.storage.limitBytes ?? 0) }}
-            </p>
+          <div v-else class="py-16 text-center text-xs text-muted">
+            暂无作品内容
           </div>
         </div>
-      </UCard>
+      </Transition>
     </template>
-
-    <div class="mt-5 text-right">
-      <UButton color="neutral" variant="ghost" size="sm" icon="i-lucide-refresh-cw" :loading="status === 'pending'" @click="refresh()">
-        刷新数据
-      </UButton>
-    </div>
   </div>
 </template>
