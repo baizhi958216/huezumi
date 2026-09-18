@@ -1,26 +1,23 @@
-import IORedis from 'ioredis'
+import { createHash } from 'node:crypto'
+import { useDatabasePool } from '../database/client'
+import { incrementRateLimit, pruneRateLimits } from '../database/rate-limit'
 
-interface Counter { count: number, expiresAt: number }
-const localCounters = new Map<string, Counter>()
+let nextCleanupAt = 0
 
 export async function enforceRateLimit(event: Parameters<typeof getRequestIP>[0], bucket: string, limit: number, windowSeconds: number) {
   const ip = getRequestIP(event, { xForwardedFor: true }) || 'unknown'
-  const key = `forkvdo:rate:${bucket}:${ip}`
-  const redisUrl = String(useRuntimeConfig().redisUrl || '').trim()
+  const key = createHash('sha256').update(`${bucket}:${ip}`).digest('hex')
   let count: number
-  if (redisUrl) {
-    const runtime = globalThis as typeof globalThis & { __forkvdoRateRedis?: IORedis }
-    runtime.__forkvdoRateRedis ||= new IORedis(redisUrl, { maxRetriesPerRequest: 1, enableOfflineQueue: false })
-    count = await runtime.__forkvdoRateRedis.incr(key)
-    if (count === 1)
-      await runtime.__forkvdoRateRedis.expire(key, windowSeconds)
+  try {
+    const pool = useDatabasePool()
+    count = await incrementRateLimit(pool, key, windowSeconds)
+    if (Date.now() >= nextCleanupAt) {
+      nextCleanupAt = Date.now() + 60_000
+      void pruneRateLimits(pool).catch(() => console.error('Rate limit cleanup failed'))
+    }
   }
-  else {
-    const now = Date.now()
-    const current = localCounters.get(key)
-    const next = !current || current.expiresAt <= now ? { count: 1, expiresAt: now + windowSeconds * 1000 } : { ...current, count: current.count + 1 }
-    localCounters.set(key, next)
-    count = next.count
+  catch {
+    throw createError({ statusCode: 503, statusMessage: '限流服务暂不可用，请稍后重试' })
   }
   if (count > limit)
     throw createError({ statusCode: 429, statusMessage: '请求过于频繁，请稍后再试' })

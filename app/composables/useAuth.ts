@@ -1,11 +1,14 @@
 import type { AuthSessionResponse, PublicUser } from '#shared/types/auth'
 
-const user = ref<PublicUser | null>(null)
-const registrationMode = ref<AuthSessionResponse['registrationMode']>('invite')
-const loaded = ref(false)
-const authDialogOpen = ref(false)
-
 export function useAuth() {
+  // Nuxt state is serialized into the hydration payload, so the header sees
+  // the same session on the server and client instead of changing its nav
+  // structure during hydration.
+  const user = useState<PublicUser | null>('auth-user', () => null)
+  const registrationMode = useState<AuthSessionResponse['registrationMode']>('auth-registration-mode', () => 'invite')
+  const loaded = useState('auth-loaded', () => false)
+  const authDialogOpen = useState('auth-dialog-open', () => false)
+
   async function refreshSession() {
     try {
       const result = await $fetch<AuthSessionResponse>('/api/auth/session')

@@ -1,78 +1,52 @@
 # HTTP API
 
-所有路径由 Nitro 提供。私有 API 使用 `forkvdo_session` HttpOnly Cookie；未登录返回 401，普通用户访问管理或 ComfyUI 接口返回 403。修改请求执行同源校验。用户资源查询始终在服务端加入 owner 条件。
+平台 API 使用 HttpOnly session Cookie，所有写请求校验来源。普通资源按 owner 过滤，管理与 ComfyUI 要求 admin。错误保留 HTTP 状态，并在 `data` 中提供 `code`、`message`、`requestId`；响应头含 `x-request-id`，不回显密钥或上游原文。
 
-## 帐号
+## 资源契约
 
-| 方法      | 路径                    | 说明                                                                        |
-| --------- | ----------------------- | --------------------------------------------------------------------------- |
-| GET       | `/api/auth/session`     | 当前会话与公开用户资料；未登录返回 `{ user: null }`                         |
-| POST      | `/api/auth/register`    | `{ email, password, displayName, invitationCode? }`；注册模式由环境变量控制 |
-| POST      | `/api/auth/login`       | 邮箱密码登录并设置安全 Cookie                                               |
-| POST      | `/api/auth/logout`      | 删除当前 session 与 Cookie                                                  |
-| GET/PATCH | `/api/auth/profile`     | 查询或修改昵称；头像仅接受当前用户上传的 `/api/files/:id` 图片路径          |
-| POST      | `/api/auth/password`    | `{ currentPassword, newPassword }` 修改密码并撤销旧会话                     |
-| GET       | `/api/billing/ledger`   | 当前用户额度流水                                                            |
-| GET       | `/api/account/overview` | 当前用户额度、存储、作品和模型资产概览                                      |
+| 方法      | 路径                                     | 契约                                                                                                 |
+| --------- | ---------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| GET       | `/api/catalog/models`                    | 登录后查询连接下的模型、能力及可用性，不返回私有地址或凭据                                           |
+| GET       | `/api/providers`                         | 公共视频能力目录，供首页和管理员选择适配器                                                           |
+| GET/POST  | `/api/projects`                          | owner 项目列表 / 创建；不命名快速创作时受理服务自动创建                                              |
+| GET/PATCH | `/api/projects/:id`                      | 项目摘要 / 重命名项目                                                                                |
+| GET       | `/api/documents`                         | 分页摘要，不包含正文、人物或场景全文                                                                 |
+| GET       | `/api/documents/:id`                     | 当前完整版本                                                                                         |
+| GET/POST  | `/api/documents/:id/versions`            | 分页版本摘要 / `{ baseVersionId, content }` 保存新版本                                               |
+| GET       | `/api/documents/:id/versions/:versionId` | 指定不可变版本                                                                                       |
+| POST      | `/api/billing/quotes`                    | `{ kind, connectionId, model, input, projectId?, sourceVersionId?, sourceExcerpt?, baseVersionId? }` |
+| GET/POST  | `/api/runs`                              | 分页任务查询 / `{ request, quoteId, idempotencyKey }`；受理返回 202                                  |
+| GET       | `/api/runs/:id`                          | 任务摘要、允许动作及结果；视频状态从原记录派生                                                       |
+| POST      | `/api/runs/:id/sync`                     | 查询已有视频或工作流执行；视频计费核对状态拒绝                                                       |
+| POST      | `/api/runs/:id/archive`                  | 重试视频或工作流输出归档，不重复扣费                                                                 |
+| GET       | `/api/works`                             | 文本、图片、视频作品摘要，返回同过滤口径 total                                                       |
+| PATCH     | `/api/works/:id`                         | `{ projectId }` 将本人作品归入本人项目                                                               |
+| GET/POST  | `/api/assets`                            | 分页媒体元数据 / multipart 上传                                                                      |
+| GET       | `/api/assets/:id/content`                | 鉴权后读取字节或跳转私有签名地址                                                                     |
+| GET       | `/api/model-assets`                      | 用户模型文件资产元数据                                                                               |
+| GET       | `/api/billing/ledger`                    | 分页额度流水                                                                                         |
+| GET       | `/api/account/overview`                  | 钱包、存储、统一作品统计及最近摘要                                                                   |
 
-`/api/account/overview` 的消耗统计只累计实际结算的 `charge` 流水；`available` 为余额减去预留额度。模型资产统计只包含当前用户未软删除的资产。
+业务分页使用 `{ items, nextCursor }`，默认 30、最大 100。`cursor` 绑定时间与 ID；作品支持 `q`、`kind`、`projectId`，任务支持 `kind`、`projectId`、`status` 和 `active=true`。目录、配置集合及原生引擎协议保持各自返回结构。
 
-## 用户模型资产
+报价返回规范化 `request`，提交必须回传它，不能重新拼装默认值。报价有效十分钟，绑定用户、模型、连接版本和价格版本。相同幂等键/请求返回原任务；冲突和过期返回 409，余额不足 402，活动任务超限 429，无价格或非法能力组合 422。
 
-| 方法 | 路径          | 说明                                                               |
-| ---- | ------------- | ------------------------------------------------------------------ |
-| GET  | `/api/models` | 当前用户自己的模型资产元数据列表；不返回 OSS key、密钥或运行时路径 |
+文本价格为连接、模型、篇幅的固定额度。结构化结果保存成功后原子结算；明确失败释放，结果不明进入 review，不自动重复调用。手动保存遇到当前版本变化返回 409；AI 完成时基础版本已变化则保存候选版本，`needsReview=true`，不覆盖当前文档。
 
-模型资产的上传、Civitai 下载、OSS 存储和 ComfyUI 部署尚未在当前阶段开放；页面空状态不会触发外部模型流量。
+## 管理
 
-## 报价与生成
+- `/api/admin/connections` GET/POST，`/:id` PUT：连接及不可变版本，凭据只写不读，省略表示保持。
+- `/api/admin/connections/:id/versions` GET：分页版本摘要，支持查询与撤销历史版本，永不返回密文或明文凭据。
+- `/api/admin/connections/:id/revoke` POST `{ revisionId }`：显式撤销版本；已受理任务不能自动换连接。
+- `/api/admin/settings` GET/PUT：注册、赠送、任务上限、日预算、默认连接。
+- `/api/admin/text-prices` GET/POST：发布固定文本价格版本，不自动预设价格。
+- `/api/admin/deployment` GET：只读配置存在性与运行方式。
+- `/api/admin/runs` GET：待核对文本任务；`/:id/settle` POST `{ action: 'release' | 'charge', reason }`，最多按报价结算，不伪造正文。
+- 原有 `/api/admin/users`、`pricing`、`generations`、`audit`、`invitations` 保留管理职责。
+- `/api/admin/comfyui/**` 与 WebSocket：原生工作流及执行端管理；prompt 提交先持久化执行意图再请求引擎。作品历史由 worker 同步，列表不访问引擎。
 
-`POST /api/billing/quote` 接收经平台 schema 验证的 `GenerationRequest`，返回报价 ID、预估额度、价格版本、来源说明和过期时间。规则缺失返回 422。
+## 身份与旧地址
 
-`POST /api/generations` 在生成请求中额外要求 `quoteId` 与 `idempotencyKey`。报价必须属于当前用户、未过期且请求摘要一致。接口原子预留额度并创建待派发任务；余额不足返回 402，并发超限返回 429，报价冲突返回 409。相同用户和幂等键重复提交相同请求时返回原任务，不再次预留或派发。
+`/api/auth/session`、`register`、`login`、`logout`、`password` 与 `PATCH /api/auth/profile` 保持原契约；没有 `GET /api/auth/profile`。
 
-`GET /api/generations` 返回当前用户任务，按创建时间倒序。`GET /api/generations/:id` 返回当前用户单条任务。两者只读 PostgreSQL，不调用供应商。`POST /api/generations/:id/refresh` 只把已有供应商任务加入查询队列，不会重新提交生成。
-
-返回记录的 `billing` 包含预估、实际扣费、价格版本与结算状态。对象存储 key、供应商密钥和上游原始错误不进入响应。
-
-## 私有文件
-
-`POST /api/files` 接收字段名为 `file` 的 multipart 上传。视频最大 100 MiB，其他素材最大 20 MiB，同时受用户存储上限约束。生产环境未配置 OSS 时返回 503；开发环境可回退到 `.data`。
-
-`GET /api/files/:id` 验证 owner 或管理员。OSS 资产返回短期签名地址的 302；本地开发资产直接返回字节。私有响应使用 `no-store`。生成结果通过 `GET /api/generations/:id/video` 使用相同所有权和签名流程。
-
-个人资料页的头像通过 `POST /api/files` 上传图片后再保存资料；资料接口会再次验证素材属于当前用户、未删除且为图片。头像不接受外部在线 URL。密码修改要求当前密码和至少 10 个字符的新密码，成功后当前请求会建立新 session，原有 session 全部失效。
-
-## 供应商目录
-
-`GET /api/providers` 返回平台能力目录和服务端启用状态，不返回凭据。请求结构以 `shared/types/generation.ts` 和 `server/utils/generation-schema.ts` 为准；供应商特有映射保留在 `server/services/providers/`。
-
-## 管理 API
-
-全部要求 admin：
-
-| 方法     | 路径                                | 说明                                                 |
-| -------- | ----------------------------------- | ---------------------------------------------------- |
-| GET      | `/api/admin/overview`               | 用户、任务、资产、预算等概览                         |
-| GET      | `/api/admin/users`                  | 用户、额度、存储和任务数量                           |
-| PATCH    | `/api/admin/users/:id`              | 修改状态、角色或存储上限；停用会撤销会话             |
-| POST     | `/api/admin/users/:id/credits`      | 通过调整流水增减额度                                 |
-| POST     | `/api/admin/invitations`            | 创建一次性邀请码                                     |
-| GET/POST | `/api/admin/pricing`                | 查询或发布不可变价格版本                             |
-| GET      | `/api/admin/generations`            | 最近 200 个所有用户任务                              |
-| POST     | `/api/admin/generations/:id/action` | `refresh` 核对，或带理由 `release`/`charge` 人工结算 |
-| GET      | `/api/admin/audit`                  | 最近 200 条管理员审计记录                            |
-
-## ComfyUI
-
-当前所有 `/api/comfyui/**` 端点和 `/api/comfyui/ws` 仅管理员可用。HTTP 覆盖 status、object-info、prompt、history、queue、interrupt、free、upload、view 和工作流 CRUD；WebSocket 转发实时事件。生产 local/auto 配置返回服务配置错误，本地 install/start/stop 只服务开发环境。
-
-`POST /api/comfyui/upload` 接收 multipart 字段 `file` 与 `kind`（`image`、`audio` 或 `video`），上传到 ComfyUI input 目录后失效节点定义缓存；工作流右侧检查器会根据选中加载节点的上传标记选择文件类型，并把返回文件名写回节点参数。
-
-工作流保存到 PostgreSQL并绑定 owner；prompt ID 同步记录到 `comfy_executions`。共享实例的任意工作流尚未对普通用户开放。
-
-工作流 CRUD 的列表会返回当前用户自己的记录和 `visibility=public` 的公开记录。摘要和详情额外返回 `visibility`（`private` / `public`）以及 `scope`（`mine` / `public`）；左侧“公开工作流”按 `visibility=public` 筛选，因此拥有者自己的公开工作流会同时出现在“我的工作流”和“公开工作流”中。公开工作流允许读取和载入，保存公开工作流时只能更新自己的记录，载入他人的公开工作流会在页面中按副本保存。`POST /api/comfyui/workflows` 可传 `visibility`，默认是私有；删除仍只允许工作流拥有者。
-
-## 契约演进
-
-修改 API 时同步共享类型、Zod schema、spec 与本文。数据库结构通过 `drizzle/` migration 演进；持久化 generation payload 带 `schemaVersion`，不兼容变更必须提供兼容读取或迁移。
+历史 `/api/files/:id`、`/api/generations/:id/video`、`/api/comfyui/view` 继续提供受保护的媒体访问；旧继续创作链接中的视频 ID 由 `/api/runs/:id` 解析为统一任务，旧业务详情入口已移除。旧的免费文本生成、视频提交和引擎作品聚合入口已退出使用。队列仍接受旧视频 submit/poll 消息。

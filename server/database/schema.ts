@@ -1,10 +1,11 @@
 import type { ComfyWorkflowJSON } from '#shared/types/comfyui'
 import type { GenerationRequest, GenerationStatus } from '#shared/types/generation'
+import type { ConnectionSettings, PlatformSettings, RunRequest } from '#shared/types/platform'
+import type { TextCreationContent, TextCreationKind, TextCreationRequest } from '#shared/types/text-creation'
 import type { PriceFormula } from '#shared/utils/pricing'
 import { bigint, boolean, index, integer, jsonb, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core'
 
 export type { PriceFormula } from '#shared/utils/pricing'
-
 export const userRole = pgEnum('user_role', ['user', 'admin'])
 export const userStatus = pgEnum('user_status', ['pending', 'active', 'disabled'])
 export const dispatchStatus = pgEnum('dispatch_status', ['queued', 'submitting', 'submitted', 'reconciling', 'complete', 'failed'])
@@ -13,7 +14,7 @@ export const modelAssetSource = pgEnum('model_asset_source', ['upload', 'civitai
 export const modelAssetKind = pgEnum('model_asset_kind', ['checkpoint', 'lora', 'vae', 'clip', 'unet', 'controlnet', 'embedding', 'upscale', 'other'])
 export const modelAssetStatus = pgEnum('model_asset_status', ['pending', 'ready', 'failed', 'quarantined'])
 export const modelAssetVisibility = pgEnum('model_asset_visibility', ['private', 'shared', 'platform'])
-
+export const creativeProjectStatus = pgEnum('creative_project_status', ['draft', 'active', 'completed', 'archived'])
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
   email: text('email').notNull(),
@@ -26,7 +27,6 @@ export const users = pgTable('users', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, table => [uniqueIndex('users_email_unique').on(table.email)])
-
 export const sessions = pgTable('sessions', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
@@ -35,28 +35,28 @@ export const sessions = pgTable('sessions', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   lastSeenAt: timestamp('last_seen_at', { withTimezone: true }).notNull().defaultNow(),
 }, table => [uniqueIndex('sessions_token_hash_unique').on(table.tokenHash), index('sessions_user_idx').on(table.userId)])
-
 export const invitationCodes = pgTable('invitation_codes', {
   id: uuid('id').primaryKey().defaultRandom(),
   codeHash: text('code_hash').notNull(),
+  code: text('code'),
+  note: text('note'),
   createdBy: uuid('created_by').references(() => users.id),
   usedBy: uuid('used_by').references(() => users.id),
   expiresAt: timestamp('expires_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   usedAt: timestamp('used_at', { withTimezone: true }),
 }, table => [uniqueIndex('invitation_codes_hash_unique').on(table.codeHash)])
-
 export const wallets = pgTable('wallets', {
   userId: uuid('user_id').primaryKey().references(() => users.id, { onDelete: 'cascade' }),
   balanceCredits: integer('balance_credits').notNull().default(0),
   reservedCredits: integer('reserved_credits').notNull().default(0),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })
-
 export const ledgerEntries = pgTable('ledger_entries', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: uuid('user_id').notNull().references(() => users.id),
   generationId: uuid('generation_id'),
+  runId: uuid('run_id'),
   type: text('type').notNull(),
   amountCredits: integer('amount_credits').notNull(),
   idempotencyKey: text('idempotency_key').notNull(),
@@ -64,7 +64,6 @@ export const ledgerEntries = pgTable('ledger_entries', {
   actorUserId: uuid('actor_user_id').references(() => users.id),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, table => [uniqueIndex('ledger_idempotency_unique').on(table.idempotencyKey), index('ledger_user_idx').on(table.userId, table.createdAt)])
-
 export const pricingRules = pgTable('pricing_rules', {
   id: uuid('id').primaryKey().defaultRandom(),
   provider: text('provider').notNull(),
@@ -83,20 +82,22 @@ export const pricingRules = pgTable('pricing_rules', {
   index('pricing_lookup_idx').on(table.provider, table.model, table.resolution, table.active),
   uniqueIndex('pricing_version_unique').on(table.provider, table.model, table.resolution, table.version),
 ])
-
 export const quotes = pgTable('quotes', {
+  kind: text('kind').notNull().default('video'),
+  connectionVersionId: uuid('connection_version_id'),
+  platformRequest: jsonb('platform_request').$type<RunRequest>(),
   id: uuid('id').primaryKey().defaultRandom(),
   userId: uuid('user_id').notNull().references(() => users.id),
   requestHash: text('request_hash').notNull(),
-  request: jsonb('request').$type<GenerationRequest>().notNull(),
-  ruleId: uuid('rule_id').notNull().references(() => pricingRules.id),
+  request: jsonb('request').$type<GenerationRequest | TextCreationRequest>().notNull(),
+  ruleId: uuid('rule_id').references(() => pricingRules.id),
   priceVersion: integer('price_version').notNull(),
   estimatedCredits: integer('estimated_credits').notNull(),
   expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, table => [index('quotes_user_idx').on(table.userId, table.createdAt)])
-
 export const generations = pgTable('generations', {
+  connectionVersionId: uuid('connection_version_id'),
   id: uuid('id').primaryKey().defaultRandom(),
   schemaVersion: integer('schema_version').notNull().default(1),
   ownerId: uuid('owner_id').notNull().references(() => users.id),
@@ -119,7 +120,6 @@ export const generations = pgTable('generations', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, table => [uniqueIndex('generation_owner_idempotency_unique').on(table.ownerId, table.idempotencyKey), index('generation_owner_created_idx').on(table.ownerId, table.createdAt), index('generation_dispatch_idx').on(table.dispatchStatus, table.updatedAt)])
-
 export const assets = pgTable('assets', {
   id: uuid('id').primaryKey().defaultRandom(),
   schemaVersion: integer('schema_version').notNull().default(1),
@@ -132,7 +132,40 @@ export const assets = pgTable('assets', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   deletedAt: timestamp('deleted_at', { withTimezone: true }),
 }, table => [index('assets_owner_idx').on(table.ownerId, table.createdAt)])
-
+/** 创作项目是文章、人物、图片与镜头后续汇合的稳定所有权边界。 */
+export const creativeProjects = pgTable('creative_projects', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  schemaVersion: integer('schema_version').notNull().default(1),
+  ownerId: uuid('owner_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  status: creativeProjectStatus('status').notNull().default('active'),
+  lastActiveStage: text('last_active_stage').notNull().default('article'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, table => [index('creative_projects_owner_idx').on(table.ownerId, table.updatedAt)])
+/** 文档保存稳定身份；currentVersionId 仅作快速指针，版本表保留不可变正文。 */
+export const creativeDocuments = pgTable('creative_documents', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  schemaVersion: integer('schema_version').notNull().default(1),
+  ownerId: uuid('owner_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  projectId: uuid('project_id').notNull().references(() => creativeProjects.id, { onDelete: 'cascade' }),
+  kind: text('kind').$type<TextCreationKind>().notNull(),
+  title: text('title').notNull(),
+  currentVersionId: uuid('current_version_id'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, table => [index('creative_documents_owner_idx').on(table.ownerId, table.updatedAt), index('creative_documents_project_idx').on(table.projectId, table.updatedAt)])
+export const creativeDocumentVersions = pgTable('creative_document_versions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  documentId: uuid('document_id').notNull().references(() => creativeDocuments.id, { onDelete: 'cascade' }),
+  version: integer('version').notNull(),
+  source: text('source').$type<'ai' | 'manual'>().notNull(),
+  provider: text('provider'),
+  model: text('model'),
+  promptSnapshot: jsonb('prompt_snapshot').$type<TextCreationRequest>(),
+  content: jsonb('content').$type<TextCreationContent>().notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, table => [uniqueIndex('creative_document_version_unique').on(table.documentId, table.version), index('creative_document_versions_document_idx').on(table.documentId, table.createdAt)])
 /**
  * 用户模型资产的元数据。模型原文件和部署状态后续由 model_asset_files / agent 管理，
  * 这里先把所有权、来源和用户可见信息独立出来，避免把模型当作普通图片素材处理。
@@ -156,7 +189,6 @@ export const modelAssets = pgTable('model_assets', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   deletedAt: timestamp('deleted_at', { withTimezone: true }),
 }, table => [index('model_assets_owner_idx').on(table.ownerId, table.createdAt), index('model_assets_status_idx').on(table.status, table.updatedAt)])
-
 /**
  * 一个模型资产可以由多个文件组成，兼容视频模型的 diffusion model、VAE、文本编码器等组合。
  * 当前只读管理页使用汇总字段，真实上传/部署任务后续再填充对象存储 key。
@@ -173,7 +205,6 @@ export const modelAssetFiles = pgTable('model_asset_files', {
   localStorageKey: text('local_storage_key'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, table => [index('model_asset_files_asset_idx').on(table.modelAssetId)])
-
 export const assetReservations = pgTable('asset_reservations', {
   id: uuid('id').primaryKey().defaultRandom(),
   ownerId: uuid('owner_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
@@ -181,7 +212,6 @@ export const assetReservations = pgTable('asset_reservations', {
   expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, table => [index('asset_reservation_owner_idx').on(table.ownerId, table.expiresAt)])
-
 export const workflows = pgTable('workflows', {
   id: uuid('id').primaryKey().defaultRandom(),
   schemaVersion: integer('schema_version').notNull().default(1),
@@ -192,7 +222,6 @@ export const workflows = pgTable('workflows', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, table => [index('workflows_owner_idx').on(table.ownerId, table.updatedAt), index('workflows_visibility_idx').on(table.visibility, table.updatedAt)])
-
 export const comfyExecutions = pgTable('comfy_executions', {
   id: uuid('id').primaryKey().defaultRandom(),
   ownerId: uuid('owner_id').notNull().references(() => users.id),
@@ -201,7 +230,6 @@ export const comfyExecutions = pgTable('comfy_executions', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, table => [uniqueIndex('comfy_prompt_unique').on(table.promptId), index('comfy_owner_idx').on(table.ownerId, table.createdAt)])
-
 export const outboxEvents = pgTable('outbox_events', {
   id: uuid('id').primaryKey().defaultRandom(),
   topic: text('topic').notNull(),
@@ -212,7 +240,6 @@ export const outboxEvents = pgTable('outbox_events', {
   publishedAt: timestamp('published_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, table => [index('outbox_pending_idx').on(table.publishedAt, table.availableAt)])
-
 export const auditLogs = pgTable('audit_logs', {
   id: uuid('id').primaryKey().defaultRandom(),
   actorUserId: uuid('actor_user_id').references(() => users.id),
@@ -222,3 +249,89 @@ export const auditLogs = pgTable('audit_logs', {
   detail: jsonb('detail').$type<Record<string, unknown>>().notNull().default({}),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, table => [index('audit_created_idx').on(table.createdAt)])
+export const rateLimitBuckets = pgTable('rate_limit_buckets', {
+  key: text('key').primaryKey(),
+  count: integer('count').notNull(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+}, table => [index('rate_limit_expiry_idx').on(table.expiresAt)])
+export const platformConnections = pgTable('platform_connections', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  importKey: text('import_key').unique(),
+  name: text('name').notNull(),
+  kind: text('kind').$type<'video' | 'text'>().notNull(),
+  provider: text('provider').notNull(),
+  enabled: boolean('enabled').notNull().default(true),
+  currentVersionId: uuid('current_version_id'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+})
+export const connectionVersions = pgTable('connection_versions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  connectionId: uuid('connection_id').notNull().references(() => platformConnections.id),
+  version: integer('version').notNull(),
+  settings: jsonb('settings').$type<ConnectionSettings>().notNull(),
+  encryptedSecrets: text('encrypted_secrets').notNull(),
+  hasCredentials: boolean('has_credentials').notNull(),
+  revokedAt: timestamp('revoked_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, t => [uniqueIndex('connection_version_unique').on(t.connectionId, t.version)])
+export const platformSettings = pgTable('platform_settings', {
+  id: text('id').primaryKey().default('platform'),
+  value: jsonb('value').$type<PlatformSettings>().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+})
+export const textPrices = pgTable('text_prices', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  connectionId: uuid('connection_id').notNull().references(() => platformConnections.id),
+  model: text('model').notNull(),
+  length: text('length').$type<'short' | 'medium' | 'long'>().notNull(),
+  credits: integer('credits').notNull(),
+  version: integer('version').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, t => [uniqueIndex('text_price_version_unique').on(t.connectionId, t.model, t.length, t.version)])
+export const runs = pgTable('runs', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  ownerId: uuid('owner_id').notNull().references(() => users.id),
+  kind: text('kind').$type<'video' | 'text' | 'workflow'>().notNull(),
+  projectId: uuid('project_id').references(() => creativeProjects.id),
+  generationId: uuid('generation_id').unique().references(() => generations.id, { onDelete: 'cascade' }),
+  promptId: text('prompt_id').unique(),
+  request: jsonb('request').$type<RunRequest>(),
+  workflow: jsonb('workflow').$type<ComfyWorkflowJSON>(),
+  sourceVersionId: uuid('source_version_id').references(() => creativeDocumentVersions.id),
+  baseVersionId: uuid('base_version_id'),
+  connectionVersionId: uuid('connection_version_id').references(() => connectionVersions.id),
+  quoteId: uuid('quote_id').references(() => quotes.id),
+  idempotencyKey: text('idempotency_key').notNull(),
+  requestHash: text('request_hash').notNull(),
+  status: text('status').$type<GenerationStatus>().notNull().default('PENDING'),
+  stage: text('stage').notNull().default('queued'),
+  settlementStatus: text('settlement_status').notNull().default('reserved'),
+  reservedCredits: integer('reserved_credits').notNull().default(0),
+  chargedCredits: integer('charged_credits'),
+  resultVersionId: uuid('result_version_id').references(() => creativeDocumentVersions.id),
+  needsReview: boolean('needs_review').notNull().default(false),
+  error: text('error'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, t => [uniqueIndex('run_owner_idempotency_unique').on(t.ownerId, t.idempotencyKey), index('run_owner_created_idx').on(t.ownerId, t.createdAt)])
+export const works = pgTable('works', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  ownerId: uuid('owner_id').notNull().references(() => users.id),
+  kind: text('kind').$type<'text' | 'image' | 'video'>().notNull(),
+  title: text('title').notNull(),
+  summary: text('summary').notNull().default(''),
+  projectId: uuid('project_id').references(() => creativeProjects.id),
+  runId: uuid('run_id').references(() => runs.id, { onDelete: 'cascade' }),
+  documentId: uuid('document_id').references(() => creativeDocuments.id),
+  versionId: uuid('version_id').references(() => creativeDocumentVersions.id),
+  assetId: uuid('asset_id').references(() => assets.id),
+  generationId: uuid('generation_id').references(() => generations.id, { onDelete: 'cascade' }),
+  sourceKey: text('source_key').notNull().unique(),
+  sourceFile: jsonb('source_file').$type<{
+    filename: string
+    subfolder?: string
+    type: 'output'
+  }>(),
+  availability: text('availability').$type<'available' | 'pending' | 'unavailable'>().notNull().default('pending'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, t => [index('work_owner_created_idx').on(t.ownerId, t.createdAt)])

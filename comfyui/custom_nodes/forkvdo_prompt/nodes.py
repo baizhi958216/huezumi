@@ -11,6 +11,7 @@ import base64
 import hashlib
 import json
 import os
+from http.client import HTTPException
 from io import BytesIO
 from typing import Any
 from urllib.error import HTTPError, URLError
@@ -27,6 +28,21 @@ DEFAULT_MAX_IMAGES = 8
 DEFAULT_MAX_IMAGE_BYTES = 20 * 1024 * 1024
 DEFAULT_MAX_TOTAL_BYTES = 60 * 1024 * 1024
 DEFAULT_TIMEOUT_SECONDS = 120
+API_PROTOCOLS = ("auto", "chat_completions", "responses")
+
+PROMPT_SCHEMA = {
+    "name": "forkvdo_image_prompts",
+    "strict": True,
+    "schema": {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "positive_prompt": {"type": "string"},
+            "negative_prompt": {"type": "string"},
+        },
+        "required": ["positive_prompt", "negative_prompt"],
+    },
+}
 
 DEFAULT_RULES = """You are an expert prompt director for an AI image-generation workflow.
 Your task is to analyze the user's natural language request and any ordered reference images (labeled as 图1, 图2...), and produce two prompts: positive_prompt and negative_prompt.
@@ -173,7 +189,7 @@ def _normalise_base_url(value: Any) -> str:
     if parsed.path.rstrip("/").endswith("/v1"):
         return base_url
     if parsed.path not in {"", "/"}:
-        raise RuntimeError("首版只支持 origin 或以 /v1 结尾的 OpenAI 兼容 baseUrl")
+        raise RuntimeError("baseUrl 请填写 origin 或以 /v1 结尾的地址；API 协议在连接节点中选择")
     return f"{base_url}/v1"
 
 
@@ -285,6 +301,61 @@ def _parse_prompt_result(text: str) -> tuple[str, str]:
     return positive.strip(), negative.strip()
 
 
+class ModelHTTPError(RuntimeError):
+    """Keep retry decisions independent of translated or upstream error text."""
+
+    def __init__(self, status_code: int, protocol: str, client_restricted: bool = False):
+        self.status_code = status_code
+        self.client_restricted = client_restricted
+        endpoint = "/responses" if protocol == "responses" else "/chat/completions"
+        context = f"HTTP {status_code}，{endpoint}"
+        if client_restricted:
+            message = f"大模型服务不接受通用 API 请求（{context}），要求 Codex 等指定客户端；请使用支持通用 API 的连接或对应客户端接入"
+        elif status_code in {404, 405}:
+            message = f"大模型 API 不支持当前模型或端点不存在（{context}），请核对模型和 API 协议；仅支持 Responses 的模型不能使用 Chat Completions"
+        elif status_code == 401:
+            message = f"大模型鉴权失败（{context}），请检查 API Key 是否有效"
+        elif status_code == 403:
+            message = f"大模型访问被拒绝（{context}），请检查模型权限、网络或服务商的客户端限制"
+        elif status_code == 429:
+            message = f"大模型请求受限（{context}），请检查额度或稍后重试"
+        elif status_code >= 500:
+            message = f"大模型服务暂不可用（{context}），请稍后重试或检查服务商状态"
+        else:
+            message = f"大模型请求参数不兼容（{context}），请检查 API 协议、模型和连接配置"
+        super().__init__(message)
+
+
+def _sse_events(response):
+    data: list[str] = []
+    for raw_line in response:
+        line = raw_line.decode("utf-8").rstrip("\r\n")
+        if line.startswith("data:"):
+            data.append(line[5:].lstrip(" "))
+        elif not line and data:
+            yield "\n".join(data)
+            data = []
+    if data:
+        yield "\n".join(data)
+
+
+def _read_responses_stream(response) -> Any:
+    for data in _sse_events(response):
+        if data == "[DONE]":
+            break
+        event = json.loads(data)
+        if not isinstance(event, dict):
+            raise RuntimeError("大模型返回的流事件格式无效")
+        event_type = event.get("type")
+        if event_type == "response.completed":
+            return event.get("response")
+        if event_type in ("error", "response.failed", "response.incomplete"):
+            raise RuntimeError("大模型生成失败或输出不完整，请检查服务商状态后重试")
+    # A delta can contain valid JSON even when generation subsequently fails.
+    # Only a terminal completed response is safe to hand to the image sampler.
+    raise RuntimeError("大模型输出流中断或缺少完成事件，请重试")
+
+
 def _post_json(url: str, api_key: str, payload: dict[str, Any], timeout: int) -> tuple[int, Any]:
     request = Request(
         url,
@@ -294,13 +365,95 @@ def _post_json(url: str, api_key: str, payload: dict[str, Any], timeout: int) ->
     )
     try:
         with urlopen(request, timeout=timeout) as response:
-            body = response.read()
-            return int(response.status), json.loads(body.decode("utf-8"))
+            if "text/event-stream" in response.headers.get("content-type", "").lower():
+                return int(response.status), _read_responses_stream(response)
+            return int(response.status), json.loads(response.read().decode("utf-8"))
     except HTTPError as error:
-        # Do not include upstream response bodies in the ComfyUI error; they may contain secrets.
-        raise RuntimeError(f"大模型连接被拒绝（HTTP {error.code}），请检查连接标识、密钥、模型和端点") from None
-    except (URLError, TimeoutError, OSError, ValueError):
+        # Inspect only a bounded fragment for a known client restriction. Never
+        # expose or retain upstream bodies, which can echo credentials or inputs.
+        try:
+            with error:
+                client_restricted = b"invalid codex request" in error.read(8192).lower()
+        except (OSError, HTTPException):
+            client_restricted = False
+        protocol = "responses" if url.endswith("/responses") else "chat_completions"
+        raise ModelHTTPError(error.code, protocol, client_restricted) from None
+    except (URLError, TimeoutError, OSError, HTTPException):
         raise RuntimeError("无法连接大模型或请求超时，请检查执行端网络和连接配置") from None
+    except ValueError:
+        raise RuntimeError("大模型返回不是有效 JSON 或 SSE，请检查 API 协议和兼容端点") from None
+
+
+def _responses_payload(model: str, messages: list[dict[str, Any]]) -> dict[str, Any]:
+    instructions: list[str] = []
+    inputs: list[dict[str, Any]] = []
+    for message in messages:
+        if message["role"] == "system":
+            instructions.append(message["content"])
+            continue
+        content = message["content"]
+        if isinstance(content, str):
+            content = [{"type": "text", "text": content}]
+        parts: list[dict[str, Any]] = []
+        for part in content:
+            if part["type"] == "text":
+                parts.append({"type": "input_text", "text": part["text"]})
+            elif part["type"] == "image_url":
+                parts.append({"type": "input_image", "image_url": part["image_url"]["url"]})
+            else:
+                raise RuntimeError("Responses 输入包含不支持的内容类型")
+        inputs.append({"role": message["role"], "content": parts})
+    return {
+        "model": model,
+        "instructions": "\n\n".join(instructions),
+        "input": inputs,
+        "store": False,
+        "stream": True,
+        "text": {"format": {"type": "json_schema", **PROMPT_SCHEMA}},
+    }
+
+
+def _responses_text(payload: Any) -> str:
+    if not isinstance(payload, dict):
+        raise RuntimeError("大模型返回的 Responses 格式无效")
+    if payload.get("error") or payload.get("status") not in (None, "completed"):
+        raise RuntimeError("大模型生成失败或输出不完整，请检查服务商状态后重试")
+    output = payload.get("output")
+    if not isinstance(output, list):
+        raise RuntimeError("大模型返回缺少 Responses 输出")
+    chunks: list[str] = []
+    for item in output:
+        if not isinstance(item, dict) or item.get("type") != "message" or item.get("role", "assistant") != "assistant":
+            continue
+        if item.get("status") not in (None, "completed"):
+            raise RuntimeError("大模型消息输出不完整，请重试")
+        content = item.get("content")
+        if not isinstance(content, list):
+            raise RuntimeError("大模型返回的消息内容格式无效")
+        for part in content:
+            if not isinstance(part, dict):
+                continue
+            if part.get("type") == "refusal":
+                raise RuntimeError("大模型未接受当前需求，请调整需求后重试")
+            if part.get("type") == "output_text" and isinstance(part.get("text"), str):
+                chunks.append(part["text"])
+    text = "".join(chunks).strip()
+    if not text:
+        raise RuntimeError("大模型返回缺少可解析的提示词文本")
+    return text
+
+
+def _request_model(url: str, api_key: str, payload: dict[str, Any], timeout: int, format_key: str) -> Any:
+    try:
+        _, response = _post_json(url, api_key, payload, timeout)
+    except ModelHTTPError as error:
+        if error.status_code != 400 or error.client_restricted:
+            raise
+        # Some compatible services reject structured-output parameters. Retry
+        # only the rejected request; never retry parsing or a failed output stream.
+        fallback = {key: value for key, value in payload.items() if key != format_key}
+        _, response = _post_json(url, api_key, fallback, timeout)
+    return response
 
 
 def _call_model(connection: dict[str, Any], model: str, messages: list[dict[str, Any]], timeout: int) -> tuple[str, str]:
@@ -309,39 +462,27 @@ def _call_model(connection: dict[str, Any], model: str, messages: list[dict[str,
         api_key = ""
     elif not api_key:
         raise RuntimeError("大模型连接未配置 apiKey")
-    url = f"{_normalise_base_url(connection.get('baseUrl'))}/chat/completions"
-    payload: dict[str, Any] = {
-        "model": model,
-        "messages": messages,
-        "temperature": 0.2,
-        "response_format": {
-            "type": "json_schema",
-            "json_schema": {
-                "name": "forkvdo_image_prompts",
-                "strict": True,
-                "schema": {
-                    "type": "object",
-                    "additionalProperties": False,
-                    "properties": {
-                        "positive_prompt": {"type": "string"},
-                        "negative_prompt": {"type": "string"},
-                    },
-                    "required": ["positive_prompt", "negative_prompt"],
-                },
-            },
-        },
-    }
-    try:
-        _, response = _post_json(url, api_key, payload, timeout)
-        return _parse_prompt_result(_response_text(response))
-    except RuntimeError as error:
-        # A 400 from a compatible endpoint is indistinguishable from other 400s without
-        # exposing the body. Retry once without response_format; output validation remains strict.
-        if "HTTP 400" not in str(error):
-            raise
-        payload.pop("response_format", None)
-        _, response = _post_json(url, api_key, payload, timeout)
-        return _parse_prompt_result(_response_text(response))
+    base_url = _normalise_base_url(connection.get("baseUrl"))
+    protocol = str(connection.get("apiProtocol") or "auto").strip()
+    if protocol not in API_PROTOCOLS:
+        raise RuntimeError("大模型 API 协议无效，请选择 auto、chat_completions 或 responses")
+    if protocol in {"auto", "chat_completions"}:
+        payload = {
+            "model": model,
+            "messages": messages,
+            "temperature": 0.2,
+            "response_format": {"type": "json_schema", "json_schema": PROMPT_SCHEMA},
+        }
+        try:
+            response = _request_model(f"{base_url}/chat/completions", api_key, payload, timeout, "response_format")
+        except ModelHTTPError as error:
+            if protocol != "auto" or error.status_code not in {404, 405} or error.client_restricted:
+                raise
+        else:
+            return _parse_prompt_result(_response_text(response))
+    payload = _responses_payload(model, messages)
+    response = _request_model(f"{base_url}/responses", api_key, payload, timeout, "text")
+    return _parse_prompt_result(_responses_text(response))
 
 
 class ForkVdoPrompt:

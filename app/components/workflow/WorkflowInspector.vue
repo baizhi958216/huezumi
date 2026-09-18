@@ -142,7 +142,7 @@ const uploadHint = computed(() => {
   if (!widget) {
     return props.selectedNode
       ? '当前节点没有文件上传参数；素材类输入请添加 Load Image、Load Audio 或 Load Video 节点后再连线。'
-      : '请选择 Load Image、Load Audio 或 Load Video 节点后上传文件。'
+      : '请选择带上传控件的参考素材或 Load 节点后上传文件。'
   }
   return `文件会上传到 ComfyUI，并自动填入「${widget.name}」参数。`
 })
@@ -433,24 +433,27 @@ function onFileChange(event: Event) {
           运行后这里会显示生成结果
         </p>
         <div v-else class="comfy-outputs">
-          <a
+          <template
             v-for="file in outputs"
             :key="`${file.type}-${file.subfolder}-${file.filename}`"
-            :href="buildViewUrl(file)"
-            target="_blank"
-            rel="noopener"
-            class="comfy-outputs__item"
           >
-            <video
+            <div
               v-if="isVideoFile(file)"
-              :src="buildViewUrl(file)"
-              muted
-              loop
-              playsinline
-              class="comfy-outputs__media"
-            />
-            <img v-else :src="buildViewUrl(file)" :alt="file.filename" loading="lazy" class="comfy-outputs__media">
-          </a>
+              class="comfy-outputs__item comfy-outputs__item--video"
+            >
+              <video
+                :src="buildViewUrl(file)"
+                controls
+                playsinline
+                preload="metadata"
+                class="comfy-outputs__media"
+              >浏览器无法播放该视频。</video>
+              <a :href="buildViewUrl(file)" target="_blank" rel="noopener" class="comfy-outputs__open">
+                打开原视频
+              </a>
+            </div>
+            <WorkflowOutputImage v-else :file="file" />
+          </template>
         </div>
       </section>
     </div>

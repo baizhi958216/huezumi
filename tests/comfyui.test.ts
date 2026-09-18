@@ -65,6 +65,69 @@ it('recognizes upload-enabled COMBO inputs from current ComfyUI definitions', ()
   assert.deepEqual(video.widgets[0]?.choices, ['demo.mp4'])
 })
 
+it('serializes ComfyUI dynamic combo v3 values required by SaveVideo', () => {
+  const saveVideoInfo: ComfyObjectInfo = {
+    SaveVideo: {
+      input: {
+        required: {
+          video: ['VIDEO', {}],
+          filename_prefix: ['STRING', { default: 'video/ComfyUI' }],
+          format: ['COMFY_DYNAMICCOMBO_V3', {
+            options: [
+              { key: 'auto', inputs: { required: {} } },
+              { key: 'mp4', inputs: { required: {} } },
+            ],
+          }],
+        },
+        optional: {
+          codec: ['COMFY_DYNAMICCOMBO_V3', {
+            options: [{ key: 'auto', inputs: { required: {} } }],
+          }],
+        },
+      },
+      output: ['VIDEO'],
+      name: 'SaveVideo',
+    },
+  }
+  const workflow: ComfyWorkflowJSON = {
+    last_node_id: 1,
+    last_link_id: 0,
+    nodes: [{
+      id: 1,
+      type: 'SaveVideo',
+      pos: [0, 0],
+      size: [260, 120],
+      order: 0,
+      mode: 0,
+      inputs: [{ name: 'video', type: 'VIDEO', link: null }],
+      widgets_values: ['video/MiniMax_H3', 'auto', 'auto'],
+    }],
+    links: [],
+  }
+
+  const info = buildNodeTypeInfo('SaveVideo', saveVideoInfo.SaveVideo!)
+  assert.deepEqual(info.widgets.map(widget => widget.name), ['filename_prefix', 'format', 'codec'])
+  assert.deepEqual(info.inputs.map(input => input.name), ['video'])
+  assert.deepEqual(info.widgets.find(widget => widget.name === 'format')?.choices, ['auto', 'mp4'])
+
+  const result = serializeGraphToApiPrompt(workflow, saveVideoInfo)
+  assert.deepEqual(result.issues, [])
+  assert.deepEqual(result.prompt['1']?.inputs, {
+    filename_prefix: 'video/MiniMax_H3',
+    format: 'auto',
+    codec: 'auto',
+  })
+
+  workflow.nodes[0]!.widgets_values = ['video/Legacy_H3']
+  const legacy = serializeGraphToApiPrompt(workflow, saveVideoInfo)
+  assert.deepEqual(legacy.issues, [])
+  assert.deepEqual(legacy.prompt['1']?.inputs, {
+    filename_prefix: 'video/Legacy_H3',
+    format: 'auto',
+    codec: 'auto',
+  })
+})
+
 const imageInfo: ComfyObjectInfo = JSON.parse(readFileSync(new URL('./fixtures/comfy-image-nodes.json', import.meta.url), 'utf8'))
 
 it('serializes the single image workflow with independent text and separate model inputs', () => {
@@ -82,6 +145,7 @@ it('serializes the single image workflow with independent text and separate mode
   assert.equal(prompt['8']?.inputs.steps, 24)
   assert.equal(prompt['8']?.inputs.control_after_generate, undefined)
   assert.equal(prompt['3']?.inputs.connection_id, 'workflow')
+  assert.equal(prompt['10']?.inputs.api_protocol, 'auto')
   assert.equal(existsSync('workflows/anima-llm-prompt-generate.json'), false)
   assert.equal(existsSync('workflows/anima-llm-multi-image-edit.json'), false)
   for (const [id, sourceId, sourceSlot, targetId, targetSlot, type] of workflow.links) {
@@ -92,6 +156,28 @@ it('serializes the single image workflow with independent text and separate mode
     assert.ok(source?.links?.includes(id))
     assert.equal(target?.link, id)
   }
+})
+
+it('keeps legacy LLM connection values when the protocol widget is appended', () => {
+  const workflow: ComfyWorkflowJSON = JSON.parse(readFileSync('workflows/image-creation.json', 'utf8'))
+  const connection = workflow.nodes.find(node => node.type === 'ForkVdoLLMConfig')!
+  connection.widgets_values = ['https://example.invalid/v1', 'fixture-key', 'bearer', 'gpt-6-astra', true, 45]
+  const legacy = serializeGraphToApiPrompt(workflow, imageInfo)
+  assert.deepEqual(legacy.issues, [])
+  assert.deepEqual(legacy.prompt['10']?.inputs, {
+    base_url: 'https://example.invalid/v1',
+    api_key: 'fixture-key',
+    auth: 'bearer',
+    model_name: 'gpt-6-astra',
+    supports_vision: true,
+    timeout_seconds: 45,
+    api_protocol: 'auto',
+  })
+  connection.widgets_values.push('responses')
+  const explicit = serializeGraphToApiPrompt(workflow, imageInfo)
+  assert.deepEqual(explicit.issues, [])
+  assert.equal(explicit.prompt['10']?.inputs.api_protocol, 'responses')
+  assert.deepEqual(explicit.prompt['3']?.inputs.llm_config, ['10', 0])
 })
 
 it('uses forceInput sockets without shifting positional widget values', () => {
@@ -123,4 +209,35 @@ it('recognizes seed controls from metadata and advances only the next-run seed',
   assert.equal(next.steps, 24)
   assert.equal(nextSeedValues(info.widgets, { ...values, control_after_generate: 'fixed' }).seed, 7)
   assert.equal(nextSeedValues(info.widgets, { ...values, seed: 0, control_after_generate: 'decrement' }).seed, 4294967295)
+})
+
+it('ships five local MiniMax H3 ComfyUI presets with valid media routes', () => {
+  const presets = [
+    ['workflows/minimax-h3-text-to-video.json', 'MiniMaxH3ImageToVideo'],
+    ['workflows/minimax-h3-reference-image.json', 'MiniMaxH3ReferenceToVideo'],
+    ['workflows/minimax-h3-character-consistency.json', 'MiniMaxH3ReferenceToVideo'],
+    ['workflows/minimax-h3-first-last-frame.json', 'MiniMaxH3ImageToVideo'],
+    ['workflows/minimax-h3-multi-material.json', 'MiniMaxH3ReferenceToVideo'],
+  ] as const
+
+  for (const [file, samplerType] of presets) {
+    const workflow: ComfyWorkflowJSON = JSON.parse(readFileSync(file, 'utf8'))
+    const nodeIds = new Set(workflow.nodes.map(node => node.id))
+    assert.match(workflow.name || '', /^MiniMax H3 · /)
+    assert.ok(workflow.nodes.some(node => node.type === samplerType))
+    assert.ok(workflow.nodes.some(node => node.type === 'SaveVideo'))
+    assert.ok(workflow.links.every(link => nodeIds.has(link[1]) && nodeIds.has(link[3])))
+  }
+
+  const character: ComfyWorkflowJSON = JSON.parse(readFileSync('workflows/minimax-h3-character-consistency.json', 'utf8'))
+  assert.equal(character.nodes.find(node => node.type === 'MiniMaxH3ReferenceToVideo')?.inputs?.filter(input => input.name.startsWith('ref_images.')).length, 3)
+
+  const firstLast: ComfyWorkflowJSON = JSON.parse(readFileSync('workflows/minimax-h3-first-last-frame.json', 'utf8'))
+  assert.deepEqual(firstLast.nodes.find(node => node.type === 'MiniMaxH3ImageToVideo')?.inputs?.filter(input => input.name.endsWith('_frame')).map(input => input.name), ['first_frame', 'last_frame'])
+
+  const multi: ComfyWorkflowJSON = JSON.parse(readFileSync('workflows/minimax-h3-multi-material.json', 'utf8'))
+  const multiInputNames = multi.nodes.find(node => node.type === 'MiniMaxH3ReferenceToVideo')?.inputs?.map(input => input.name) || []
+  assert.ok(multiInputNames.includes('ref_videos.ref_video_0'))
+  assert.ok(multiInputNames.includes('ref_video_audios.ref_video_audio_0'))
+  assert.ok(multiInputNames.includes('ref_audios.ref_audio_0'))
 })

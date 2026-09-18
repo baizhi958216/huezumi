@@ -4,8 +4,7 @@ import { useDatabase } from '../database/client'
 import { assets } from '../database/schema'
 import { createOssUploader } from '../utils/oss'
 
-const ASSET_URL = /^\/api\/files\/([0-9a-f-]{36})$/i
-
+const ASSET_URL = /^\/api\/(?:files\/|assets\/)([0-9a-f-]{36})(?:\/content)?$/i
 export async function resolveProviderMediaUrls(ownerId: string, request: GenerationRequest): Promise<GenerationRequest> {
   const ids = request.media.map(item => item.url.match(ASSET_URL)?.[1]).filter((id): id is string => Boolean(id))
   if (!ids.length)

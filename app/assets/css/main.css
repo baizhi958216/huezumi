@@ -50,6 +50,8 @@
 
 /* Nuxt UI 语义变量微调：更干净的白、更细腻的描边 */
 :root {
+  --app-header-height: 3.625rem;
+  --app-header-offset: 4.625rem;
   --ui-radius: 0.5rem;
   --ui-container: 80rem;
   --ui-bg: #f7f8fa;
@@ -299,342 +301,264 @@
 }
 
 /* ==========================================================================
-   液态玻璃导航 / Liquid Glass Navigation
-   多层半透明材质：环境采样、内高光、动态折射与浮动阴影。
+   全站头部 / Application Header
+   所有页面复用同一高度、材质和导航状态；页面工具栏不再承担全局导航。
    ========================================================================== */
-.liquid-nav {
-  --liquid-shift: 0;
+/* 页面内的固定导航不能盖住挂载到 body 的弹窗及其下拉选项。 */
+#__nuxt {
+  isolation: isolate;
+}
+
+.app-main {
+  min-width: 0;
+  padding-top: var(--app-header-offset);
+}
+
+.app-home-page {
+  margin-top: calc(var(--app-header-offset) * -1);
+}
+
+.skip-link {
+  position: fixed;
+  z-index: 100;
+  top: 0.5rem;
+  left: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius-sm);
+  background: var(--ui-bg-elevated);
+  color: var(--ui-text-highlighted);
+  box-shadow: var(--shadow-card);
+  font-size: 0.875rem;
+  font-weight: 600;
+  transform: translateY(-150%);
+  transition: transform 160ms ease;
+}
+
+.skip-link:focus {
+  transform: translateY(0);
+}
+
+.app-header {
   position: fixed;
   z-index: 50;
-  top: 12px;
-  right: 14px;
-  left: 14px;
+  top: 0.5rem;
+  right: 0.75rem;
+  left: 0.75rem;
   display: flex;
   justify-content: center;
   pointer-events: none;
-  transition: top 500ms var(--ease-cinematic);
 }
 
-.liquid-nav__glass {
-  position: relative;
-  isolation: isolate;
-  width: 100%;
-  height: 64px;
+.app-header__surface {
+  width: min(100%, 96rem);
+  height: var(--app-header-height);
   display: flex;
   align-items: center;
-  gap: 1.35rem;
-  overflow: hidden;
-  padding: 0.55rem 0.65rem 0.55rem 1rem;
-  border: 1px solid rgb(255 255 255 / 56%);
-  border-radius: 1.25rem;
-  background: linear-gradient(180deg, rgb(255 255 255 / 20%), rgb(255 255 255 / 7%));
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 72%),
-    inset 0 -1px 0 rgb(255 255 255 / 20%),
-    0 1px 2px rgb(15 18 24 / 5%),
-    0 14px 42px -22px rgb(15 18 24 / 30%);
+  gap: 0.75rem;
+  min-width: 0;
+  padding: 0.45rem 0.5rem 0.45rem 0.85rem;
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--ui-bg-elevated) 88%, transparent);
+  box-shadow: var(--shadow-card);
+  backdrop-filter: blur(18px) saturate(1.25);
   pointer-events: auto;
-  transition:
-    height 500ms var(--ease-cinematic),
-    border-radius 500ms var(--ease-cinematic),
-    background 500ms var(--ease-cinematic),
-    border-color 500ms var(--ease-cinematic),
-    box-shadow 500ms var(--ease-cinematic);
 }
 
-.liquid-nav__motion {
-  width: min(100%, 76rem);
-}
-
-.liquid-nav__glass::after {
-  position: absolute;
-  z-index: -1;
-  inset: 0;
-  border-radius: inherit;
-  background: linear-gradient(100deg, transparent 8%, rgb(255 255 255 / 34%) 36%, transparent 58%);
-  content: '';
-  opacity: 0.66;
-  pointer-events: none;
-  transform: translateX(calc(var(--liquid-shift) * 1%));
-  transition: opacity 500ms var(--ease-cinematic);
-}
-
-.liquid-nav__brand {
+.app-header__brand {
+  display: inline-flex;
   flex: none;
-  border-radius: 0.65rem;
-}
-
-.liquid-nav__links {
-  display: flex;
   align-items: center;
-  gap: 0.2rem;
+  border-radius: var(--radius-sm);
 }
 
-.liquid-nav__link {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  min-height: 38px;
-  padding: 0 0.85rem;
-  border-radius: 0.75rem;
-  color: color-mix(in srgb, var(--ui-text-muted) 88%, transparent);
-  font-size: 1rem;
-  font-weight: 550;
-  line-height: 1;
-  letter-spacing: -0.012em;
-  transition:
-    color 180ms ease,
-    background-color 180ms ease,
-    transform 180ms var(--ease-cinematic);
+.app-header__brand .brand-logo__wordmark {
+  height: 1.7rem;
 }
 
-.liquid-nav__link::after {
-  position: absolute;
-  right: 0.8rem;
-  bottom: 5px;
-  left: 0.8rem;
-  height: 1.5px;
-  border-radius: 99px;
-  background: var(--color-signal-500);
-  content: '';
-  opacity: 0;
-  transform: scaleX(0.35);
-  transition:
-    opacity 220ms ease,
-    transform 350ms var(--ease-cinematic);
-}
-
-.liquid-nav__link:hover {
-  background: rgb(255 255 255 / 42%);
-  color: var(--ui-text-highlighted);
-}
-
-.liquid-nav__link:active {
-  transform: scale(0.97);
-}
-
-.liquid-nav__link.is-active {
-  background: rgb(255 255 255 / 56%);
-  color: var(--ui-text-highlighted);
-}
-
-.liquid-nav__link.is-active::after {
-  opacity: 1;
-  transform: scaleX(1);
-}
-
-.liquid-nav__actions {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
-}
-
-.liquid-nav__status {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  padding: 0 0.5rem;
-  color: var(--ui-text-muted);
-  font-family: var(--font-sans);
-  font-size: 1rem;
-  font-weight: 500;
-  letter-spacing: 0.02em;
-}
-
-.liquid-nav__status-dot {
-  width: 0.375rem;
-  height: 0.375rem;
-  border-radius: 50%;
-  background: #22c55e;
-  box-shadow:
-    0 0 0 3px rgb(34 197 94 / 12%),
-    0 0 12px rgb(34 197 94 / 32%);
-}
-
-.liquid-nav__icon-button {
-  border-radius: 0.75rem !important;
-}
-
-.liquid-nav__cta {
-  border-radius: 0.75rem !important;
-  box-shadow: 0 8px 18px -10px rgb(255 77 53 / 68%);
-}
-
-.liquid-nav.is-scrolled {
-  top: 8px;
-}
-
-.liquid-nav.is-scrolled .liquid-nav__glass {
-  height: 56px;
-  border-color: rgb(255 255 255 / 64%);
-  border-radius: 1rem;
-  background: linear-gradient(180deg, rgb(255 255 255 / 30%), rgb(255 255 255 / 12%));
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 82%),
-    inset 0 -1px 0 rgb(255 255 255 / 24%),
-    0 1px 2px rgb(15 18 24 / 7%),
-    0 18px 48px -22px rgb(15 18 24 / 40%);
-}
-
-.dark .liquid-nav__glass {
-  border-color: rgb(255 255 255 / 14%);
-  background: linear-gradient(180deg, rgb(255 255 255 / 10%), rgb(255 255 255 / 4%));
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 13%),
-    inset 0 -1px 0 rgb(255 255 255 / 4%),
-    0 1px 2px rgb(0 0 0 / 30%),
-    0 18px 48px -22px rgb(0 0 0 / 80%);
-}
-
-.dark .liquid-nav__link:hover,
-.dark .liquid-nav__link.is-active {
-  background: rgb(255 255 255 / 8%);
-}
-
-.dark .liquid-nav.is-scrolled .liquid-nav__glass {
-  border-color: rgb(255 255 255 / 18%);
-  background: linear-gradient(180deg, rgb(255 255 255 / 13%), rgb(255 255 255 / 6%));
-}
-
-/* 创作台使用低干扰的工作区工具栏，不沿用营销页导航结构。 */
-.liquid-nav--workspace {
-  top: 10px;
-  right: 16px;
-  left: 16px;
-}
-
-.liquid-nav--workspace .liquid-nav__motion {
-  width: min(100%, 105rem);
-}
-
-.liquid-nav--workspace .liquid-nav__glass {
-  height: 50px;
-  gap: 0.65rem;
-  padding: 0.35rem 0.45rem;
-  border-color: color-mix(in srgb, var(--ui-border) 80%, transparent);
-  border-radius: 0.875rem;
-  background: color-mix(in srgb, var(--ui-bg-elevated) 72%, transparent);
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 40%),
-    0 8px 24px -18px rgb(15 18 24 / 32%);
-}
-
-.liquid-nav--workspace.is-scrolled {
-  top: 10px;
-}
-
-.liquid-nav--workspace.is-scrolled .liquid-nav__glass {
-  height: 50px;
-  border-color: color-mix(in srgb, var(--ui-border) 80%, transparent);
-  border-radius: 0.875rem;
-  background: color-mix(in srgb, var(--ui-bg-elevated) 78%, transparent);
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 40%),
-    0 8px 24px -18px rgb(15 18 24 / 32%);
-}
-
-.liquid-nav__workspace-brand {
-  display: inline-flex;
-  border-radius: 0.65rem;
-}
-
-.liquid-nav__divider {
+.app-header__divider {
   width: 1px;
-  height: 20px;
+  height: 1.25rem;
+  flex: none;
   background: var(--ui-border);
 }
 
-.liquid-nav__workspace-title {
+.app-header__nav {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.app-header__nav-link {
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  color: var(--ui-text-toned);
-  font-size: 1rem;
-  font-weight: 600;
-  letter-spacing: -0.01em;
+  gap: 0.4rem;
+  min-height: 2.25rem;
+  padding: 0 0.65rem;
+  border-radius: var(--radius-sm);
+  color: var(--ui-text-muted);
+  font-size: 0.875rem;
+  font-weight: 550;
+  line-height: 1;
+  white-space: nowrap;
+  transition:
+    color 160ms ease,
+    background-color 160ms ease,
+    box-shadow 160ms ease;
 }
 
-.liquid-nav__workspace-title > span {
+.app-header__nav-icon {
+  width: 1rem;
+  height: 1rem;
+  flex: none;
   color: var(--ui-text-dimmed);
+  transition: color 160ms ease;
 }
 
-.liquid-nav__workspace-actions {
+.app-header__nav-link:hover {
+  background: var(--ui-bg-muted);
+  color: var(--ui-text-highlighted);
+}
+
+.app-header__nav-link.is-active {
+  background: color-mix(in srgb, var(--color-signal-500) 9%, var(--ui-bg-elevated));
+  color: var(--color-signal-700);
+}
+
+.app-header__nav-link.is-active .app-header__nav-icon {
+  color: var(--color-signal-600);
+}
+
+.app-header__studio-nav {
+  display: inline-flex;
+  align-items: stretch;
+  border-radius: var(--radius-sm);
+  transition: background-color 160ms ease;
+}
+
+.app-header__studio-link {
+  border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+  padding-right: 0.45rem;
+}
+
+.app-header__studio-toggle {
+  display: inline-flex;
+  width: 1.75rem;
+  min-height: 2.25rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  color: var(--ui-text-dimmed);
+  transition:
+    color 160ms ease,
+    background-color 160ms ease;
+}
+
+.app-header__studio-nav:hover,
+.app-header__studio-nav.is-active {
+  background: var(--ui-bg-muted);
+}
+
+.app-header__studio-nav.is-active {
+  background: color-mix(in srgb, var(--color-signal-500) 9%, var(--ui-bg-elevated));
+}
+
+.app-header__studio-nav.is-active .app-header__studio-link,
+.app-header__studio-nav.is-active .app-header__nav-icon,
+.app-header__studio-nav.is-active .app-header__studio-toggle {
+  color: var(--color-signal-700);
+}
+
+.app-header__studio-toggle:hover {
+  background: color-mix(in srgb, var(--ui-text-highlighted) 5%, transparent);
+  color: var(--ui-text-highlighted);
+}
+
+.app-header__actions {
   margin-left: auto;
   display: flex;
   align-items: center;
   gap: 0.2rem;
+  flex: none;
 }
 
-.liquid-nav__workspace-button {
-  border-radius: 0.65rem !important;
-  color: var(--ui-text-muted) !important;
-  font-size: 1rem !important;
+.app-header__icon-button,
+.app-header__account-button,
+.app-header__cta {
+  border-radius: var(--radius-sm) !important;
 }
 
-.dark .liquid-nav--workspace .liquid-nav__glass,
-.dark .liquid-nav--workspace.is-scrolled .liquid-nav__glass {
-  border-color: var(--ui-border);
-  background: color-mix(in srgb, var(--ui-bg-elevated) 76%, transparent);
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 8%),
-    0 8px 24px -18px rgb(0 0 0 / 72%);
+.app-header__cta {
+  margin-right: 0.15rem;
+  box-shadow: 0 6px 16px -10px rgb(255 77 53 / 70%);
 }
 
-@media (max-width: 767px) {
-  .liquid-nav {
-    top: 8px;
-    right: 8px;
-    left: 8px;
-  }
+.app-header__mobile-menu {
+  display: none;
+}
 
-  .liquid-nav__glass {
-    height: 60px;
-    gap: 0.5rem;
-    padding: 0.45rem 0.45rem 0.45rem 0.8rem;
-    border-radius: 1rem;
-  }
+.dark .app-header__surface {
+  background: color-mix(in srgb, var(--ui-bg-elevated) 90%, transparent);
+  box-shadow: 0 12px 32px -22px rgb(0 0 0 / 88%);
+}
 
-  .liquid-nav__motion {
-    width: 100%;
-  }
+.dark .app-header__nav-link.is-active {
+  background: color-mix(in srgb, var(--color-signal-500) 13%, var(--ui-bg-elevated));
+  color: var(--color-signal-300);
+}
 
-  .liquid-nav--workspace {
-    top: 8px;
-    right: 8px;
-    left: 8px;
-  }
+.dark .app-header__nav-link.is-active .app-header__nav-icon {
+  color: var(--color-signal-400);
+}
 
-  .liquid-nav--workspace .liquid-nav__glass {
-    height: 52px;
-  }
+.dark .app-header__studio-nav.is-active {
+  background: color-mix(in srgb, var(--color-signal-500) 13%, var(--ui-bg-elevated));
+}
 
-  .liquid-nav__workspace-button {
-    padding-inline: 0.5rem !important;
-  }
+.dark .app-header__studio-nav.is-active .app-header__studio-link,
+.dark .app-header__studio-nav.is-active .app-header__nav-icon,
+.dark .app-header__studio-nav.is-active .app-header__studio-toggle {
+  color: var(--color-signal-300);
+}
 
-  .liquid-nav__workspace-button:first-child {
+@supports not (backdrop-filter: blur(1px)) {
+  .app-header__surface {
+    background: var(--ui-bg-elevated);
+  }
+}
+
+@media (max-width: 1099px) {
+  .app-header__nav,
+  .app-header__divider {
     display: none;
   }
 
-  .liquid-nav__links,
-  .liquid-nav__status,
-  .liquid-nav__cta {
-    display: none !important;
-  }
-
-  .liquid-nav__actions {
-    gap: 0.2rem;
+  .app-header__mobile-menu {
+    display: block;
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .liquid-nav,
-  .liquid-nav__glass,
-  .liquid-nav__glass::after,
-  .liquid-nav__link,
-  .liquid-nav__link::after {
-    transition-duration: 0.01ms !important;
+@media (max-width: 639px) {
+  :root {
+    --app-header-offset: 4.375rem;
+  }
+
+  .app-header {
+    top: 0.375rem;
+    right: 0.375rem;
+    left: 0.375rem;
+  }
+
+  .app-header__surface {
+    padding-left: 0.7rem;
+  }
+
+  .app-header__brand .brand-logo__wordmark {
+    height: 1.55rem;
+  }
+
+  .app-header__cta {
+    display: none !important;
   }
 }
 
@@ -660,19 +584,33 @@
 }
 
 /* ==========================================================================
-   页面过渡 / Page Transition
+   页面过渡与选项卡平滑微动效 / Transitions
    ========================================================================== */
 .page-enter-active,
 .page-leave-active {
-  transition:
-    opacity 0.28s var(--ease-cinematic),
-    transform 0.28s var(--ease-cinematic);
+  transition: opacity 0.18s var(--ease-cinematic);
 }
 
 .page-enter-from,
 .page-leave-to {
   opacity: 0;
-  transform: translateY(8px);
+}
+
+.tab-fade-enter-active,
+.tab-fade-leave-active {
+  transition:
+    opacity 0.18s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.tab-fade-enter-from {
+  opacity: 0;
+  transform: translateY(6px);
+}
+
+.tab-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-4px);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -715,13 +653,25 @@
 }
 
 /* ---- 页面外壳 ---- */
+.creation-content {
+  width: calc(100% - 1.5rem);
+  max-width: 100rem;
+  margin-inline: auto;
+}
+
 .comfy-shell {
   display: flex;
   flex-direction: column;
-  height: 100vh;
-  padding: 0.5rem 0.75rem 0.75rem;
+  height: calc(100dvh - var(--app-header-offset));
+  padding: 0.5rem 0 0.75rem;
   gap: 0.5rem;
   overflow: hidden;
+}
+
+@media (min-width: 768px) {
+  .creation-content {
+    width: calc(100% - 2rem);
+  }
 }
 
 .comfy-shell__notice {
@@ -779,7 +729,7 @@
 @media (max-width: 900px) {
   .comfy-shell {
     height: auto;
-    min-height: 100vh;
+    min-height: calc(100dvh - var(--app-header-offset));
     overflow: visible;
   }
 
@@ -808,7 +758,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
-  height: 48px;
+  height: 52px;
   padding: 0 0.75rem;
   background: var(--ui-bg-elevated);
   border: 1px solid var(--ui-border);
@@ -825,51 +775,20 @@
   flex-shrink: 0;
 }
 
-.comfy-toolbar__brand {
+.comfy-toolbar__page-label {
   display: inline-flex;
   align-items: center;
-  border-radius: var(--radius-sm);
-  transition: opacity 0.15s ease;
-}
-
-.comfy-toolbar__brand:hover {
-  opacity: 0.85;
+  gap: 0.4rem;
+  color: var(--ui-text-toned);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  white-space: nowrap;
 }
 
 .comfy-toolbar__divider {
   width: 1px;
   height: 16px;
   background: var(--ui-border);
-}
-
-.comfy-toolbar__nav {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-}
-
-.comfy-toolbar__nav-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 0.25rem 0.5rem;
-  border-radius: var(--radius-sm);
-  font-size: 0.75rem;
-  font-weight: 500;
-  color: var(--ui-text-muted);
-  text-decoration: none;
-  transition: all 0.15s ease;
-}
-
-.comfy-toolbar__nav-link:hover {
-  background: var(--ui-bg-muted);
-  color: var(--ui-text-highlighted);
-}
-
-.comfy-toolbar__nav-link.is-active {
-  background: var(--ui-bg-muted);
-  color: var(--color-signal-600);
-  font-weight: 600;
 }
 
 .comfy-toolbar__center {
@@ -945,10 +864,10 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 18px;
-  height: 18px;
+  width: 28px;
+  height: 28px;
   border: 0;
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
   background: transparent;
   color: var(--ui-text-muted);
   cursor: pointer;
@@ -1210,8 +1129,9 @@
 }
 
 .comfy-library__scope-btn.is-active {
-  color: var(--color-signal-600);
-  background: color-mix(in srgb, var(--color-signal-500) 10%, transparent);
+  color: var(--ui-text-highlighted);
+  background: var(--ui-bg-elevated);
+  box-shadow: var(--shadow-soft);
 }
 
 .comfy-workflow-list {
@@ -2150,7 +2070,8 @@
 /* ---- 输出画廊 ---- */
 .comfy-outputs {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(96px, 100%), 1fr));
+  align-items: start;
   gap: 0.375rem;
 }
 
@@ -2175,6 +2096,34 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+.comfy-outputs__item--video {
+  grid-column: 1 / -1;
+  aspect-ratio: auto;
+  padding: 0.375rem;
+}
+
+.comfy-outputs__item--video:hover {
+  transform: none;
+}
+
+.comfy-outputs__item--video .comfy-outputs__media {
+  display: block;
+  height: auto;
+  max-height: 20rem;
+  aspect-ratio: 16 / 9;
+  object-fit: contain;
+  background: #000;
+  border-radius: var(--radius-sm);
+}
+
+.comfy-outputs__open {
+  display: inline-block;
+  padding: 0.375rem 0.125rem 0.125rem;
+  color: var(--ui-text-toned);
+  font-size: 0.75rem;
+  text-decoration: underline;
 }
 
 /* ---- 提示词专用检查器 ---- */

@@ -1,10 +1,9 @@
-import type { GenerationRecord } from './generation'
+import type { WorkSummary } from './platform'
 
 export type ModelAssetKind = 'checkpoint' | 'lora' | 'vae' | 'clip' | 'unet' | 'controlnet' | 'embedding' | 'upscale' | 'other'
 export type ModelAssetSource = 'upload' | 'civitai' | 'training' | 'platform'
 export type ModelAssetStatus = 'pending' | 'ready' | 'failed' | 'quarantined'
 export type ModelAssetVisibility = 'private' | 'shared' | 'platform'
-
 export interface ModelAssetSummary {
   id: string
   name: string
@@ -21,7 +20,6 @@ export interface ModelAssetSummary {
   createdAt: string
   updatedAt: string
 }
-
 export interface AccountLedgerEntry {
   id: string
   type: string
@@ -30,7 +28,6 @@ export interface AccountLedgerEntry {
   generationId?: string
   createdAt: string
 }
-
 export interface AccountOverview {
   credits: {
     balance: number
@@ -52,6 +49,6 @@ export interface AccountOverview {
     models: number
   }
   recentLedger: AccountLedgerEntry[]
-  recentWorks: GenerationRecord[]
+  recentWorks: WorkSummary[]
   recentModels: ModelAssetSummary[]
 }

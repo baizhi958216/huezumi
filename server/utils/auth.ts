@@ -6,11 +6,11 @@ import { promisify } from 'node:util'
 import { and, eq, gt, isNull, sql } from 'drizzle-orm'
 import { useDatabase } from '../database/client'
 import { assets, sessions, users, wallets } from '../database/schema'
+import { readSettings } from '../services/platform/connections'
 
 const scrypt = promisify(scryptCallback)
 const COOKIE_NAME = 'forkvdo_session'
 const SESSION_DAYS = 30
-
 export interface AuthUser {
   id: string
   email: string
@@ -21,21 +21,17 @@ export interface AuthUser {
   storageLimitBytes: number
   createdAt: Date
 }
-
 export function normalizeEmail(value: string) {
   return value.trim().toLowerCase()
 }
-
 export function hashToken(value: string) {
   return createHash('sha256').update(value).digest('hex')
 }
-
 export async function hashPassword(password: string) {
   const salt = randomBytes(16)
   const derived = await scrypt(password, salt, 64) as Buffer
   return `scrypt:${salt.toString('base64')}:${derived.toString('base64')}`
 }
-
 export async function verifyPassword(password: string, stored: string) {
   const [algorithm, saltEncoded, hashEncoded] = stored.split(':')
   if (algorithm !== 'scrypt' || !saltEncoded || !hashEncoded)
@@ -44,12 +40,9 @@ export async function verifyPassword(password: string, stored: string) {
   const actual = await scrypt(password, Buffer.from(saltEncoded, 'base64'), expected.length) as Buffer
   return actual.length === expected.length && timingSafeEqual(actual, expected)
 }
-
-export function registrationMode(): 'open' | 'invite' | 'disabled' {
-  const value = String(useRuntimeConfig().registrationMode || 'invite')
-  return value === 'open' || value === 'disabled' ? value : 'invite'
+export async function registrationMode(): Promise<'open' | 'invite' | 'disabled'> {
+  return (await readSettings()).registrationMode
 }
-
 export async function createSession(event: Parameters<typeof setCookie>[0], userId: string) {
   const rawToken = randomBytes(32).toString('base64url')
   const expiresAt = new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000)
@@ -62,14 +55,12 @@ export async function createSession(event: Parameters<typeof setCookie>[0], user
     maxAge: SESSION_DAYS * 24 * 60 * 60,
   })
 }
-
 export async function destroySession(event: Parameters<typeof getCookie>[0]) {
   const token = getCookie(event, COOKIE_NAME)
   if (token)
     await useDatabase().delete(sessions).where(eq(sessions.tokenHash, hashToken(token)))
   deleteCookie(event, COOKIE_NAME, { path: '/' })
 }
-
 export async function optionalUser(event: Parameters<typeof getCookie>[0]): Promise<AuthUser | null> {
   const token = getCookie(event, COOKIE_NAME)
   if (!token)
@@ -91,21 +82,18 @@ export async function optionalUser(event: Parameters<typeof getCookie>[0]): Prom
     .limit(1)
   return row ?? null
 }
-
 export async function requireUser(event: Parameters<typeof getCookie>[0]) {
   const user = await optionalUser(event)
   if (!user)
     throw createError({ statusCode: 401, statusMessage: '请先登录' })
   return user
 }
-
 export async function requireAdmin(event: Parameters<typeof getCookie>[0]) {
   const user = await requireUser(event)
   if (user.role !== 'admin')
     throw createError({ statusCode: 403, statusMessage: '需要管理员权限' })
   return user
 }
-
 export async function toPublicUser(user: AuthUser): Promise<PublicUser> {
   const db = useDatabase()
   const [wallet] = await db.select().from(wallets).where(eq(wallets.userId, user.id)).limit(1)
@@ -130,7 +118,6 @@ export async function toPublicUser(user: AuthUser): Promise<PublicUser> {
     createdAt: user.createdAt.toISOString(),
   }
 }
-
 export function assertSameOrigin(event: Parameters<typeof getHeader>[0]) {
   if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(event.method))
     return

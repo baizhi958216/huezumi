@@ -15,6 +15,8 @@ RUN npm install --global pnpm@10.15.1
 COPY --from=builder /app/.output ./.output
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./package.json
+COPY --from=builder /app/server ./server
+COPY --from=builder /app/shared ./shared
 COPY --from=builder /app/scripts ./scripts
 COPY --from=builder /app/drizzle ./drizzle
 RUN mkdir -p /app/.data && chown -R node:node /app

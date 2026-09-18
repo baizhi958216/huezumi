@@ -7,6 +7,7 @@ import process from 'node:process'
 import { fetchSystemStats } from './client'
 import { getComfyConfig, resolvePythonBin } from './config'
 import { ensureForkvdoCustomNode } from './custom-nodes'
+import { comfyChildEnvironment } from './environment'
 import { isComfyInstalled } from './installer'
 import {
   appendRuntimeLog,
@@ -137,13 +138,7 @@ export async function startComfy(): Promise<ComfyUIStatus> {
   ], {
     cwd: config.dir,
     stdio: ['ignore', 'pipe', 'pipe'],
-    // Secrets are inherited by the local execution process only. They never enter
-    // the graph, object-info response, log buffer, or browser-facing error.
-    env: {
-      ...process.env,
-      PYTHONUNBUFFERED: '1',
-      FORKVDO_LLM_CONNECTIONS_JSON: config.llmConnectionsJson || process.env.FORKVDO_LLM_CONNECTIONS_JSON || '',
-    },
+    env: comfyChildEnvironment(process.env, config.llmConnectionsJson),
   })
 
   runtime.child = child

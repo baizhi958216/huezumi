@@ -13,23 +13,19 @@ services:
       timeout: 5s
       retries: 20
 
-  redis:
-    image: redis:8-alpine
-    command: [redis-server, --appendonly, yes]
-    volumes:
-      - redis-data:/data
-    healthcheck:
-      test: [CMD, redis-cli, ping]
-      interval: 5s
-      timeout: 3s
-      retries: 20
-
   migrate:
     build: .
     environment: &app-env
+      NUXT_CONNECTION_ENCRYPTION_KEY: ${NUXT_CONNECTION_ENCRYPTION_KEY:?set NUXT_CONNECTION_ENCRYPTION_KEY}
+      NUXT_PUBLIC_APP_URL: ${NUXT_PUBLIC_APP_URL:?set NUXT_PUBLIC_APP_URL}
+      NUXT_OSS_ACCESS_KEY_ID: ${NUXT_OSS_ACCESS_KEY_ID:?set NUXT_OSS_ACCESS_KEY_ID}
+      NUXT_OSS_ACCESS_KEY_SECRET: ${NUXT_OSS_ACCESS_KEY_SECRET:?set NUXT_OSS_ACCESS_KEY_SECRET}
+      NUXT_OSS_BUCKET: ${NUXT_OSS_BUCKET:?set NUXT_OSS_BUCKET}
+      NUXT_OSS_REGION: ${NUXT_OSS_REGION:-cn-beijing}
+      NUXT_OSS_ENDPOINT: ${NUXT_OSS_ENDPOINT:-}
+      NUXT_OSS_SECURE: ${NUXT_OSS_SECURE:-true}
+      NUXT_OSS_PUBLIC_BASE_URL: ${NUXT_OSS_PUBLIC_BASE_URL:-}
       NUXT_DATABASE_URL: postgresql://forkvdo:${POSTGRES_PASSWORD}@postgres:5432/forkvdo
-      NUXT_REDIS_URL: redis://redis:6379
-      NUXT_QUEUE_MODE: redis
       NUXT_COMFYUI_MODE: remote
       NUXT_COMFYUI_REMOTE_BASE_URL: http://comfyui:8188
     command: [pnpm, 'db:migrate']
@@ -47,20 +43,16 @@ services:
     depends_on:
       migrate:
         condition: service_completed_successfully
-      redis:
-        condition: service_healthy
 
   worker:
     build: .
     environment:
       <<: *app-env
       NUXT_WORKER_ENABLED: 'true'
-      NUXT_WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-4}
+      NUXT_WORKER_CONCURRENCY: ${NUXT_WORKER_CONCURRENCY:-4}
     depends_on:
       migrate:
         condition: service_completed_successfully
-      redis:
-        condition: service_healthy
 
   comfyui:
     build:
@@ -69,6 +61,11 @@ services:
       args:
         COMFYUI_REF: ${COMFYUI_REF:-v0.3.59}
     gpus: all
+    environment:
+      FORKVDO_LLM_CONNECTIONS_JSON: ${FORKVDO_LLM_CONNECTIONS_JSON:-}
+      FORKVDO_DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:-}
+      FORKVDO_DASHSCOPE_WORKSPACE_ID: ${DASHSCOPE_WORKSPACE_ID:-}
+      FORKVDO_DASHSCOPE_REGION: ${DASHSCOPE_REGION:-cn-beijing}
     volumes:
       - ${COMFYUI_MODELS_DIR:?set COMFYUI_MODELS_DIR}:/opt/ComfyUI/models:ro
       - comfy-input:/opt/ComfyUI/input
@@ -79,7 +76,6 @@ services:
 
 volumes:
   postgres-data:
-  redis-data:
   comfy-input:
   comfy-output:
   comfy-temp:

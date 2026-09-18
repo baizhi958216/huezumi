@@ -36,6 +36,34 @@
       "when": 1788694163627,
       "tag": "0004_medical_otto_octavius",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1789197411635,
+      "tag": "0005_crazy_impossible_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1789615726421,
+      "tag": "0006_goofy_silk_fever",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1789721618882,
+      "tag": "0007_wakeful_squadron_sinister",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1789721620000,
+      "tag": "0008_invitation_code_and_note",
+      "breakpoints": true
     }
   ]
 }

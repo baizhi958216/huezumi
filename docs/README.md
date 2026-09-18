@@ -3,6 +3,7 @@
 - [`../DESIGN.md`](../DESIGN.md)：系统架构、边界、流程和已知约束。
 - [`development.md`](development.md)：本地开发、验证与排障。
 - [`api.md`](api.md)：当前 HTTP API 概览。
+- [`minimax-h3-local-validation.md`](minimax-h3-local-validation.md)：H3 本地模型来源、节点覆盖和采样启动实测。
 - [`../spec/README.md`](../spec/README.md)：规格的创建和生命周期。
 - [`decisions/README.md`](decisions/README.md)：架构决策记录（ADR）。
 - [`../harness/README.md`](../harness/README.md)：统一、无凭据的工程验证入口。

@@ -35,7 +35,7 @@ const selectClass = 'h-9 appearance-none rounded-lg border border-default bg-ele
 </script>
 
 <template>
-  <section class="sticky top-16 z-20 mt-3 rounded-xl border border-default bg-default/90 p-2.5 shadow-soft backdrop-blur-xl sm:mt-4" aria-label="作品检索与筛选">
+  <section class="sticky top-[var(--app-header-offset)] z-20 mt-3 rounded-xl border border-default bg-default/90 p-2.5 shadow-soft backdrop-blur-xl sm:mt-4" aria-label="作品检索与筛选">
     <div class="flex flex-col gap-2.5 xl:flex-row xl:items-center">
       <!-- Search Input -->
       <label class="relative min-w-0 flex-1">
@@ -64,10 +64,11 @@ const selectClass = 'h-9 appearance-none rounded-lg border border-default bg-ele
           v-for="pill in ratioPills"
           :key="pill.value"
           type="button"
-          class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition"
+          class="focus-ring inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition"
           :class="ratio === pill.value
-            ? 'bg-zinc-950 text-white shadow-xs dark:bg-white dark:text-zinc-950'
+            ? 'bg-muted text-highlighted shadow-xs ring-1 ring-inset ring-default'
             : 'text-muted hover:text-highlighted'"
+          :aria-pressed="ratio === pill.value"
           @click="ratio = pill.value"
         >
           <UIcon :name="pill.icon" class="size-3" />
@@ -109,12 +110,13 @@ const selectClass = 'h-9 appearance-none rounded-lg border border-default bg-ele
             v-for="item in viewItems"
             :key="item.value"
             type="button"
-            class="grid size-8 place-items-center rounded-md transition"
+            class="focus-ring grid size-8 place-items-center rounded-md transition"
             :class="view === item.value
-              ? 'bg-zinc-950 text-white shadow-xs dark:bg-white dark:text-zinc-950'
+              ? 'bg-muted text-highlighted shadow-xs ring-1 ring-inset ring-default'
               : 'text-muted hover:bg-muted/50 hover:text-highlighted'"
             :title="item.label"
             :aria-label="item.label"
+            :aria-pressed="view === item.value"
             @click="view = item.value"
           >
             <UIcon :name="item.icon" class="size-3.5" />

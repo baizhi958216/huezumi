@@ -11,7 +11,7 @@
 - 选择模型后，只显示它支持的分辨率、画幅、时长和素材数量
 - 邀请注册、登录、个人头像、管理员控制面板和用户数据隔离
 - 报价、额度预留、结算流水、幂等提交和平台预算保护
-- PostgreSQL 任务记录、Redis/BullMQ worker 和故障 outbox 补发
+- PostgreSQL 任务记录、pg-boss worker 和故障 outbox 补发
 - 把私有上传素材和生成结果归档到阿里云 OSS
 - 通过适配器接入其他供应商
 
@@ -30,32 +30,29 @@
 
 ## 开始使用
 
-本地运行需要 Node.js 22、pnpm 10 和 PostgreSQL。
+本地运行需要 Node.js 22.12 或更新版本、pnpm 10 和 Docker Compose。PostgreSQL、SeaweedFS 在 Docker 中运行；Nuxt 与项目内的 ComfyUI 在宿主机运行。
 
 ```bash
 pnpm install
-cp .env.example .env
-pnpm db:migrate
-pnpm admin:create -- --email=admin@example.com --password='replace-with-a-long-password'
+cp -n .env.example .env
+docker compose -f docker-compose.dev.yml up -d
+# 确认两个服务健康后执行
+node --env-file=.env --import tsx scripts/db-migrate.ts
+pnpm config:import -- --compact-env
+node --env-file=.env --import tsx scripts/backfill-platform.ts
+node --env-file=.env --import tsx scripts/admin-create.ts --email=admin@example.com --password='replace-with-a-long-password'
 pnpm dev
 ```
 
-所有环境变量都写在 `.env.example` 里。
+最小部署变量写在 `.env.example`，模型连接和运营参数在 `/admin/settings` 维护，详见[配置说明](./docs/configuration.md)。已有 `.env` 请按[本机开发指南](./docs/development.md#本机热更新开发)合并配置。管理员进入工作流页面安装、启动 ComfyUI；模型需要另行安装。
 
-阿里云百炼示例最小配置：
-
-```dotenv
-NUXT_DASHSCOPE_API_KEY=sk-your-api-key
-NUXT_DASHSCOPE_WORKSPACE_ID=your-workspace-id
-NUXT_DASHSCOPE_REGION=cn-beijing
-NUXT_PUBLIC_APP_URL=https://your-public-domain.example.com
-```
+管理员在连接设置中新增百炼连接并填写凭据、业务空间和模型。文本生成还需发布模型与篇幅价格。
 
 开发环境未启用 OSS 时可把素材保存在 `.data`；生产环境要求 private OSS，并由 worker 向供应商签发短期素材地址。
 
 ## Docker
 
-生产编排文件包含 PostgreSQL、Redis、migration、Web、worker 和独立 ComfyUI GPU 服务：
+生产编排文件包含 PostgreSQL、migration、Web、worker 和独立 ComfyUI GPU 服务：
 
 ```bash
 POSTGRES_PASSWORD='replace-me' COMFYUI_MODELS_DIR='/absolute/path/to/models' \
@@ -69,6 +66,7 @@ POSTGRES_PASSWORD='replace-me' COMFYUI_MODELS_DIR='/absolute/path/to/models' \
 ```bash
 pnpm check        # repository contract + tests + lint + typecheck
 pnpm check:full   # 上述检查 + production build
+pnpm test:postgres # PostgreSQL 队列与限流集成验证
 ```
 
 接入新供应商时，实现 `VideoProvider.submit()` 和 `VideoProvider.getTask()`，再把它注册到能力目录和 provider factory。上游请求类型留在 `server/services/providers/` 内，不进入 UI 或平台 API。

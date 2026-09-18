@@ -55,22 +55,23 @@ function select(key: StatusFilter) {
     </div>
 
     <!-- Compact status navigation tabs -->
-    <div class="flex items-center gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden" aria-label="作品状态筛选">
+    <div class="flex w-fit max-w-full items-center gap-1 overflow-x-auto rounded-lg border border-default bg-muted/70 p-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden" aria-label="作品状态筛选">
       <button
         v-for="item in items"
         :key="item.key"
         type="button"
-        class="inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition"
+        class="focus-ring inline-flex min-h-8 shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition"
         :class="statusFilter === item.key
-          ? 'bg-signal-500/10 text-signal-600 ring-1 ring-inset ring-signal-500/30 dark:bg-signal-500/15 dark:text-signal-400'
-          : 'text-muted hover:bg-muted/60 hover:text-highlighted'"
+          ? 'bg-elevated text-highlighted shadow-soft ring-1 ring-inset ring-default'
+          : 'text-muted hover:bg-elevated/70 hover:text-highlighted'"
+        :aria-pressed="statusFilter === item.key"
         @click="select(item.key)"
       >
         <UIcon :name="item.icon" class="size-3.5" :class="item.key === 'ACTIVE' && counts.active ? 'animate-spin' : ''" />
         <span>{{ item.label }}</span>
         <span
           class="rounded px-1.5 py-0.2 text-[11px] tabular-nums"
-          :class="statusFilter === item.key ? 'bg-signal-500/20 text-signal-600 dark:text-signal-300' : 'bg-muted text-dimmed'"
+          :class="statusFilter === item.key ? 'bg-muted text-toned' : 'bg-elevated text-dimmed'"
         >
           {{ props.counts[item.count] }}
         </span>

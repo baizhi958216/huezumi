@@ -7,12 +7,12 @@ const modelCount = computed(() => providers.value.reduce((sum, provider) => sum 
 </script>
 
 <template>
-  <main class="bg-default">
+  <div class="app-home-page bg-default">
     <HomeHero :model-count="modelCount" :provider-count="providers.length" />
     <HomeModelCatalog :providers="providers" />
     <HomeGenerationModes />
     <HomeUseCases />
     <HomeWorkflow />
     <HomeFaqCta />
-  </main>
+  </div>
 </template>

@@ -1,5 +1,4 @@
 import type {
-  ComfyHistoryEntry,
   ComfyNodeMode,
   ComfyNodeTypeInfo,
   ComfyObjectInfo,
@@ -12,6 +11,8 @@ import type {
 } from '#shared/types/comfyui'
 import type { Edge, Node } from '@vue-flow/core'
 import { buildNodeTypeInfo, getWidgetDefault } from '#shared/types/comfyui'
+
+export { collectOutputFiles } from '#shared/utils/comfy-output'
 
 /** 单个节点卡片携带的数据；控件值按控件名索引，序列化时再按声明顺序展开。 */
 export interface ComfyNodeData {
@@ -328,39 +329,18 @@ export function createSampleGraph(typeIndex: Record<string, ComfyNodeTypeInfo>):
   return { nodes, edges }
 }
 
-export function collectOutputFiles(entry?: ComfyHistoryEntry): ComfyOutputFile[] {
-  const files: ComfyOutputFile[] = []
-  for (const group of Object.values(entry?.outputs ?? {})) {
-    for (const value of Object.values(group ?? {})) {
-      if (!Array.isArray(value))
-        continue
-      for (const item of value) {
-        if (item && typeof item === 'object' && 'filename' in item) {
-          files.push({
-            filename: String(item.filename),
-            subfolder: String(item.subfolder ?? ''),
-            type: String(item.type ?? 'output'),
-            format: item.format ? String(item.format) : undefined,
-          })
-        }
-      }
-    }
-  }
-  return files
-}
-
 export function buildViewUrl(file: ComfyOutputFile): string {
   const params = new URLSearchParams({ filename: file.filename, type: file.type || 'output' })
   if (file.subfolder)
     params.set('subfolder', file.subfolder)
-  return `/api/comfyui/view?${params.toString()}`
+  return `/api/admin/comfyui/view?${params.toString()}`
 }
 
 /** 用于在检查器和节点卡片中预览已上传到 ComfyUI input 目录的图片。 */
 export function buildInputViewUrl(filename: string): string {
   const value = filename.replace(/\s*\[(?:input|output|temp)\]$/i, '')
   const params = new URLSearchParams({ filename: value, type: 'input' })
-  return `/api/comfyui/view?${params.toString()}`
+  return `/api/admin/comfyui/view?${params.toString()}`
 }
 
 export function isVideoFile(file: ComfyOutputFile): boolean {

@@ -9,6 +9,7 @@
     "db:migrate": "tsx scripts/db-migrate.ts",
     "admin:create": "tsx scripts/admin-create.ts",
     "data:migrate": "tsx scripts/migrate-legacy.ts",
+    "data:restore-oss": "tsx scripts/restore-oss-archives.ts",
     "check": "node harness/run.mjs",
     "check:full": "node harness/run.mjs --full",
     "dev": "nuxt dev",
@@ -18,7 +19,11 @@
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
     "test": "vitest run",
-    "typecheck": "nuxt typecheck"
+    "test:postgres": "node --env-file=.env harness/postgres.mjs",
+    "typecheck": "nuxt typecheck",
+    "config:import": "tsx scripts/config-import.ts",
+    "config:check": "tsx scripts/config-check.ts",
+    "data:backfill": "tsx scripts/backfill-platform.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1127.0",
@@ -28,13 +33,12 @@
     "@vue-flow/core": "^1.48.2",
     "@vueuse/core": "^13.7.0",
     "ali-oss": "^6.23.0",
-    "bullmq": "^6.3.4",
     "drizzle-orm": "^0.45.2",
     "gsap": "^3.15.0",
-    "ioredis": "^6.0.0",
     "nuxt": "^4.1.0",
     "ogl": "^1.0.11",
     "pg": "^8.23.0",
+    "pg-boss": "12.31.0",
     "vue": "^3.5.20",
     "vue-router": "^5.3.0",
     "zod": "^4.1.5"
