@@ -1,18 +1,40 @@
 <script setup lang="ts">
 import type { AspectRatio, GenerationMode, GenerationRecord, MediaInput, MediaType, ProviderCapability, Resolution } from '#shared/types/generation'
+import type { ModelOption } from '#shared/types/platform'
+import type { PlatformQuote } from '~/composables/usePlatformApi'
 import { getMediaValidationIssue, MEDIA_META, MODE_META, resolveModelCapability, SMART_DURATION } from '#shared/types/generation'
 import { useIntervalFn } from '@vueuse/core'
 
-const { data: providerCatalog } = await useFetch<ProviderCapability[]>('/api/providers')
+const route = useRoute()
+const platform = usePlatformApi()
+const { data: modelCatalog, refresh: refreshModels } = await useFetch<ModelOption[]>('/api/catalog/models')
+const providerCatalog = computed<ProviderCapability[]>(() => {
+  const ids = [...new Set((modelCatalog.value || []).filter(m => m.kind === 'video').map(m => m.connectionId))]
+  return ids.flatMap((id) => {
+    const items = modelCatalog.value!.filter(m => m.connectionId === id)
+    const first = items[0]
+    if (!first?.capability)
+      return []
+    return [{ ...first.capability, id, name: first.label.split(' · ')[0]!, enabled: items.some(m => m.available), models: items.flatMap(i => first.capability!.models.filter(m => m.id === i.model)) }]
+  })
+})
+const { items: projectOptions, cursor: projectCursor, loadMore: moreProjects } = await useProjectOptions()
+const projectId = ref('')
+const sourceVersionId = ref<string>()
+const sourceExcerpt = ref<string>()
+const sourceText = ref('')
+const runId = ref<string>()
 const { user, authDialogOpen } = useAuth()
-
+watch(user, () => {
+  if (user.value)
+    refreshModels()
+})
 const providerId = ref<string>()
 const capability = computed(() => providerCatalog.value?.find(item => item.id === providerId.value))
 watch(providerCatalog, () => {
   if (!capability.value)
     providerId.value = providerCatalog.value?.[0]?.id
 }, { immediate: true })
-
 const model = ref('')
 const mode = ref<GenerationMode>('text')
 const prompt = ref('夜幕下，一列复古列车穿过无边的盐湖。镜头贴近水面低速跟随，远处闪电短暂照亮群山，电影级光影，细腻胶片颗粒。')
@@ -30,36 +52,30 @@ const advancedOpen = ref(false)
 const submitting = ref(false)
 const errorMessage = ref('')
 const task = ref<GenerationRecord>()
-const quote = ref<{ id: string, estimatedCredits: number, expiresAt: string, sourceLabel: string, idempotencyKey: string }>()
-
+const quote = ref<PlatformQuote & {
+  idempotencyKey: string
+  sourceLabel: string
+}>()
 const providerItems = computed(() => (providerCatalog.value || []).map(item => ({
-  label: item.enabled ? item.name : `${item.name} · 未配置凭据`,
+  label: item.enabled ? item.name : `${item.name} · ${modelCatalog.value?.find(m => m.connectionId === item.id)?.reason || '暂不可用'}`,
   value: item.id,
   disabled: !item.enabled,
 })))
-
-const modelItems = computed(() => (capability.value?.models || []).map(item => ({
-  label: item.badge ? `${item.name} · ${item.badge}` : item.name,
-  value: item.id,
-})))
-
+const modelItems = computed(() => (capability.value?.models || []).map((item) => {
+  const option = modelCatalog.value?.find(m => m.connectionId === providerId.value && m.model === item.id)
+  return { label: `${item.name}${option?.reason ? ` · ${option.reason}` : item.badge ? ` · ${item.badge}` : ''}`, value: item.id, disabled: !option?.available }
+}))
 const selectedModel = computed(() => capability.value?.models.find(item => item.id === model.value))
 const effectiveCapability = computed(() => capability.value
   ? resolveModelCapability(capability.value, model.value, resolution.value)
   : undefined)
-
 const modeOptions = computed(() => (effectiveCapability.value?.modes || []).map(id => ({
   ...MODE_META[id],
   value: id,
 })))
-
 const resolutionOptions = computed(() => effectiveCapability.value?.resolutions || [])
 const ratioOptions = computed(() => effectiveCapability.value?.ratios || [])
-
-const referenceSlots = computed<MediaType[]>(() =>
-  (effectiveCapability.value?.media || []).filter(type => type.startsWith('reference_')),
-)
-
+const referenceSlots = computed<MediaType[]>(() => (effectiveCapability.value?.media || []).filter(type => type.startsWith('reference_')))
 const durationSteps = computed(() => effectiveCapability.value?.duration.steps)
 const effectiveDuration = computed(() => smartDuration.value ? SMART_DURATION : duration.value)
 const durationSliderValue = computed<number | number[]>({
@@ -70,9 +86,7 @@ const durationSliderValue = computed<number | number[]>({
       duration.value = next
   },
 })
-
 const selectedModelName = computed(() => selectedModel.value?.name || model.value)
-
 /** 切换供应商后先选择该供应商的默认模型。 */
 watch(capability, (cap) => {
   if (!cap)
@@ -80,7 +94,6 @@ watch(capability, (cap) => {
   if (!cap.models.some(item => item.id === model.value))
     model.value = cap.models[0]?.id || ''
 }, { immediate: true })
-
 /** 切换模型、清晰度后，把现有选择收敛到模型级能力范围。 */
 watch(effectiveCapability, (cap) => {
   if (!cap)
@@ -105,12 +118,10 @@ watch(effectiveCapability, (cap) => {
   const mediaIssue = getMediaValidationIssue(cap, media.value)
   errorMessage.value = mediaIssue ? formatMediaValidationIssue(mediaIssue) : ''
 }, { immediate: true })
-
 watch(mode, () => {
   media.value = []
   errorMessage.value = ''
 })
-
 function formatMediaValidationIssue(issue: ReturnType<typeof getMediaValidationIssue>) {
   if (!issue)
     return ''
@@ -124,14 +135,12 @@ function formatMediaValidationIssue(issue: ReturnType<typeof getMediaValidationI
     return `「${MEDIA_META[issue.type].label}」时长需在 ${issue.min}–${issue.max} 秒之间`
   return issue.limit.message
 }
-
 /** 将跨类型总数限制折算成当前素材槽位的可添加数量，减少无效上传。 */
 function mediaSlotMax(type: MediaType) {
   const cap = effectiveCapability.value
   const baseMax = cap?.mediaLimits[type]?.max
   if (!cap)
     return baseMax
-
   let max = baseMax
   for (const limit of cap.mediaCombinationLimits || []) {
     if (!limit.types.includes(type))
@@ -145,7 +154,6 @@ function mediaSlotMax(type: MediaType) {
   }
   return max
 }
-
 function setMedia(type: MediaType, values: MediaInput[]) {
   const next = [...media.value.filter(item => item.type !== type), ...values]
   const mediaIssue = effectiveCapability.value && getMediaValidationIssue(effectiveCapability.value, next)
@@ -156,11 +164,9 @@ function setMedia(type: MediaType, values: MediaInput[]) {
   media.value = next
   errorMessage.value = ''
 }
-
 function mediaValues(type: MediaType) {
   return media.value.filter(item => item.type === type)
 }
-
 const progress = computed(() => {
   if (!task.value)
     return 0
@@ -170,20 +176,20 @@ const progress = computed(() => {
     return 62
   return 100
 })
-
 const polling = useIntervalFn(async () => {
   if (!task.value || ['SUCCEEDED', 'FAILED', 'UNKNOWN'].includes(task.value.status)) {
     polling.pause()
     return
   }
   try {
-    task.value = await $fetch<GenerationRecord>(`/api/generations/${task.value.id}`)
-    if (['SUCCEEDED', 'FAILED', 'UNKNOWN'].includes(task.value.status))
+    if (runId.value)
+      task.value = (await platform.run(runId.value)).generation
+    if (!task.value || ['SUCCEEDED', 'FAILED', 'UNKNOWN'].includes(task.value.status))
       polling.pause()
   }
-  catch {}
+  catch {
+  }
 }, 12000, { immediate: false })
-
 async function generate() {
   errorMessage.value = ''
   if (!capability.value)
@@ -201,16 +207,14 @@ async function generate() {
     errorMessage.value = formatMediaValidationIssue(mediaIssue)
     return
   }
-
   if (!user.value) {
     authDialogOpen.value = true
     return
   }
-
   submitting.value = true
   try {
     const request = {
-      provider: providerId.value,
+      provider: modelCatalog.value?.find(m => m.connectionId === providerId.value)?.provider || '',
       model: model.value,
       mode: mode.value,
       prompt: prompt.value,
@@ -225,18 +229,14 @@ async function generate() {
       seed: seed.value,
     }
     if (!quote.value || new Date(quote.value.expiresAt).getTime() <= Date.now()) {
-      const response = await $fetch<{ id: string, estimatedCredits: number, expiresAt: string, sourceLabel: string }>('/api/billing/quote', { method: 'POST', body: request })
-      quote.value = { ...response, idempotencyKey: crypto.randomUUID() }
+      const response = await platform.quote({ kind: 'video', connectionId: providerId.value!, model: model.value, input: request, projectId: projectId.value || undefined, sourceVersionId: sourceVersionId.value, sourceExcerpt: sourceExcerpt.value })
+      quote.value = { ...response, sourceLabel: `价格版本 ${response.priceVersion}`, idempotencyKey: crypto.randomUUID() }
       return
     }
-    task.value = await $fetch<GenerationRecord>('/api/generations', {
-      method: 'POST',
-      body: {
-        ...request,
-        quoteId: quote.value.id,
-        idempotencyKey: quote.value.idempotencyKey,
-      },
-    })
+    const accepted = await platform.submit(quote.value, quote.value.idempotencyKey)
+    runId.value = accepted.id
+    task.value = accepted.generation
+    await navigateTo({ query: { ...route.query, run: accepted.id } }, { replace: true })
     quote.value = undefined
     polling.resume()
   }
@@ -247,29 +247,31 @@ async function generate() {
     submitting.value = false
   }
 }
-
-watch([providerId, model, mode, prompt, negativePrompt, media, resolution, ratio, effectiveDuration, audio, promptExtend, watermark, seed], () => {
+watch([projectId, providerId, model, mode, prompt, negativePrompt, media, resolution, ratio, effectiveDuration, audio, promptExtend, watermark, seed], () => {
   quote.value = undefined
 }, { deep: true })
-
 async function refreshTaskExplicitly() {
   if (!task.value)
     return
-  await $fetch(`/api/generations/${task.value.id}/refresh`, { method: 'POST' })
-  task.value = await $fetch<GenerationRecord>(`/api/generations/${task.value.id}`)
-  if (['PENDING', 'RUNNING'].includes(task.value.status))
+  if (!runId.value)
+    return
+  const summary = await platform.run(runId.value)
+  const action = summary.allowedActions[0]
+  if (!action)
+    return
+  await platform.command(runId.value, action)
+  if (runId.value)
+    task.value = (await platform.run(runId.value)).generation
+  if (task.value && ['PENDING', 'RUNNING'].includes(task.value.status))
     polling.resume()
 }
-
-const route = useRoute()
 const reusedFromId = ref<string>()
-
 async function loadFromTask(fromId: string) {
   try {
-    const prior = await $fetch<GenerationRecord>(`/api/generations/${fromId}`)
+    const prior = (await platform.run(fromId)).generation
     if (prior) {
       if (prior.provider)
-        providerId.value = prior.provider
+        providerId.value = modelCatalog.value?.find(m => m.provider === prior.provider)?.connectionId
       if (prior.model)
         model.value = prior.model
       if (prior.mode)
@@ -312,21 +314,52 @@ async function loadFromTask(fromId: string) {
     console.warn('Failed to load prior task for studio reuse', error)
   }
 }
-
 onMounted(() => {
+  if (typeof route.query.provider === 'string') {
+    const selected = modelCatalog.value?.find(m => m.kind === 'video' && m.provider === route.query.provider && (!route.query.model || m.model === route.query.model))
+    if (selected) {
+      providerId.value = selected.connectionId
+      model.value = selected.model
+    }
+  }
   const fromId = route.query.from
   if (typeof fromId === 'string' && fromId) {
     loadFromTask(fromId)
   }
 })
-
 onBeforeUnmount(polling.pause)
+onMounted(async () => {
+  try {
+    if (typeof route.query.run === 'string') {
+      runId.value = route.query.run
+      const run = await platform.run(runId.value)
+      task.value = run.generation
+      projectId.value = run.projectId || ''
+      if (['PENDING', 'RUNNING'].includes(run.status))
+        polling.resume()
+    }
+    if (typeof route.query.sourceVersion === 'string' && typeof route.query.document === 'string') {
+      const version = await $fetch<import('#shared/types/text-creation').TextDocumentVersionRecord>(`/api/documents/${route.query.document}/versions/${route.query.sourceVersion}`)
+      sourceVersionId.value = version.id
+      projectId.value = version.projectId
+      sourceText.value = version.content.content
+      sourceExcerpt.value = version.content.content.slice(0, 20000)
+      prompt.value = sourceExcerpt.value
+    }
+  }
+  catch (error) {
+    errorMessage.value = apiError(error)
+  }
+})
 </script>
 
 <template>
   <div class="min-h-[calc(100svh-var(--app-header-offset))] overflow-x-hidden bg-muted/35 py-3 md:py-4 xl:h-[calc(100svh-var(--app-header-offset))]">
     <div class="creation-content grid h-full gap-4 xl:grid-cols-[400px_1fr] 2xl:grid-cols-[420px_1fr]">
       <StudioConfigPanel
+        v-model:project-id="projectId"
+        v-model:source-version-id="sourceVersionId"
+        v-model:source-excerpt="sourceExcerpt"
         v-model:provider-id="providerId"
         v-model:model="model"
         v-model:mode="mode"
@@ -360,6 +393,11 @@ onBeforeUnmount(polling.pause)
         :media-values="mediaValues"
         :media-slot-max="mediaSlotMax"
         :set-media="setMedia"
+        :project-options="projectOptions"
+        :project-cursor="projectCursor"
+        :source-text="sourceText"
+        @more-projects="moreProjects().catch(e => errorMessage = apiError(e))"
+        @fill-excerpt-to-prompt="prompt = sourceExcerpt || ''"
         @update:duration-slider-value="durationSliderValue = $event"
         @generate="generate"
       />

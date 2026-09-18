@@ -79,6 +79,7 @@ export default defineAppConfig({
 
     modal: {
       slots: {
+        wrapper: 'min-w-0 pe-8',
         overlay: 'fixed inset-0 bg-black/60 dark:bg-black/80 backdrop-blur-md',
         content: 'rounded-2xl border border-default/70 dark:border-white/10 bg-elevated/95 dark:bg-[#0c0d10]/95 shadow-cinema backdrop-blur-2xl divide-y-0',
       },

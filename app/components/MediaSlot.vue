@@ -174,7 +174,7 @@ async function upload(event: Event) {
       const duration = needsDuration.value ? await readVideoDuration(file) : undefined
       const body = new FormData()
       body.append('file', file)
-      const result = await $fetch<{ url: string, name: string }>('/api/files', { method: 'POST', body })
+      const result = await $fetch<{ url: string, name: string }>('/api/assets', { method: 'POST', body })
       const item: MediaInput = { type: props.type, url: result.url, name: result.name }
       if (duration !== undefined)
         item.duration = duration
