@@ -14,7 +14,7 @@ async function main() {
   try {
     await admin.query(`create database "${name}"`)
     created = true
-    const result = spawnSync('pnpm', ['exec', 'vitest', 'run', 'tests/postgres.integration.test.ts'], {
+    const result = spawnSync('pnpm', ['exec', 'vitest', 'run', 'tests/postgres.integration.test.ts', 'tests/platform.integration.test.ts'], {
       env: { ...process.env, FORKVDO_TEST_DATABASE_URL: testUrl.toString() },
       stdio: 'inherit',
     })
