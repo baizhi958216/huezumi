@@ -30,27 +30,27 @@ function messageOf(error: unknown): string {
 
 export function useComfyServer() {
   async function refreshStatus() {
-    status.value = await $fetch<ComfyUIStatus>('/api/comfyui/status')
+    status.value = await $fetch<ComfyUIStatus>('/api/admin/comfyui/status')
     return status.value
   }
 
   async function startService() {
-    status.value = await $fetch<ComfyUIStatus>('/api/comfyui/start', { method: 'POST', body: {} })
+    status.value = await $fetch<ComfyUIStatus>('/api/admin/comfyui/start', { method: 'POST', body: {} })
     return status.value
   }
 
   async function stopService() {
-    status.value = await $fetch<ComfyUIStatus>('/api/comfyui/stop', { method: 'POST', body: {} })
+    status.value = await $fetch<ComfyUIStatus>('/api/admin/comfyui/stop', { method: 'POST', body: {} })
     return status.value
   }
 
   async function installService(installDeps = true) {
-    await $fetch('/api/comfyui/install', { method: 'POST', body: { installDeps } })
+    await $fetch('/api/admin/comfyui/install', { method: 'POST', body: { installDeps } })
     await refreshStatus()
   }
 
   async function loadObjectInfo(refresh = false) {
-    const result = await $fetch<ComfyObjectInfo>('/api/comfyui/object-info', {
+    const result = await $fetch<ComfyObjectInfo>('/api/admin/comfyui/object-info', {
       query: refresh ? { refresh: '1' } : undefined,
     })
     objectInfo.value = result ?? {}
@@ -63,54 +63,54 @@ export function useComfyServer() {
     clientId?: string
     front?: boolean
   }) {
-    return await $fetch<ComfyPromptResponse>('/api/comfyui/prompt', { method: 'POST', body: payload })
+    return await $fetch<ComfyPromptResponse>('/api/admin/comfyui/prompt', { method: 'POST', body: payload })
   }
 
   async function fetchHistoryEntry(promptId: string) {
-    return await $fetch<ComfyHistoryEntry>(`/api/comfyui/history/${promptId}`)
+    return await $fetch<ComfyHistoryEntry>(`/api/admin/comfyui/history/${promptId}`)
   }
 
   async function fetchQueue() {
-    return await $fetch<ComfyQueueState>('/api/comfyui/queue')
+    return await $fetch<ComfyQueueState>('/api/admin/comfyui/queue')
   }
 
   async function clearQueue() {
-    await $fetch('/api/comfyui/queue', { method: 'POST', body: { clear: true } })
+    await $fetch('/api/admin/comfyui/queue', { method: 'POST', body: { clear: true } })
   }
 
   async function deleteQueueItems(numbers: number[]) {
-    await $fetch('/api/comfyui/queue', { method: 'POST', body: { delete: numbers } })
+    await $fetch('/api/admin/comfyui/queue', { method: 'POST', body: { delete: numbers } })
   }
 
   async function interrupt() {
-    await $fetch('/api/comfyui/interrupt', { method: 'POST', body: {} })
+    await $fetch('/api/admin/comfyui/interrupt', { method: 'POST', body: {} })
   }
 
   async function freeMemory() {
-    await $fetch('/api/comfyui/free', { method: 'POST', body: { unloadModels: true, freeMemory: true } })
+    await $fetch('/api/admin/comfyui/free', { method: 'POST', body: { unloadModels: true, freeMemory: true } })
   }
 
   async function uploadAsset(file: File, kind: ComfyUploadType) {
     const form = new FormData()
     form.append('file', file)
     form.append('kind', kind)
-    const uploaded = await $fetch<{ name: string, subfolder: string, type: string }>('/api/comfyui/upload', { method: 'POST', body: form })
+    const uploaded = await $fetch<{ name: string, subfolder: string, type: string }>('/api/admin/comfyui/upload', { method: 'POST', body: form })
     // 上传后加载节点的 COMBO 需要新文件，必须回源刷新节点定义。
     await loadObjectInfo(true)
     return uploaded
   }
 
   async function refreshWorkflows() {
-    workflows.value = await $fetch<ComfyWorkflowSummary[]>('/api/comfyui/workflows')
+    workflows.value = await $fetch<ComfyWorkflowSummary[]>('/api/admin/comfyui/workflows')
     return workflows.value
   }
 
   async function loadWorkflow(id: string) {
-    return await $fetch<ComfyWorkflowRecord>(`/api/comfyui/workflows/${id}`)
+    return await $fetch<ComfyWorkflowRecord>(`/api/admin/comfyui/workflows/${id}`)
   }
 
   async function saveWorkflow(payload: { id?: string, name: string, graph: ComfyWorkflowJSON, visibility?: ComfyWorkflowVisibility }) {
-    const record = await $fetch<ComfyWorkflowRecord>('/api/comfyui/workflows', {
+    const record = await $fetch<ComfyWorkflowRecord>('/api/admin/comfyui/workflows', {
       method: 'POST',
       body: payload,
     })
@@ -119,7 +119,7 @@ export function useComfyServer() {
   }
 
   async function removeWorkflow(id: string) {
-    await $fetch(`/api/comfyui/workflows/${id}`, { method: 'DELETE' })
+    await $fetch(`/api/admin/comfyui/workflows/${id}`, { method: 'DELETE' })
     await refreshWorkflows()
   }
 
@@ -237,7 +237,7 @@ export function useComfyEvents() {
       return
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    socket = new WebSocket(`${protocol}//${window.location.host}/api/comfyui/ws?clientId=${encodeURIComponent(clientId)}`)
+    socket = new WebSocket(`${protocol}//${window.location.host}/api/admin/comfyui/ws?clientId=${encodeURIComponent(clientId)}`)
     socket.addEventListener('open', () => {
       connected.value = true
     })
