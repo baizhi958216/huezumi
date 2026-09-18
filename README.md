@@ -38,20 +38,15 @@ cp -n .env.example .env
 docker compose -f docker-compose.dev.yml up -d
 # 确认两个服务健康后执行
 node --env-file=.env --import tsx scripts/db-migrate.ts
+pnpm config:import -- --compact-env
+node --env-file=.env --import tsx scripts/backfill-platform.ts
 node --env-file=.env --import tsx scripts/admin-create.ts --email=admin@example.com --password='replace-with-a-long-password'
 pnpm dev
 ```
 
-所有环境变量都写在 `.env.example` 里。已有 `.env` 请按[本机开发指南](./docs/development.md#本机热更新开发)合并配置。管理员进入工作流页面安装、启动 ComfyUI；模型需要另行安装。
+最小部署变量写在 `.env.example`，模型连接和运营参数在 `/admin/settings` 维护，详见[配置说明](./docs/configuration.md)。已有 `.env` 请按[本机开发指南](./docs/development.md#本机热更新开发)合并配置。管理员进入工作流页面安装、启动 ComfyUI；模型需要另行安装。
 
-阿里云百炼示例最小配置：
-
-```dotenv
-NUXT_DASHSCOPE_API_KEY=sk-your-api-key
-NUXT_DASHSCOPE_WORKSPACE_ID=your-workspace-id
-NUXT_DASHSCOPE_REGION=cn-beijing
-NUXT_PUBLIC_APP_URL=https://your-public-domain.example.com
-```
+管理员在连接设置中新增百炼连接并填写凭据、业务空间和模型。文本生成还需发布模型与篇幅价格。
 
 开发环境未启用 OSS 时可把素材保存在 `.data`；生产环境要求 private OSS，并由 worker 向供应商签发短期素材地址。
 

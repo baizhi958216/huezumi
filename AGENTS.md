@@ -21,6 +21,7 @@ pnpm install
 pnpm dev
 pnpm check        # 文档约束 + lint + typecheck
 pnpm check:full   # 上述检查 + production build
+pnpm config:check # 脱敏配置检查
 pnpm test:postgres # 显式 PostgreSQL 队列 / 限流集成验证（需本机数据库）
 ```
 
@@ -52,9 +53,9 @@ pnpm test:postgres # 显式 PostgreSQL 队列 / 限流集成验证（需本机�
 ## 不可破坏的边界
 
 - 平台层使用 `GenerationRequest`/`GenerationRecord`，不得把供应商原始请求类型泄漏到 UI 或 API 契约。
-- 供应商差异集中在 `server/services/providers/`；能力差异声明在 `catalog.ts`，UI 应由 `/api/providers` 驱动。
+- 供应商差异集中在 `server/services/providers/`；能力差异声明在 `catalog.ts`，创作 UI 应由 `/api/catalog/models` 驱动，公共能力展示可使用 `/api/providers`。
 - 所有外部输入在 API 边界校验。客户端校验只改善体验，不能替代服务端校验。
-- API Key 只能来自私有 runtime config 或用户明确配置的私有工作流连接，禁止进入 `runtimeConfig.public`、公开工作流、客户端日志或错误响应。
+- API Key 只能来自私有 runtime config、管理员配置并经环境主密钥加密的数据库连接版本，或用户明确配置的私有工作流连接，禁止进入 `runtimeConfig.public`、公开工作流、客户端日志或错误响应。
 - 对已经持久化的 `GenerationRecord` 做不兼容修改时，必须给出迁移或兼容读取策略。
 - `PENDING`/`RUNNING` 任务查询可以触发供应商刷新；终态任务不得再次请求供应商。
 - 上传文件大小、类型和可访问性限制需要前后端保持一致。

@@ -11,10 +11,10 @@
 
 当前事实已核对 [DESIGN.md](../DESIGN.md)、[API 文档](../docs/api.md) 和实际调用链：
 
-- [创建任务](../server/api/generations/index.post.ts) 先提交供应商、再保存本地记录；保存失败时可能产生有费用却没有平台记录的任务。
-- [任务服务](../server/services/generations.ts) 在查询请求内刷新和归档；没有帐号归属、额度预留和跨实例协调。
+- [创建任务](../server/services/platform/runs.ts) 先提交供应商、再保存本地记录；保存失败时可能产生有费用却没有平台记录的任务。
+- [任务服务](../server/services/generation-worker.ts) 在查询请求内刷新和归档；没有帐号归属、额度预留和跨实例协调。
 - [OSS 工具](../server/utils/oss.ts) 写入公开对象，[文件接口](../server/api/files/[id].get.ts) 无鉴权并设置一年公共缓存。仅增加用户目录无法使历史公开素材变成私密。
-- [ComfyUI 队列操作](../server/api/comfyui/queue.post.ts)、[历史列表](../server/api/comfyui/history/index.get.ts) 和 [WebSocket 代理](../server/routes/api/comfyui/ws.ts) 直接对应共享实例；全局事件、文件和控制操作均需重新划分权限。
+- [ComfyUI 队列操作](../server/api/admin/comfyui/queue.post.ts)、[历史列表](../server/api/admin/comfyui/history/index.get.ts) 和 [WebSocket 代理](../server/routes/api/admin/comfyui/ws.ts) 直接对应共享实例；全局事件、文件和控制操作均需重新划分权限。
 - [Dockerfile](../Dockerfile) 的运行镜像为 Node Alpine，只复制 Nuxt 构建结果，不包含 Python、Git、ComfyUI 与模型。[模式解析](../server/services/comfyui/config.ts) 尚未强制生产环境使用 remote。
 - 当前供应商目录包括百炼、MiniMax、Kling、Seedance、RollDek、Runway。同名模型经不同渠道调用时，能力与采购价格不能互相替代。
 

@@ -1,3 +1,5 @@
+> 2026-09-18：平台连接、文本价格和运营参数已迁入管理后台；部署和旧配置导入以 [configuration.md](configuration.md) 为准。下文 ComfyUI 参数仍适用于独立执行端。
+
 # 开发与部署指南
 
 ## 本地环境
@@ -17,7 +19,7 @@ node --env-file=.env --import tsx scripts/admin-create.ts --email=admin@example.
 pnpm dev
 ```
 
-所有帐号和任务 API 都需要 PostgreSQL。首次管理员通过 `admin:create` 对应脚本创建；已有管理员无需重复创建（重复执行会重置该帐号密码）。默认注册模式是 `invite`，登录后在控制面板生成邀请码；开发时可设置 `NUXT_REGISTRATION_MODE=open`。
+所有帐号和任务 API 都需要 PostgreSQL。首次管理员通过 `admin:create` 对应脚本创建；已有管理员无需重复创建（重复执行会重置该帐号密码）。默认注册模式是 `invite`，登录后在控制面板生成邀请码；开发时可在管理后台将注册方式设为 open。
 
 ### 本机热更新开发
 
@@ -115,7 +117,7 @@ pnpm data:restore-oss -- --owner-email=owner@example.com --dry-run
 pnpm data:restore-oss -- --owner-email=owner@example.com
 ```
 
-脚本默认读取 `.env` 中第一次出现的 `NUXT_OSS_*` 配置，适用于本地配置同时保留旧阿里云和当前本地 S3 覆盖项的情况；也可用 `FORKVDO_LEGACY_OSS_*` 环境变量显式覆盖。导入前应确认当前帐号就是历史作品的归属帐号，并保留数据库备份。
+脚本只读取明确的 `FORKVDO_LEGACY_OSS_*` 配置，不从当前存储连接猜测历史凭据。导入前应确认当前帐号就是历史作品的归属帐号，并保留数据库备份。
 
 迁移脚本按现有 ID 幂等导入，不会猜测历史数据归属。
 
@@ -244,4 +246,4 @@ pnpm test:postgres
 
 ## 文本创作连接
 
-创作台默认页 `/studio` 使用服务端私有 `NUXT_TEXT_LLM_CONNECTIONS_JSON`。结构与 ComfyUI 的连接 JSON 相同，至少包含 `baseUrl`、`defaultModel` 和 `apiKey`；本地免鉴权连接需显式设置 `auth: "none"`。支持 `auto`、`chat_completions` 和 `responses`。未设置专用变量时会复用 `NUXT_COMFYUI_LLM_CONNECTIONS_JSON`，浏览器不会获得端点或密钥。
+创作台默认页 `/studio` 使用后台维护的文本连接和篇幅价格。先获取报价，再受理后台任务；结果保存成功后结算。旧 JSON 仅用于首次配置导入，不再作为应用运行期覆盖。详见 [配置说明](configuration.md)。
