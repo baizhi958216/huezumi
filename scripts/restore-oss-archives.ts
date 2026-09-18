@@ -2,7 +2,7 @@ import { execFile as execFileCallback } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import process from 'node:process'
-import { promisify } from 'node:util'
+import { parseEnv, promisify } from 'node:util'
 import OSS from 'ali-oss'
 import { Pool } from 'pg'
 
@@ -11,58 +11,42 @@ const args = process.argv.slice(2)
 const option = (name: string) => args.find(value => value.startsWith(`--${name}=`))?.slice(name.length + 3)
 const ownerEmail = (option('owner-email') || '').trim().toLowerCase()
 const dryRun = args.includes('--dry-run')
-
 interface EnvValues {
   [key: string]: string | undefined
 }
-
 interface ProbeStream {
   codec_type?: string
   width?: number
   height?: number
 }
-
 interface ProbeResult {
   streams?: ProbeStream[]
-  format?: { duration?: string }
+  format?: {
+    duration?: string
+  }
 }
-
 interface ArchiveObject {
   name: string
   size: number
   lastModified?: string
 }
-
-function readFirstEnvValues(text: string): EnvValues {
-  const values: EnvValues = {}
-  for (const line of text.split(/\r?\n/)) {
-    const match = line.match(/^([A-Z][A-Z0-9_]*)=(.*)$/)
-    if (match && !(match[1] in values))
-      values[match[1]] = match[2]
-  }
-  return values
-}
-
 async function loadEnvFile() {
   try {
-    return readFirstEnvValues(await readFile('.env', 'utf8'))
+    return parseEnv(await readFile('.env', 'utf8'))
   }
   catch {
     return {}
   }
 }
-
 function configValue(values: EnvValues, name: string) {
-  return process.env[`FORKVDO_LEGACY_${name}`] || values[`NUXT_OSS_${name}`] || ''
+  return process.env[`FORKVDO_LEGACY_${name}`] || values[`FORKVDO_LEGACY_${name}`] || ''
 }
-
 function requiredConfig(values: EnvValues, name: string) {
   const value = configValue(values, name).trim()
   if (!value)
-    throw new Error(`缺少旧 OSS 配置：FORKVDO_LEGACY_${name} 或 NUXT_OSS_${name}`)
+    throw new Error(`缺少旧 OSS 配置：FORKVDO_LEGACY_${name}`)
   return value
 }
-
 function parseArgs() {
   const databaseUrl = process.env.NUXT_DATABASE_URL
   if (!databaseUrl || !ownerEmail) {
@@ -70,18 +54,18 @@ function parseArgs() {
   }
   return databaseUrl
 }
-
 function normalizeRegion(value: string) {
   return value.startsWith('oss-') ? value : `oss-${value}`
 }
-
 function objectUrl(baseUrl: string, key: string) {
   return `${baseUrl.replace(/\/+$/, '')}/${key.split('/').map(segment => encodeURIComponent(segment)).join('/')}`
 }
-
 function ratioFor(width: number, height: number) {
   const ratio = width / height
-  const candidates: Array<[number, string]> = [
+  const candidates: Array<[
+    number,
+    string,
+  ]> = [
     [9 / 16, '9:16'],
     [3 / 4, '3:4'],
     [1, '1:1'],
@@ -92,7 +76,6 @@ function ratioFor(width: number, height: number) {
   const closest = candidates.reduce((best, candidate) => Math.abs(candidate[0] - ratio) < Math.abs(best[0] - ratio) ? candidate : best)
   return Math.abs(closest[0] - ratio) < 0.03 ? closest[1] : 'adaptive'
 }
-
 function resolutionFor(width: number, height: number): '480P' | '768P' | '720P' | '1080P' | '2K' | '4K' {
   const shortSide = Math.min(width, height)
   if (shortSide >= 3840)
@@ -107,7 +90,6 @@ function resolutionFor(width: number, height: number): '480P' | '768P' | '720P' 
     return '720P'
   return '480P'
 }
-
 async function probeVideo(url: string): Promise<ProbeResult | undefined> {
   try {
     const { stdout } = await execFile('ffprobe', [
@@ -118,7 +100,7 @@ async function probeVideo(url: string): Promise<ProbeResult | undefined> {
       '-of',
       'json',
       url,
-    ], { maxBuffer: 100_000, timeout: 60_000 })
+    ], { maxBuffer: 100000, timeout: 60000 })
     const parsed = JSON.parse(stdout) as ProbeResult
     return parsed
   }
@@ -126,7 +108,6 @@ async function probeVideo(url: string): Promise<ProbeResult | undefined> {
     return undefined
   }
 }
-
 function requestFor(object: ArchiveObject, probe?: ProbeResult) {
   const video = probe?.streams?.find(stream => stream.codec_type === 'video')
   const audio = Boolean(probe?.streams?.some(stream => stream.codec_type === 'audio'))
@@ -135,7 +116,6 @@ function requestFor(object: ArchiveObject, probe?: ProbeResult) {
   const actualDuration = Number(probe?.format?.duration || 0)
   const ratio = width > 0 && height > 0 ? ratioFor(width, height) : 'adaptive'
   const duration = actualDuration > 0 ? Math.max(2, Math.round(actualDuration)) : -1
-
   return {
     provider: 'legacy-oss',
     model: '历史阿里云归档',
@@ -153,7 +133,6 @@ function requestFor(object: ArchiveObject, probe?: ProbeResult) {
       : {}),
   }
 }
-
 async function main() {
   const databaseUrl = parseArgs()
   const envValues = await loadEnvFile()
@@ -165,7 +144,6 @@ async function main() {
   const configuredPublicBaseUrl = configValue(envValues, 'PUBLIC_BASE_URL').trim()
   const prefix = (configValue(envValues, 'OUTPUT_PREFIX') || 'forkvdo/outputs').replace(/^\/+|\/+$/g, '')
   const publicBaseUrl = configuredPublicBaseUrl || `https://${bucket}.${endpoint.replace(/^https?:\/\//, '').replace(/\/+$/, '')}`
-
   const client = new OSS({
     region: normalizeRegion(regionValue),
     accessKeyId,
@@ -180,19 +158,18 @@ async function main() {
     .map(item => ({ name: item.name, size: Number(item.size || 0), lastModified: item.lastModified }))
     .filter(item => /^[0-9a-f-]{36}\.mp4$/i.test(item.name.slice(`${prefix}/`.length)))
     .sort((a, b) => (a.lastModified || '').localeCompare(b.lastModified || ''))
-
   if (!objects.length) {
     console.log(`没有找到 ${prefix}/ 下可恢复的 MP4`)
     return
   }
-
   const pool = new Pool({ connectionString: databaseUrl })
   const db = await pool.connect()
   try {
-    const owner = await db.query<{ id: string }>('select id from users where email = $1', [ownerEmail])
+    const owner = await db.query<{
+      id: string
+    }>('select id from users where email = $1', [ownerEmail])
     if (!owner.rows[0])
       throw new Error(`Owner account not found: ${ownerEmail}`)
-
     const ownerId = owner.rows[0].id
     const priceRuleId = '00000000-0000-4000-8000-000000000099'
     await db.query('begin')
@@ -201,8 +178,16 @@ async function main() {
       values ($1, 'legacy-oss', '*', '*', $2, '历史阿里云归档导入（不可用于新生成）', 1, false)
       on conflict (id) do nothing
     `, [priceRuleId, JSON.stringify({ fixedCredits: 0 })])
-
-    const rows: Array<{ id: string, size: number, createdAt: string, width?: number, height?: number, duration?: number, audio: boolean, action: 'insert' | 'skip' }> = []
+    const rows: Array<{
+      id: string
+      size: number
+      createdAt: string
+      width?: number
+      height?: number
+      duration?: number
+      audio: boolean
+      action: 'insert' | 'skip'
+    }> = []
     for (const object of objects) {
       const id = object.name.slice(`${prefix}/`.length, -'.mp4'.length)
       const url = objectUrl(publicBaseUrl, object.name)
@@ -217,11 +202,9 @@ async function main() {
         rows.push({ id, size: object.size, createdAt: createdAt.toISOString(), width: video?.width, height: video?.height, duration: actualDuration || undefined, audio: request.audio, action: 'skip' })
         continue
       }
-
       rows.push({ id, size: object.size, createdAt: createdAt.toISOString(), width: video?.width, height: video?.height, duration: actualDuration || undefined, audio: request.audio, action: 'insert' })
       if (dryRun)
         continue
-
       const quoteId = randomUUID()
       await db.query(`
         insert into quotes (id, user_id, request_hash, request, rule_id, price_version, estimated_credits, expires_at, created_at)
@@ -244,17 +227,16 @@ async function main() {
         createdAt,
       ])
     }
-
     if (dryRun)
       await db.query('rollback')
     else
       await db.query('commit')
-
     const inserted = rows.filter(row => row.action === 'insert').length
     console.log(JSON.stringify({ dryRun, ownerEmail, bucket, prefix, found: rows.length, inserted, skipped: rows.length - inserted, rows }, null, 2))
   }
   catch (error) {
-    await db.query('rollback').catch(() => {})
+    await db.query('rollback').catch(() => {
+    })
     throw error
   }
   finally {
@@ -262,5 +244,4 @@ async function main() {
     await pool.end()
   }
 }
-
 await main()

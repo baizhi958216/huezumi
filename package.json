@@ -20,7 +20,10 @@
     "postinstall": "nuxt prepare",
     "test": "vitest run",
     "test:postgres": "node --env-file=.env harness/postgres.mjs",
-    "typecheck": "nuxt typecheck"
+    "typecheck": "nuxt typecheck",
+    "config:import": "tsx scripts/config-import.ts",
+    "config:check": "tsx scripts/config-check.ts",
+    "data:backfill": "tsx scripts/backfill-platform.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1127.0",

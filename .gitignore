@@ -15,3 +15,8 @@ _tmp_*
 
 # Python custom-node import caches
 __pycache__/
+
+.env.*
+!.env.example
+!.env.production.example
+.private-backups/

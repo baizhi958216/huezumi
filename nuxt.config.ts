@@ -30,40 +30,11 @@ export default defineNuxtConfig({
     },
   },
   runtimeConfig: {
+    connectionEncryptionKey: '',
     // 宿主机开发连接 docker-compose.dev.yml；连接信息由私有 .env 提供。
     databaseUrl: '',
     workerEnabled: false, // 本机 PostgreSQL 队列由 .env 启用，生产 Web 保持关闭。
     workerConcurrency: 4,
-    registrationMode: 'invite',
-    signupCredits: 0,
-    userMaxActiveGenerations: 3,
-    platformDailyCreditBudget: 100000,
-    // 阿里云百炼 DashScope
-    dashscopeApiKey: '',
-    dashscopeWorkspaceId: '',
-    dashscopeRegion: 'cn-beijing',
-    dashscopeBaseUrl: '',
-    dashscopeModel: 'wan3.0-video-prime',
-    // MiniMax
-    minimaxApiKey: '',
-    minimaxGroupId: '',
-    // 可灵 Kling
-    klingAccessKey: '',
-    klingSecretKey: '',
-    // Seedance（火山方舟）
-    seedanceApiKey: '',
-    seedanceBaseUrl: '',
-    seedanceModel: 'doubao-seedance-1-5-pro-251215',
-    // RollDek WAN 3.0
-    rolldekApiKey: '',
-    rolldekBaseUrl: '',
-    // Runway Dev
-    runwayApiKey: '',
-    runwayBaseUrl: '',
-    runwayModel: 'gen4.5',
-    // MiniMax / 可灵 / Seedance 均可通过对应 *_BASE_URL 覆盖默认接入点
-    minimaxBaseUrl: '',
-    klingBaseUrl: '',
     // OSS 兼容对象存储：可接阿里云 OSS 或本地 SeaweedFS
     ossAccessKeyId: '',
     ossAccessKeySecret: '',
@@ -88,8 +59,6 @@ export default defineNuxtConfig({
     comfyuiCustomNodeSourceDir: '',
     // JSON remains private and is passed only to a local ComfyUI child process.
     comfyuiLlmConnectionsJson: '',
-    // 文本创作优先使用独立连接；未设置时兼容复用 ComfyUI 的私有连接 JSON。
-    textLlmConnectionsJson: '',
     comfyuiStartTimeoutMs: 180000,
     comfyuiProbeTimeoutMs: 1500,
     public: {
