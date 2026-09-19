@@ -275,7 +275,7 @@ function getExpiresText(expiresAt: string | null, status: string) {
           <span class="text-xs font-medium text-dimmed">
             已被使用
           </span>
-          <UIcon name="i-lucide-user-check" class="size-4 text-indigo-500" />
+          <UIcon name="i-lucide-user-check" class="size-4 text-warning" />
         </div>
         <p class="mt-2 font-mono text-2xl font-semibold tracking-tight text-highlighted">
           {{ data?.stats?.used ?? 0 }}
@@ -643,7 +643,7 @@ function getExpiresText(expiresAt: string | null, status: string) {
             <label class="text-xs font-semibold text-toned">指定邀请码</label>
             <UInput
               v-model="createForm.customCode"
-              placeholder="例如: VIP-2026 或 FORKVDO-BETA"
+              placeholder="例如: VIP-2026 或 HUIXIAOZHOU-BETA"
               class="font-mono uppercase w-full"
             />
             <p class="text-[11px] text-dimmed">

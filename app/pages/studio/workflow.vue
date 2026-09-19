@@ -18,7 +18,7 @@ import {
 import '@vue-flow/core/dist/style.css'
 import '@vue-flow/core/dist/theme-default.css'
 
-definePageMeta({ title: '工作流 · forkvdo' })
+definePageMeta({ title: '工作流 · 绘小宙' })
 
 const route = useRoute()
 

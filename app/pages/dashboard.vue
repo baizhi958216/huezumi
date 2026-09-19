@@ -101,14 +101,14 @@ const stats = computed(() => [
     value: overview.value?.counts.works ?? 0,
     hint: `${overview.value?.counts.activeWorks ?? 0} 个渲染中`,
     icon: 'i-lucide-film',
-    color: 'text-sky-500',
+    color: 'text-primary',
   },
   {
     label: '模型资产',
     value: overview.value?.counts.models ?? 0,
     hint: formatBytes(overview.value?.storage.modelUsedBytes ?? 0),
     icon: 'i-lucide-cpu',
-    color: 'text-violet-500',
+    color: 'text-success',
   },
 ])
 
@@ -175,7 +175,7 @@ watch(activeSection, section => loadSection(section), { immediate: true })
           </UBadge>
         </div>
         <p class="mt-1 text-xs text-muted">
-          管理个人创作产物、账户额度流水、私有模型资产及存储用量
+          你的小宇宙在这里：看看最近的作品，也为下一次创作做好准备。
         </p>
       </div>
 
@@ -291,7 +291,7 @@ watch(activeSection, section => loadSection(section), { immediate: true })
                     <UIcon
                       :name="work.kind === 'video' ? 'i-lucide-film' : work.kind === 'text' ? 'i-lucide-book-open' : 'i-lucide-image'"
                       class="size-4"
-                      :class="work.kind === 'video' ? 'text-primary' : work.kind === 'text' ? 'text-sky-500' : 'text-dimmed'"
+                      :class="work.kind === 'video' ? 'text-primary' : work.kind === 'text' ? 'text-primary' : 'text-dimmed'"
                     />
                   </div>
                   <div class="min-w-0 flex-1">
@@ -478,7 +478,7 @@ watch(activeSection, section => loadSection(section), { immediate: true })
               :key="model.id"
               class="flex items-center gap-3 rounded-lg border border-default/70 bg-elevated/60 p-3.5 transition hover:border-default hover:bg-elevated"
             >
-              <span class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-violet-500/10 text-violet-500">
+              <span class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-success/10 text-success">
                 <UIcon name="i-lucide-cpu" class="size-4" />
               </span>
               <div class="min-w-0 flex-1">
@@ -545,7 +545,7 @@ watch(activeSection, section => loadSection(section), { immediate: true })
                 <UIcon
                   :name="work.kind === 'video' ? 'i-lucide-film' : work.kind === 'text' ? 'i-lucide-book-open' : 'i-lucide-image'"
                   class="size-4"
-                  :class="work.kind === 'video' ? 'text-primary' : work.kind === 'text' ? 'text-sky-500' : 'text-dimmed'"
+                  :class="work.kind === 'video' ? 'text-primary' : work.kind === 'text' ? 'text-primary' : 'text-dimmed'"
                 />
               </div>
               <div class="min-w-0 flex-1">

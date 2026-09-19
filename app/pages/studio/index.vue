@@ -294,7 +294,7 @@ onMounted(async () => {
                   文本创作
                 </p>
                 <h1 class="mt-1 text-lg font-650 text-highlighted">
-                  从想法到可拍摄故事
+                  让小小的灵感长成故事
                 </h1>
                 <p class="mt-1 text-xs leading-relaxed text-muted">
                   生成内容保存为可编辑版本，选定片段后可继续生成视频。
@@ -348,7 +348,7 @@ onMounted(async () => {
                   :maxrows="14"
                   maxlength="12000"
                   class="w-full text-sm leading-relaxed"
-                  placeholder="输入故事核心大纲、人物关系或创意设定。例如：一个失去记忆的外卖员发现，每送完一单就会想起另一个人的人生……"
+                  placeholder="写下故事、角色或场景的想法。例如：住在小星球上的邮递员，每天替人们寄出心愿。今天，她收到了一封写给自己的信……"
                 />
               </UFormField>
 
@@ -592,7 +592,7 @@ onMounted(async () => {
                 <UIcon name="i-lucide-file-pen-line" class="size-5" />
               </div>
               <h2 class="mt-4 text-lg font-semibold text-highlighted">
-                创作结果会在这里成为可编辑文档
+                故事的下一页，等你来写
               </h2>
               <p class="mt-2 text-sm leading-relaxed text-muted">
                 除了正文，还会保留人物设定、场景画面、动作和对白。可选择已保存版本的正文片段，继续创作视频镜头。

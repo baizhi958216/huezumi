@@ -161,11 +161,11 @@ async function handleGeneration(target: AdminGeneration, action: 'refresh' | 're
 
 const overviewMeta: Record<string, { label: string, icon: string, color: string }> = {
   users: { label: '注册用户', icon: 'i-lucide-users', color: 'text-primary' },
-  generations: { label: '视频任务', icon: 'i-lucide-film', color: 'text-sky-500' },
+  generations: { label: '视频任务', icon: 'i-lucide-film', color: 'text-primary' },
   activeGenerations: { label: '进行中任务', icon: 'i-lucide-loader-circle', color: 'text-amber-500' },
-  assetBytes: { label: '存储资产', icon: 'i-lucide-hard-drive', color: 'text-violet-500' },
+  assetBytes: { label: '存储资产', icon: 'i-lucide-hard-drive', color: 'text-success' },
   connections: { label: '可用连接', icon: 'i-lucide-network', color: 'text-emerald-500' },
-  runs: { label: '总执行数', icon: 'i-lucide-activity', color: 'text-indigo-500' },
+  runs: { label: '总执行数', icon: 'i-lucide-activity', color: 'text-warning' },
 }
 </script>
 
