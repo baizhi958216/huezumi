@@ -3,7 +3,8 @@ import type { ModelSpec, ProviderCapability } from '#shared/types/generation'
 import { resolveModelCapability } from '#shared/types/generation'
 import { useClipboard } from '@vueuse/core'
 
-const props = defineProps<{ providers: ProviderCapability[] }>()
+const props = defineProps<{ providers: ProviderCapability[], loading?: boolean, failed?: boolean }>()
+defineEmits<{ retry: [] }>()
 const selectedProviderId = ref('')
 const selectedModelId = ref('')
 const { copy, copied } = useClipboard({ copiedDuring: 1800 })
@@ -42,73 +43,135 @@ function chooseProvider(id: string) {
 
 function specs(provider: ProviderCapability, model: ModelSpec) {
   const cap = resolveModelCapability(provider, model.id)
-  const modeNames = [cap.modes.includes('text') && '文生', cap.modes.includes('frames') && (cap.media.includes('last_frame') ? '首尾帧' : '首帧'), cap.modes.includes('reference') && '参考生'].filter(Boolean).join(' · ')
+  const modeNames = [cap.modes.includes('text') && '文生视频', cap.modes.includes('frames') && (cap.media.includes('last_frame') ? '首尾帧过渡' : '首帧生成'), cap.modes.includes('reference') && '参考生视频'].filter(Boolean).join(' · ')
   const duration = cap.duration.steps?.length ? cap.duration.steps.map(value => `${value}s`).join(' / ') : `${cap.duration.min}–${cap.duration.max}s`
-  const media = [cap.media.includes('first_frame') && '首帧', cap.media.includes('last_frame') && '尾帧', cap.media.includes('reference_image') && '参考图', cap.media.includes('reference_video') && '视频', cap.media.includes('reference_audio') && '音频'].filter(Boolean).join(' · ') || '纯文本'
+  const media = [cap.media.includes('first_frame') && '首帧图', cap.media.includes('last_frame') && '尾帧图', cap.media.includes('reference_image') && '参考图', cap.media.includes('reference_video') && '参考视频', cap.media.includes('reference_audio') && '参考音频'].filter(Boolean).join(' · ') || '纯文本提示'
   return [
-    { label: '生成方式', icon: 'i-lucide-wand-sparkles', value: modeNames },
-    { label: '清晰度', icon: 'i-lucide-scan', value: cap.resolutions.join(' / ') },
-    { label: '输出时长', icon: 'i-lucide-timer', value: cap.duration.smart ? `${duration} / 智能` : duration },
-    { label: '画幅比例', icon: 'i-lucide-frame', value: cap.ratios.length ? cap.ratios.map(value => value === 'adaptive' ? '自适应' : value).join(' / ') : '跟随素材' },
-    { label: '音频模式', icon: 'i-lucide-audio-lines', value: cap.supportsAudio ? '支持生成音频' : '无声' },
-    { label: '输入素材', icon: 'i-lucide-folder-input', value: media },
+    { label: '生成模式', icon: 'i-lucide-wand-sparkles', value: modeNames },
+    { label: '分辨率支持', icon: 'i-lucide-scan', value: cap.resolutions.join(' / ') },
+    { label: '输出时长', icon: 'i-lucide-timer', value: cap.duration.smart ? `${duration} (支持智能时长)` : duration },
+    { label: '画幅比例', icon: 'i-lucide-frame', value: cap.ratios.length ? cap.ratios.map(value => value === 'adaptive' ? '自适应' : value).join(' / ') : '素材自适应' },
+    { label: '音频支持', icon: 'i-lucide-audio-lines', value: cap.supportsAudio ? '原生支持同步音频生成' : '纯画面生成 (无声)' },
+    { label: '输入素材类型', icon: 'i-lucide-folder-input', value: media },
   ]
 }
 </script>
 
 <template>
-  <section id="capabilities" class="mx-auto max-w-[1200px] px-5 py-16 md:px-8 md:py-20">
-    <div class="flex flex-col justify-between gap-5 md:flex-row md:items-end">
+  <section id="capabilities" class="home-section model-section">
+    <div class="home-section-header">
       <div>
-        <p class="type-kicker">
-          MODEL CATALOG
-        </p><h2 class="type-section-title mt-2">
-          全生态视频模型矩阵，统一契约调度
-        </h2><p class="type-body mt-2 max-w-2xl">
-          深度适配 {{ providers.length }} 家供应商、{{ modelCount }} 款视频模型，参数与生成能力自动对齐。
-        </p>
+        <span class="section-kicker">✦ 创作工具箱</span>
+        <h2 class="section-title">
+          让想象动起来，<br>
+          选一个顺手的模型。
+        </h2>
       </div>
-      <USelect v-model="selectedKey" :items="modelItems" class="w-full md:w-72" aria-label="选择模型" />
+      <p class="section-lead">
+        已接入 {{ providers.length }} 家供应商 · {{ modelCount }} 款视频模型。<br>
+        支持文生视频、首尾帧过渡与图生视频，实际可用模型与规格以创作台为准。
+      </p>
     </div>
-    <div class="mt-7 flex flex-wrap gap-2">
-      <button v-for="provider in providers" :key="provider.id" type="button" class="rounded-full border px-3 py-1.5 text-sm font-medium transition" :class="selectedProvider?.id === provider.id ? 'border-signal-500 bg-signal-500 text-white' : 'border-default bg-elevated text-muted hover:border-accented hover:text-highlighted'" @click="chooseProvider(provider.id)">
-        {{ provider.name }} <span class="ml-1 opacity-70">{{ provider.models.length }}</span>
+
+    <!-- 加载与异常状态 -->
+    <div v-if="loading" role="status" class="model-status-strip">
+      <UIcon name="i-lucide-loader-2" class="size-4 animate-spin text-primary" />
+      <span>正在打开模型工具箱……</span>
+    </div>
+    <div v-else-if="failed" role="alert" class="model-status-strip model-status-strip--error">
+      <UIcon name="i-lucide-alert-circle" class="size-4 text-red-500" />
+      <span>模型目录暂时没能打开，请检查网络后重试。</span>
+      <UButton variant="soft" color="primary" size="xs" @click="$emit('retry')">
+        重新加载
+      </UButton>
+    </div>
+    <div v-else-if="!providers.length" class="model-status-strip">
+      <UIcon name="i-lucide-info" class="size-4 text-muted" />
+      <span>暂无公开展示的模型，你仍可直接进入创作台开始分镜构思。</span>
+    </div>
+
+    <!-- 供应商切换器 (开放式水平标尺 Tabs) -->
+    <div class="provider-track-tabs" role="group" aria-label="选择视频供应商">
+      <button
+        v-for="provider in providers"
+        :key="provider.id"
+        type="button"
+        class="provider-track-tab focus-ring"
+        :aria-pressed="selectedProvider?.id === provider.id"
+        :class="{ 'is-active': selectedProvider?.id === provider.id }"
+        @click="chooseProvider(provider.id)"
+      >
+        <span>{{ provider.name }}</span>
+        <span class="provider-track-tab__count">{{ provider.models.length }}</span>
       </button>
     </div>
 
-    <div v-if="selectedProvider && selectedModel" class="mt-6 grid overflow-hidden rounded-2xl border border-default bg-elevated shadow-card lg:grid-cols-[0.9fr_1.1fr]">
-      <div class="border-b border-default p-5 md:p-7 lg:border-b-0 lg:border-r">
-        <p class="type-kicker">
-          {{ selectedProvider.name }} · {{ selectedProvider.vendor }}
-        </p>
-        <div class="mt-4 flex flex-wrap items-center gap-2">
-          <h3 class="text-2xl font-650 tracking-tight text-highlighted">
+    <!-- 开放式规格参数展面 (无卡片外壳，双栏工作台展陈) -->
+    <div v-if="selectedProvider && selectedModel" class="model-spec-sheet">
+      <div class="model-spec-sheet__primary">
+        <div class="model-spec-sheet__select-wrap">
+          <label class="model-spec-sheet__label">挑选一个视频模型：</label>
+          <USelect v-model="selectedKey" :items="modelItems" class="w-full max-w-sm" aria-label="选择模型" />
+        </div>
+
+        <div class="model-spec-sheet__content">
+          <span class="model-spec-sheet__vendor">{{ selectedProvider.vendor }}</span>
+          <h3 class="model-spec-sheet__name">
             {{ cleanName(selectedModel.name) }}
-          </h3><UBadge v-if="selectedModel.badge" color="primary" variant="subtle">
-            {{ selectedModel.badge }}
-          </UBadge>
+          </h3>
+          <p class="model-spec-sheet__desc">
+            {{ selectedModel.description }}
+          </p>
+
+          <div class="model-spec-sheet__id-box">
+            <span class="model-spec-sheet__id-label">模型 ID：</span>
+            <code>{{ selectedModel.id }}</code>
+            <button
+              type="button"
+              class="model-spec-sheet__copy-btn focus-ring"
+              :title="copied ? '已复制到剪贴板' : '复制模型标识'"
+              @click="copy(selectedModel.id)"
+            >
+              <UIcon :name="copied ? 'i-lucide-check' : 'i-lucide-copy'" class="size-3.5" />
+              <span>{{ copied ? '已复制' : '复制' }}</span>
+            </button>
+          </div>
+
+          <div class="model-spec-sheet__actions">
+            <UButton
+              :to="`/studio/video?provider=${selectedProvider.id}&model=${selectedModel.id}`"
+              trailing-icon="i-lucide-arrow-up-right"
+              class="font-semibold px-6 py-2.5"
+            >
+              用这个模型试试看
+            </UButton>
+          </div>
         </div>
-        <p class="mt-3 text-sm leading-7 text-muted">
-          {{ selectedModel.description }}
-        </p>
-        <div class="mt-5 flex items-center justify-between gap-3 rounded-lg border border-default bg-muted/40 px-3 py-2">
-          <code class="truncate text-xs text-toned">{{ selectedModel.id }}</code><button type="button" class="flex shrink-0 items-center gap-1 text-xs font-semibold text-muted hover:text-highlighted" @click="copy(selectedModel.id)">
-            <UIcon :name="copied ? 'i-lucide-check' : 'i-lucide-copy'" class="size-3.5" />{{ copied ? '已复制' : '复制' }}
-          </button>
-        </div>
-        <p v-if="selectedModel.capabilities?.notes || selectedProvider.notes" class="mt-4 rounded-lg bg-signal-50 p-3 text-xs leading-6 text-signal-800 dark:bg-signal-950/30 dark:text-signal-200">
-          {{ selectedModel.capabilities?.notes || selectedProvider.notes }}
-        </p>
-        <UButton :to="`/studio?provider=${selectedProvider.id}&model=${selectedModel.id}`" class="mt-5" trailing-icon="i-lucide-arrow-up-right">
-          去创作台使用
-        </UButton>
       </div>
-      <div class="grid sm:grid-cols-2 lg:grid-cols-3">
-        <div v-for="item in specs(selectedProvider, selectedModel)" :key="item.label" class="min-h-32 border-b border-r border-default p-5 last:border-b-0">
-          <div class="flex items-center justify-between text-xs text-dimmed">
-            <span>{{ item.label }}</span><UIcon :name="item.icon" class="size-4 text-signal-500" />
-          </div><strong class="mt-3 block text-sm leading-6 text-highlighted">{{ item.value }}</strong>
+
+      <!-- 参数规格列表 (开放式参数表) -->
+      <div class="model-spec-sheet__secondary">
+        <div class="model-spec-sheet__header">
+          <UIcon name="i-lucide-cpu" class="size-4 text-primary" />
+          <span>这个模型可以做什么</span>
         </div>
+
+        <dl class="model-spec-sheet__grid">
+          <div v-for="item in specs(selectedProvider, selectedModel)" :key="item.label" class="model-spec-row">
+            <dt class="model-spec-dt">
+              <UIcon :name="item.icon" class="size-4 text-primary shrink-0" />
+              <span>{{ item.label }}</span>
+            </dt>
+            <dd class="model-spec-dd">
+              {{ item.value }}
+            </dd>
+          </div>
+        </dl>
+
+        <p v-if="selectedModel.capabilities?.notes || selectedProvider.notes" class="model-spec-sheet__notes">
+          <UIcon name="i-lucide-alert-circle" class="size-4 text-primary shrink-0 mt-0.5" />
+          <span>{{ selectedModel.capabilities?.notes || selectedProvider.notes }}</span>
+        </p>
       </div>
     </div>
   </section>

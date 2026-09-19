@@ -1,5 +1,6 @@
 @import 'tailwindcss';
 @import '@nuxt/ui';
+@import './home-editorial.css';
 
 /* ==========================================================================
    设计令牌 / Design Tokens
@@ -2212,6 +2213,20 @@
 
 ::view-transition-new(root) {
   z-index: 9999;
+}
+
+.app-home-page section[id] {
+  scroll-margin-top: calc(var(--app-header-offset) + 1rem);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-home-page *,
+  .app-home-page *::before,
+  .app-home-page *::after {
+    scroll-behavior: auto;
+    transition: none !important;
+    animation: none !important;
+  }
 }
 
 /* 小尺寸透明指针仅用于鼠标设备；保留编辑、拖拽和系统状态的语义。 */
