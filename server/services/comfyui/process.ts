@@ -117,6 +117,14 @@ export async function startComfy(): Promise<ComfyUIStatus> {
     return getComfyStatus()
   }
 
+  // 探活会让出执行权；启动钩子和手动请求可能在此期间创建了进程。
+  if (runtime.starting) {
+    await runtime.starting
+    return getComfyStatus()
+  }
+  if (isChildAlive(runtime.child))
+    return getComfyStatus()
+
   const python = resolvePythonBin(config)
   if (!python) {
     throw createError({ statusCode: 500, statusMessage: '未找到可用的 Python 解释器，请配置 NUXT_COMFYUI_PYTHON' })

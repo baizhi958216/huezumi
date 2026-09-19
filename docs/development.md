@@ -39,7 +39,7 @@ NUXT_COMFYUI_PYTHON=./vendor/ComfyUI/.venv/bin/python
 
 两个服务仅映射到 `127.0.0.1`：PostgreSQL `55432`、SeaweedFS S3 API `9100`、控制台 `9101`。PostgreSQL 和 SeaweedFS 各用独立 volume；`docker compose -f docker-compose.dev.yml stop` 停止服务但保留数据，不要使用 `down -v` 清除已有开发数据。
 
-启动 Nuxt 后，管理员进入创作台的 `/studio/workflow`：首次点“安装 ComfyUI”并安装依赖，后端克隆到 `vendor/ComfyUI`、创建 `.venv`；完成后点“启动 ComfyUI”。项目自定义节点会在启动时挂载，浏览器通过鉴权代理访问。安装需要 Git、Python 和网络，PyTorch 首次下载可能较久。已有仓库和虚拟环境会被复用；模型权重需要另外放入 `vendor/ComfyUI/models/`，不会自动下载。
+启动 Nuxt 时会在后台自动检查 ComfyUI：已运行则复用，本地已安装但未运行则自动启动，正在启动则等待原任务。检查不会阻塞其他页面；未安装或启动失败会在终端提示，管理员可进入 `/studio/workflow` 查看状态并重试。首次仍需点“安装 ComfyUI”并安装依赖，后端克隆到 `vendor/ComfyUI`、创建 `.venv`；完成后点“启动 ComfyUI”，之后启动项目会自动带起服务。remote 模式只探活，不启动本地进程。项目自定义节点会在启动时挂载，浏览器通过鉴权代理访问。安装需要 Git、Python 和网络，PyTorch 首次下载可能较久。已有仓库和虚拟环境会被复用；模型权重需要另外放入 `vendor/ComfyUI/models/`，不会自动下载。
 
 也可以按照 [ComfyUI 官方手动安装指南](https://docs.comfy.org/installation/manual_install) 提前安装到上述目录。Apple Silicon 使用宿主机 PyTorch 的 MPS，实际可用性以 `/system_stats` 为准；无模型时只能验证服务与节点，不能执行需要权重的生成。
 
