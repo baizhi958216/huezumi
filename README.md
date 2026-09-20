@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="./public/favicon.svg" width="80" alt="绘小宙">
+  <img src="./public/favicon.svg" width="80" alt="绘小宙 Huezumi">
 </p>
 <p align="center">
-  <strong>绘小宙</strong> · 创作属于自己的小宇宙
+  <strong>绘小宙 Huezumi</strong> · 创作属于自己的小宇宙
 </p>
 <p align="center">
   写一个故事，遇见一个角色，让脑海里的画面变成会动的奇妙世界。
@@ -12,7 +12,7 @@
 
 ## 🌟 核心特性
 
-绘小宙（工程标识 forkvdo）解耦了前端交互、业务调度与底层模型供应商协议，提供一致、安全且可追溯的多模态创作体验：
+绘小宙 Huezumi（工程标识 forkvdo）解耦了前端交互、业务调度与底层模型供应商协议，提供一致、安全且可追溯的多模态创作体验：
 
 ### 📝 文案与剧本创作 (Text & Story Studio)
 

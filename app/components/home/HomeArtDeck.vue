@@ -154,19 +154,19 @@ onBeforeUnmount(() => {
 .art-deck {
   position: relative;
   min-width: 0;
-  padding-top: 3rem;
+  padding-top: 0.75rem;
 }
 .art-deck__pile {
   position: relative;
-  aspect-ratio: 1 / 1.04;
+  aspect-ratio: 1 / 0.9;
   isolation: isolate;
 }
 .art-deck__card {
   position: absolute;
   left: 22%;
-  top: 7%;
+  top: 4%;
   width: 56%;
-  height: 78%;
+  height: 86%;
   padding: 0.6rem;
   border: 1px solid var(--ui-border);
   border-radius: 48% 52% 23% 19% / 35% 43% 19% 24%;
@@ -216,7 +216,7 @@ onBeforeUnmount(() => {
 }
 .art-deck__notes {
   position: absolute;
-  inset: 3rem 0 7rem;
+  inset: 0.75rem 0 4rem;
   pointer-events: none;
   z-index: 10;
 }
@@ -266,7 +266,7 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: center;
   gap: 1rem;
-  margin-top: 1.25rem;
+  margin-top: 0;
   z-index: 11;
 }
 .art-deck__arrow {
@@ -313,14 +313,14 @@ onBeforeUnmount(() => {
 }
 @media (max-width: 640px) {
   .art-deck {
-    padding-top: 1.5rem;
+    padding-top: 0.75rem;
   }
   .art-deck__card {
     padding: 0.35rem;
   }
   .art-deck__notes {
-    top: 1.5rem;
-    bottom: 6rem;
+    top: 0.75rem;
+    bottom: 3rem;
   }
   .art-deck__note {
     padding: 0.55rem 0.75rem;
