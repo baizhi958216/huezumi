@@ -1,12 +1,17 @@
 <script setup lang="ts">
+import type { ComfyUploadType } from '#shared/types/comfyui'
 import type { NodeProps } from '@vue-flow/core'
 import type { ComfyNodeData } from '~/utils/comfy-graph'
 import { CONTROL_AFTER_GENERATE_OPTIONS } from '#shared/types/comfyui'
 import { Handle, Position, useVueFlow } from '@vue-flow/core'
 import { useComfyEvents } from '~/composables/useComfyServer'
+import { getUploadTargets } from '~/utils/comfy-controls'
 import { buildInputViewUrl } from '~/utils/comfy-graph'
 
 const props = defineProps<NodeProps<ComfyNodeData>>()
+const emit = defineEmits<{
+  upload: [payload: { file: File, kind: ComfyUploadType, nodeId: string, widgetName: string }]
+}>()
 
 const { edges, updateNodeInternals } = useVueFlow()
 const { executingNodeId, progress, cachedNodeIds, lastErrorNodeId } = useComfyEvents()
@@ -22,9 +27,83 @@ function isSlotConnected(slotName: string): boolean {
   return edges.value.some(e => e.target === props.id && e.targetHandle === slotName)
 }
 
-const uploadedImages = computed(() => data.value.widgetSpecs
+const collectionImageWidgets = computed(() => data.value.widgetSpecs
+  .filter(widget => widget.uploadType === 'image' && widget.options.image_collection === true))
+
+/**
+ * ComfyUI 的 AUTOGROW 输入会一次声明许多候选插槽。画布只显示已经接线的插槽，
+ * 再多留一个空插槽供继续扩展，避免多图节点被十几个未使用端口撑得过长。
+ */
+const visibleInputSlots = computed(() => {
+  const slots = collectionImageWidgets.value.length
+    ? data.value.inputSlots.filter(slot => slot.name !== 'previous' && !/^image_\d+_input$/.test(slot.name))
+    : data.value.inputSlots
+  const dynamicGroups = new Map<string, Array<{ slot: typeof slots[number], index: number }>>()
+
+  for (const slot of slots) {
+    const match = slot.name.match(/^(.+)\.([^.]*(?:_|-))(\d+)$/)
+    if (!match)
+      continue
+    const prefix = `${match[1]}.${match[2]}`
+    const group = dynamicGroups.get(prefix) ?? []
+    group.push({ slot, index: Number(match[3]) })
+    dynamicGroups.set(prefix, group)
+  }
+
+  const visible = new Set(slots.map(slot => slot.name))
+  for (const group of dynamicGroups.values()) {
+    group.sort((a, b) => a.index - b.index)
+    const connectedIndexes = group
+      .filter(item => isSlotConnected(item.slot.name))
+      .map(item => item.index)
+    const lastConnected = connectedIndexes.length ? Math.max(...connectedIndexes) : 0
+    const lastVisible = Math.min(group.at(-1)?.index ?? 1, lastConnected + 1)
+    for (const item of group) {
+      if (item.index > lastVisible)
+        visible.delete(item.slot.name)
+    }
+  }
+
+  return slots.filter(slot => visible.has(slot.name))
+})
+
+const collectionWidgetNames = computed(() => new Set(collectionImageWidgets.value.map(widget => widget.name)))
+const collectionImages = computed(() => collectionImageWidgets.value
+  .filter(widget => data.value.widgets[widget.name])
+  .map(widget => ({ name: widget.name, filename: String(data.value.widgets[widget.name]) })))
+const collectionMax = computed(() => Number(collectionImageWidgets.value[0]?.options.image_collection_max ?? collectionImageWidgets.value.length))
+const regularWidgetSpecs = computed(() => data.value.widgetSpecs.filter(widget => !collectionWidgetNames.value.has(widget.name)))
+const uploadedImages = computed(() => regularWidgetSpecs.value
   .filter(widget => widget.uploadType === 'image' && data.value.widgets[widget.name])
   .map(widget => ({ name: widget.name, filename: String(data.value.widgets[widget.name]) })))
+
+const collectionFileInput = ref<HTMLInputElement>()
+const collectionUploadError = ref('')
+
+function pickCollectionImages() {
+  collectionFileInput.value?.click()
+}
+
+function onCollectionFiles(event: Event) {
+  const input = event.target as HTMLInputElement
+  const files = Array.from(input.files ?? [])
+  collectionUploadError.value = ''
+  try {
+    const firstEmpty = collectionImageWidgets.value.find(widget => !data.value.widgets[widget.name])
+    if (!firstEmpty)
+      throw new Error(`最多添加 ${collectionMax.value} 张图片`)
+    const targets = getUploadTargets(collectionImageWidgets.value, data.value.widgets, firstEmpty.name, files.length)
+    files.forEach((file, index) => {
+      const target = targets[index]
+      if (target?.uploadType)
+        emit('upload', { file, kind: target.uploadType, nodeId: props.id, widgetName: target.name })
+    })
+  }
+  catch (error) {
+    collectionUploadError.value = error instanceof Error ? error.message : '无法添加图片'
+  }
+  input.value = ''
+}
 
 const COMBO_EMPTY_VALUE = '__COMBO_EMPTY__'
 
@@ -107,10 +186,10 @@ function toggleCollapse() {
 const filterKeyword = ref('')
 const showAllWidgets = ref(false)
 
-const hasManyWidgets = computed(() => data.value.widgetSpecs.length > 8)
+const hasManyWidgets = computed(() => regularWidgetSpecs.value.length > 8)
 
 const filteredWidgets = computed(() => {
-  const all = data.value.widgetSpecs
+  const all = regularWidgetSpecs.value
   const kw = filterKeyword.value.trim().toLowerCase()
   if (!kw) {
     if (hasManyWidgets.value && !showAllWidgets.value)
@@ -123,7 +202,7 @@ const filteredWidgets = computed(() => {
 const hiddenWidgetsCount = computed(() => {
   if (filterKeyword.value.trim() || !hasManyWidgets.value || showAllWidgets.value)
     return 0
-  return data.value.widgetSpecs.length - 6
+  return regularWidgetSpecs.value.length - 6
 })
 
 function toggleShowAll() {
@@ -138,6 +217,10 @@ function onValueChange(name: string, value: unknown) {
 }
 
 watch(() => [data.value.inputSlots.length, data.value.outputSlots.length, data.value.mode, isCollapsed.value], () => {
+  nextTick(() => updateNodeInternals([props.id]))
+})
+
+watch(() => visibleInputSlots.value.map(slot => slot.name).join('|'), () => {
   nextTick(() => updateNodeInternals([props.id]))
 })
 
@@ -227,7 +310,7 @@ onMounted(() => {
 
     <div class="comfy-node__slots">
       <div class="comfy-node__col">
-        <div v-for="slot in data.inputSlots" :key="slot.name" class="comfy-slot" :class="{ 'comfy-slot--connected': isSlotConnected(slot.name) }" :title="`输入: ${slot.type}`">
+        <div v-for="slot in visibleInputSlots" :key="slot.name" class="comfy-slot" :class="{ 'comfy-slot--connected': isSlotConnected(slot.name) }" :title="`输入: ${slot.type}`">
           <Handle
             :id="slot.name"
             type="target"
@@ -255,6 +338,34 @@ onMounted(() => {
       </div>
     </div>
 
+    <div v-if="!isCollapsed && collectionImageWidgets.length" class="comfy-node__collection nodrag nowheel">
+      <div class="comfy-node__collection-head">
+        <span>参考图片</span>
+        <span>{{ collectionImages.length }} / {{ collectionMax }}</span>
+      </div>
+      <div v-if="collectionImages.length" class="comfy-node__collection-grid">
+        <div v-for="img in collectionImages" :key="img.name" class="comfy-node__collection-item">
+          <img :src="buildInputViewUrl(img.filename)" :alt="img.name" loading="lazy">
+          <button type="button" :aria-label="`移除 ${img.name}`" title="移除图片" @click.stop="onValueChange(img.name, '')">
+            <UIcon name="i-lucide-x" class="size-3" />
+          </button>
+        </div>
+      </div>
+      <button
+        type="button"
+        class="comfy-node__collection-add"
+        :disabled="collectionImages.length >= collectionMax"
+        @click.stop="pickCollectionImages"
+      >
+        <UIcon name="i-lucide-images" class="size-3.5" />
+        添加图片
+      </button>
+      <input ref="collectionFileInput" type="file" accept="image/*" multiple class="hidden" @change="onCollectionFiles">
+      <p v-if="collectionUploadError" class="comfy-widget__hint text-error-500">
+        {{ collectionUploadError }}
+      </p>
+    </div>
+
     <div v-if="!isCollapsed && uploadedImages.length" class="comfy-node__gallery nodrag">
       <div v-for="img in uploadedImages" :key="img.name" class="comfy-node__gallery-item">
         <span class="comfy-node__gallery-label">{{ img.name }}</span>
@@ -262,7 +373,7 @@ onMounted(() => {
       </div>
     </div>
 
-    <div v-if="!isCollapsed && data.widgetSpecs.length" class="comfy-node__widgets nodrag nowheel">
+    <div v-if="!isCollapsed && regularWidgetSpecs.length" class="comfy-node__widgets nodrag nowheel">
       <!-- 超多参数快速搜索过滤 -->
       <div v-if="hasManyWidgets" class="comfy-widget-search nodrag">
         <UIcon name="i-lucide-search" class="comfy-widget-search__icon size-3 text-muted" />

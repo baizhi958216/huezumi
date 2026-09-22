@@ -38,6 +38,7 @@
 - `/api/admin/connections` GET/POST，`/:id` PUT：连接及不可变版本，凭据只写不读，省略表示保持。
 - `/api/admin/connections/:id/versions` GET：分页版本摘要，支持查询与撤销历史版本，永不返回密文或明文凭据。
 - `/api/admin/connections/:id/revoke` POST `{ revisionId }`：显式撤销版本；已受理任务不能自动换连接。
+- `/api/admin/comfyui/restart` POST：重启平台托管的本地 ComfyUI，并把控制面板选择的工作流 Agent 连接以私有环境配置注入执行端；外部或远程实例拒绝该操作。
 - `/api/admin/settings` GET/PUT：注册、赠送、任务上限、日预算、默认连接。
 - `/api/admin/text-prices` GET/POST：发布固定文本价格版本，不自动预设价格。
 - `/api/admin/deployment` GET：只读配置存在性与运行方式。
@@ -50,3 +51,15 @@
 `/api/auth/session`、`register`、`login`、`logout`、`password` 与 `PATCH /api/auth/profile` 保持原契约；没有 `GET /api/auth/profile`。
 
 历史 `/api/files/:id`、`/api/generations/:id/video`、`/api/comfyui/view` 继续提供受保护的媒体访问；旧继续创作链接中的视频 ID 由 `/api/runs/:id` 解析为统一任务，旧业务详情入口已移除。旧的免费文本生成、视频提交和引擎作品聚合入口已退出使用。队列仍接受旧视频 submit/poll 消息。
+
+## API 连接用途分配
+
+`/api/admin/connections` 的 `kind` 支持 `text`、`image`、`video`；图片连接使用 `openai-compatible`，必须填写 Base URL、默认模型和模型列表。Key 通过 `secrets` 写入，查询只返回 `hasCredentials`。
+
+`PUT /api/admin/settings` 支持 `defaultTextConnectionId`、`defaultImageConnectionId`、`defaultVideoConnectionId`、`workflowVideoConnectionId`（百炼）及 `workflowAgentConnectionId`（文本）。保存时验证类型、启用和撤销状态。图片 API 通过工作流入口使用，不加入文本/视频报价目录。
+
+工作流提交接口不接受客户端传入平台私有连接。服务端按节点用途生成连接快照，经执行端能力检查后写入 ComfyUI 的敏感数据槽；仅内部执行期间可读，不返回前端。
+
+## 图片生成
+
+`POST /api/billing/quotes` 支持 `kind: "image"`，`input` 字段包括 `mode: "text" | "edit"`、`prompt`、`images`（已上传素材地址）、`size`、`count`、`negativePrompt`、`promptExtend`、`watermark` 和 `seed`。报价后通过现有 `/api/runs` 提交，`GET /api/runs/:id` 返回任务状态和图片作品地址。保存失败时按 `allowedActions` 调用 `/api/runs/:id/archive`。详细配置见 [图片生成](./image-generation.md)。

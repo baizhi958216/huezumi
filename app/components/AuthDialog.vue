@@ -57,15 +57,15 @@ async function submit() {
   <UModal
     v-model:open="open"
     :scrollable="true"
-    :title="mode === 'login' ? '登录 forkvdo' : '创建帐号'"
+    :title="mode === 'login' ? '登录 绘小宙' : '创建帐号'"
     description="登录后，生成任务、素材和工作流会保存在你的私有空间。"
     :ui="{
-      content: 'sm:max-w-[460px] w-full p-0 overflow-hidden border border-default/70 dark:border-white/10 rounded-2xl bg-white/95 dark:bg-[#0c0d10]/95 backdrop-blur-2xl shadow-cinema divide-y-0',
+      content: 'sm:max-w-[460px] w-full p-0 overflow-hidden border border-default/70 dark:border-white/10 rounded-2xl bg-elevated/95 backdrop-blur-2xl shadow-cinema divide-y-0',
     }"
   >
     <template #content="{ close }">
       <div class="relative overflow-hidden p-6 sm:p-7">
-        <!-- 电影工业顶部朱红光晕与高光边饰 -->
+        <!-- 暖珊瑚色顶部光晕与高光边饰 -->
         <div class="pointer-events-none absolute -top-20 left-1/2 -translate-x-1/2 h-44 w-72 rounded-full bg-signal-500/20 blur-3xl transition-opacity duration-500" />
         <div class="pointer-events-none absolute inset-x-0 top-0 h-[1.5px] bg-gradient-to-r from-transparent via-signal-500/60 to-transparent" />
 
@@ -75,7 +75,7 @@ async function submit() {
             <BrandLogo compact class="size-6" />
             <span class="inline-flex items-center gap-1.5 rounded-full border border-signal-500/25 bg-signal-500/10 px-2.5 py-0.5 font-mono text-[10.5px] font-semibold tracking-wider text-signal-600 dark:text-signal-400">
               <span class="size-1.5 rounded-full bg-signal-500 animate-pulse" />
-              FORKVDO STUDIO
+              绘小宙 · 灵感小站
             </span>
           </div>
 
@@ -105,7 +105,7 @@ async function submit() {
           >
             <div :key="mode">
               <h2 class="type-card-title text-xl font-650 tracking-tight text-highlighted">
-                {{ mode === 'login' ? '欢迎回到创作工作台' : '开启 AI 影视创作空间' }}
+                {{ mode === 'login' ? '欢迎回到你的小宇宙' : '开启你的创作小宇宙' }}
               </h2>
               <p class="mt-1 text-xs leading-relaxed text-muted">
                 {{ mode === 'login' ? '登录后，你的生成任务、素材和工作流将同步至私有空间。' : '创建独立私有空间，畅享多模型视频生成与资产云端存储。' }}
@@ -117,7 +117,7 @@ async function submit() {
         <!-- 分段式切换药丸标签（带平滑滑动滑块动效） -->
         <div
           v-if="registrationMode !== 'disabled'"
-          class="relative mt-5 grid grid-cols-2 rounded-xl border border-default/70 bg-muted/60 p-1 dark:bg-zinc-900/70 select-none"
+          class="relative mt-5 grid grid-cols-2 rounded-xl border border-default/70 bg-muted/60 p-1 dark:bg-muted/70 select-none"
         >
           <!-- 顺滑滑动的背景高光指示器 -->
           <div
@@ -146,7 +146,8 @@ async function submit() {
 
         <!-- 表单主体（带方向感知的平滑滑动过渡面板） -->
         <form class="relative mt-5" @submit.prevent="submit">
-          <div class="relative overflow-hidden">
+          <!-- 为输入框的外扩 focus 光晕预留空间，避免被切换面板的裁切边界截断。 -->
+          <div class="relative -m-1 overflow-hidden p-1">
             <Transition
               :name="slideDirection"
               mode="out-in"

@@ -5,7 +5,7 @@
   "nodes": [
     {
       "id": 1,
-      "type": "ForkVdoBailianImage",
+      "type": "HuezumiBailianImage",
       "pos": [
         40,
         420
@@ -24,7 +24,7 @@
     },
     {
       "id": 2,
-      "type": "ForkVdoBailianVideo",
+      "type": "HuezumiBailianVideo",
       "pos": [
         40,
         660
@@ -43,7 +43,7 @@
     },
     {
       "id": 3,
-      "type": "ForkVdoBailianAudio",
+      "type": "HuezumiBailianAudio",
       "pos": [
         40,
         900
@@ -62,7 +62,7 @@
     },
     {
       "id": 4,
-      "type": "ForkVdoBailianWan3Video",
+      "type": "HuezumiBailianWan3Video",
       "pos": [
         560,
         380
@@ -86,17 +86,17 @@
         },
         {
           "name": "reference_image",
-          "type": "FORKVDO_BAILIAN_MEDIA",
+          "type": "HUEZUMI_BAILIAN_MEDIA",
           "link": 1
         },
         {
           "name": "reference_video",
-          "type": "FORKVDO_BAILIAN_MEDIA",
+          "type": "HUEZUMI_BAILIAN_MEDIA",
           "link": 2
         },
         {
           "name": "reference_audio",
-          "type": "FORKVDO_BAILIAN_MEDIA",
+          "type": "HUEZUMI_BAILIAN_MEDIA",
           "link": 3
         }
       ],
@@ -118,7 +118,7 @@
     },
     {
       "id": 5,
-      "type": "ForkVdoBailianVideoOutput",
+      "type": "HuezumiBailianVideoOutput",
       "pos": [
         1090,
         510
@@ -132,7 +132,7 @@
       "inputs": [
         {
           "name": "video",
-          "type": "FORKVDO_BAILIAN_VIDEO",
+          "type": "HUEZUMI_BAILIAN_VIDEO",
           "link": 4
         }
       ],
@@ -141,7 +141,7 @@
     },
     {
       "id": 6,
-      "type": "ForkVdoText",
+      "type": "HuezumiText",
       "pos": [
         40,
         20
@@ -160,7 +160,7 @@
     },
     {
       "id": 7,
-      "type": "ForkVdoText",
+      "type": "HuezumiText",
       "pos": [
         40,
         230
@@ -185,7 +185,7 @@
       0,
       4,
       2,
-      "FORKVDO_BAILIAN_MEDIA"
+      "HUEZUMI_BAILIAN_MEDIA"
     ],
     [
       2,
@@ -193,7 +193,7 @@
       0,
       4,
       3,
-      "FORKVDO_BAILIAN_MEDIA"
+      "HUEZUMI_BAILIAN_MEDIA"
     ],
     [
       3,
@@ -201,7 +201,7 @@
       0,
       4,
       4,
-      "FORKVDO_BAILIAN_MEDIA"
+      "HUEZUMI_BAILIAN_MEDIA"
     ],
     [
       4,
@@ -209,7 +209,7 @@
       0,
       5,
       0,
-      "FORKVDO_BAILIAN_VIDEO"
+      "HUEZUMI_BAILIAN_VIDEO"
     ],
     [
       5,

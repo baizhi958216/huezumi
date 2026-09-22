@@ -7,7 +7,7 @@ import { Pool } from 'pg'
 const args = process.argv.slice(2)
 const option = (name: string) => args.find(value => value.startsWith(`--${name}=`))?.slice(name.length + 3)
 const ownerEmail = (option('owner-email') || args.find(value => !value.startsWith('--')))?.trim().toLowerCase()
-const dataDir = option('data-dir') || process.env.FORKVDO_LEGACY_DATA_DIR || '.data'
+const dataDir = option('data-dir') || process.env.HUEZUMI_LEGACY_DATA_DIR || '.data'
 const databaseUrl = process.env.NUXT_DATABASE_URL
 if (!databaseUrl || !ownerEmail)
   throw new Error('Usage: NUXT_DATABASE_URL=... pnpm data:migrate -- --owner-email=owner@example.com [--data-dir=.data]')

@@ -11,10 +11,10 @@ interface QueueRuntime {
   locks?: Pool
 }
 const runtime = globalThis as typeof globalThis & {
-  __forkvdoPostgresQueue?: QueueRuntime
+  __huezumiPostgresQueue?: QueueRuntime
 }
 export function generationQueue() {
-  const state = runtime.__forkvdoPostgresQueue ||= {}
+  const state = runtime.__huezumiPostgresQueue ||= {}
   state.queue ||= openTaskQueue(databaseUrl()).catch((error) => {
     state.queue = undefined
     throw error
@@ -31,21 +31,21 @@ export async function publishOutbox() {
   const db = useDatabase()
   const pending = await db.select().from(outboxEvents).where(and(isNull(outboxEvents.publishedAt), lte(outboxEvents.availableAt, sql`now()`))).orderBy(asc(outboxEvents.createdAt)).limit(50)
   for (const event of pending) {
-    if (!['generation.submit', 'run.text', 'run.workflow'].includes(event.topic))
+    if (!['generation.submit', 'run.text', 'run.image', 'run.workflow'].includes(event.topic))
       continue
-    await enqueueGeneration({ kind: event.topic === 'run.text' ? 'text' : event.topic === 'run.workflow' ? 'workflow' : 'submit', generationId: event.aggregateId }, { jobId: event.id })
+    await enqueueGeneration({ kind: event.topic === 'run.image' ? 'image' : event.topic === 'run.text' ? 'text' : event.topic === 'run.workflow' ? 'workflow' : 'submit', generationId: event.aggregateId }, { jobId: event.id })
     await db.update(outboxEvents).set({ publishedAt: new Date() }).where(and(eq(outboxEvents.id, event.id), isNull(outboxEvents.publishedAt)))
   }
 }
 export async function withGenerationLock<T>(generationId: string, task: () => Promise<T>): Promise<T> {
-  const state = runtime.__forkvdoPostgresQueue ||= {}
+  const state = runtime.__huezumiPostgresQueue ||= {}
   // 锁连接与业务查询分池，避免所有连接持锁后无法执行任务内的查询。
   const concurrency = Math.max(1, Math.min(32, Math.floor(Number(useRuntimeConfig().workerConcurrency) || 4)))
   state.locks ||= new Pool({ connectionString: databaseUrl(), max: concurrency + 1, connectionTimeoutMillis: 5000 })
   return await withPostgresGenerationLock(state.locks, generationId, task)
 }
 export async function closeGenerationQueue() {
-  const state = runtime.__forkvdoPostgresQueue
+  const state = runtime.__huezumiPostgresQueue
   if (!state)
     return
   try {
@@ -54,7 +54,7 @@ export async function closeGenerationQueue() {
   }
   finally {
     await state.locks?.end()
-    if (runtime.__forkvdoPostgresQueue === state)
-      runtime.__forkvdoPostgresQueue = undefined
+    if (runtime.__huezumiPostgresQueue === state)
+      runtime.__huezumiPostgresQueue = undefined
   }
 }

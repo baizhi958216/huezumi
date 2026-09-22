@@ -40,7 +40,7 @@ export default defineEventHandler(async (event) => {
   try {
     if (uploader) {
       const config = useRuntimeConfig(event)
-      objectKey = buildOssObjectKey(`${String(config.ossPrefix || 'forkvdo/uploads').replace(/^\/+|\/+$/g, '')}/${user.id}`, id, name)
+      objectKey = buildOssObjectKey(`${String(config.ossPrefix || 'huezumi/uploads').replace(/^\/+|\/+$/g, '')}/${user.id}`, id, name)
       await uploader.upload(objectKey, file.data, contentType)
     }
     else {

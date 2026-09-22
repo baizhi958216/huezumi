@@ -44,7 +44,7 @@ const mobileNavigation = computed<DropdownMenuItem[]>(() => [
 <template>
   <header class="app-header">
     <div class="app-header__surface">
-      <NuxtLink to="/" class="app-header__brand focus-ring" aria-label="forkvdo 首页">
+      <NuxtLink to="/" class="app-header__brand focus-ring" aria-label="绘小宙 首页">
         <BrandLogo />
       </NuxtLink>
 

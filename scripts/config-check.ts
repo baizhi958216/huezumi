@@ -31,5 +31,5 @@ for (const key of ['NUXT_QUEUE_MODE', 'NUXT_REDIS_URL', 'REDIS_HOST_PORT', 'WORK
   if (env[key])
     console.log(`${key}: legacy configuration; import/remove as documented`)
 }
-console.log('Business configuration source: PostgreSQL; ComfyUI configuration source: execution environment')
+console.log('Business configuration source: PostgreSQL; workflow API configuration source: PostgreSQL (per-run private snapshot)')
 process.exitCode = failed ? 1 : 0

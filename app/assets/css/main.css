@@ -1,23 +1,24 @@
 @import 'tailwindcss';
 @import '@nuxt/ui';
+@import './home-editorial.css';
 
 /* ==========================================================================
    设计令牌 / Design Tokens
    全站唯一的颜色、字体、圆角、阴影来源。组件与页面一律引用，禁止裸值。
    ========================================================================== */
 @theme {
-  /* ---- 识别色：电影工业朱红，仅用于焦点与少量强调 ---- */
-  --color-signal-50: #fff3f0;
-  --color-signal-100: #ffe1db;
-  --color-signal-200: #ffc2b6;
-  --color-signal-300: #ff9988;
-  --color-signal-400: #ff6d55;
-  --color-signal-500: #ff4d35;
-  --color-signal-600: #ed321b;
-  --color-signal-700: #c72614;
-  --color-signal-800: #a42316;
-  --color-signal-900: #872218;
-  --color-signal-950: #490d07;
+  /* ---- 识别色：暖珊瑚色，配合奶油白与蜜桃色 ---- */
+  --color-signal-50: #fff3ef;
+  --color-signal-100: #ffe2d8;
+  --color-signal-200: #ffc8b7;
+  --color-signal-300: #ffa48c;
+  --color-signal-400: #f98269;
+  --color-signal-500: #c9513f;
+  --color-signal-600: #b94332;
+  --color-signal-700: #a83d2e;
+  --color-signal-800: #893529;
+  --color-signal-900: #713025;
+  --color-signal-950: #3d1711;
 
   /* ---- 字体 ---- */
   --font-sans: 'Noto Sans', 'Noto Sans SC', ui-sans-serif, system-ui, sans-serif;
@@ -30,19 +31,19 @@
 
   /* ---- 圆角 ---- */
   --radius-xs: 0.375rem;
-  --radius-sm: 0.5rem;
-  --radius-md: 0.625rem;
-  --radius-lg: 0.75rem;
-  --radius-xl: 0.875rem;
-  --radius-2xl: 1rem;
-  --radius-3xl: 1.25rem;
+  --radius-sm: 0.625rem;
+  --radius-md: 0.875rem;
+  --radius-lg: 1.125rem;
+  --radius-xl: 1.5rem;
+  --radius-2xl: 1.75rem;
+  --radius-3xl: 2rem;
 
-  /* ---- 阴影（分层，营造电影质感的空间深度） ---- */
-  --shadow-soft: 0 1px 2px rgb(10 11 13 / 4%), 0 4px 12px -2px rgb(10 11 13 / 6%);
-  --shadow-card: 0 1px 2px rgb(10 11 13 / 5%), 0 8px 24px -6px rgb(10 11 13 / 9%);
-  --shadow-lift: 0 2px 4px rgb(10 11 13 / 6%), 0 18px 40px -12px rgb(10 11 13 / 17%);
-  --shadow-cinema: 0 1px 2px rgb(10 11 13 / 10%), 0 30px 70px -34px rgb(10 11 13 / 48%);
-  --shadow-glow: 0 0 0 1px rgb(255 77 53 / 10%), 0 14px 34px -16px rgb(255 77 53 / 24%);
+  /* ---- 阴影（分层，柔和的纸张层次） ---- */
+  --shadow-soft: 0 1px 2px rgb(97 66 43 / 4%), 0 4px 12px -2px rgb(97 66 43 / 6%);
+  --shadow-card: 0 1px 2px rgb(97 66 43 / 5%), 0 8px 24px -6px rgb(97 66 43 / 9%);
+  --shadow-lift: 0 2px 4px rgb(97 66 43 / 6%), 0 18px 40px -12px rgb(97 66 43 / 17%);
+  --shadow-cinema: 0 1px 2px rgb(97 66 43 / 10%), 0 30px 70px -34px rgb(97 66 43 / 48%);
+  --shadow-glow: 0 0 0 1px rgb(223 96 76 / 10%), 0 14px 34px -16px rgb(223 96 76 / 24%);
 
   /* ---- 动效时长 ---- */
   --ease-cinematic: cubic-bezier(0.22, 1, 0.36, 1);
@@ -52,36 +53,36 @@
 :root {
   --app-header-height: 3.625rem;
   --app-header-offset: 4.625rem;
-  --ui-radius: 0.5rem;
+  --ui-radius: 0.75rem;
   --ui-container: 80rem;
-  --ui-bg: #f7f8fa;
-  --ui-bg-muted: #f0f1f3;
+  --ui-bg: #fffaf3;
+  --ui-bg-muted: #faf0e9;
   --ui-bg-elevated: #ffffff;
-  --ui-bg-accented: #e8eaed;
-  --ui-border: #dedfe3;
-  --ui-border-muted: #e8e9ec;
-  --ui-border-accented: #cfd1d6;
-  --ui-text: #202124;
-  --ui-text-muted: #5e6269;
-  --ui-text-toned: #35383d;
-  --ui-text-highlighted: #0c0d0f;
-  --ui-text-dimmed: #8b9098;
+  --ui-bg-accented: #f7e5d9;
+  --ui-border: #ecddd4;
+  --ui-border-muted: #f4e8df;
+  --ui-border-accented: #cfb9a7;
+  --ui-text: #4a3931;
+  --ui-text-muted: #7a655a;
+  --ui-text-toned: #614b3f;
+  --ui-text-highlighted: #35281f;
+  --ui-text-dimmed: #897366;
   color-scheme: light;
 }
 
 .dark {
-  --ui-bg: #08090b;
-  --ui-bg-muted: #101216;
-  --ui-bg-elevated: #15171b;
-  --ui-bg-accented: #1d2025;
-  --ui-border: #292d33;
-  --ui-border-muted: #202329;
-  --ui-border-accented: #383d45;
-  --ui-text: #d6d8dc;
-  --ui-text-muted: #9ba0a8;
-  --ui-text-toned: #bdc1c7;
-  --ui-text-highlighted: #f4f5f6;
-  --ui-text-dimmed: #737982;
+  --ui-bg: #211b18;
+  --ui-bg-muted: #2a221e;
+  --ui-bg-elevated: #332923;
+  --ui-bg-accented: #403229;
+  --ui-border: #514036;
+  --ui-border-muted: #42332b;
+  --ui-border-accented: #6d5446;
+  --ui-text: #eddfd2;
+  --ui-text-muted: #c5ad98;
+  --ui-text-toned: #dfc8b3;
+  --ui-text-highlighted: #fff3e5;
+  --ui-text-dimmed: #ba9c85;
   color-scheme: dark;
 }
 
@@ -125,7 +126,7 @@
   }
 
   ::selection {
-    background: rgb(255 77 53 / 20%);
+    background: rgb(223 96 76 / 20%);
     color: var(--ui-text-highlighted);
   }
 
@@ -357,8 +358,9 @@
   gap: 0.75rem;
   min-width: 0;
   padding: 0.45rem 0.5rem 0.45rem 0.85rem;
-  border-radius: var(--radius-lg);
-  background: color-mix(in srgb, var(--ui-bg-elevated) 88%, transparent);
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--ui-border-muted);
+  background: color-mix(in srgb, var(--ui-bg-elevated) 94%, transparent);
   box-shadow: var(--shadow-card);
   backdrop-filter: blur(18px) saturate(1.25);
   pointer-events: auto;
@@ -490,7 +492,7 @@
 
 .app-header__cta {
   margin-right: 0.15rem;
-  box-shadow: 0 6px 16px -10px rgb(255 77 53 / 70%);
+  box-shadow: 0 6px 16px -10px rgb(223 96 76 / 70%);
 }
 
 .app-header__mobile-menu {
@@ -906,7 +908,7 @@
 
 .comfy-toolbar__run-btn {
   font-weight: 600 !important;
-  box-shadow: 0 4px 12px -4px rgb(255 77 53 / 48%);
+  box-shadow: 0 4px 12px -4px rgb(223 96 76 / 48%);
 }
 
 .comfy-toolbar__running-pill {
@@ -1713,9 +1715,9 @@
 }
 
 .comfy-node__status-badge--cached {
-  background: color-mix(in srgb, #0ea5e9 15%, transparent);
-  color: #0ea5e9;
-  border: 1px solid color-mix(in srgb, #0ea5e9 30%, transparent);
+  background: color-mix(in srgb, #a67b32 15%, transparent);
+  color: #a67b32;
+  border: 1px solid color-mix(in srgb, #a67b32 30%, transparent);
 }
 
 .comfy-node__status-badge--executing {
@@ -1744,6 +1746,75 @@
   font-size: 0.625rem;
   color: var(--ui-text-muted);
   margin-bottom: 0.2rem;
+}
+
+.comfy-node__collection {
+  display: grid;
+  gap: 0.375rem;
+  padding: 0.5rem;
+  margin-bottom: 0.375rem;
+  background: var(--ui-bg-muted);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-xs);
+}
+
+.comfy-node__collection-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--ui-text-muted);
+  font-size: 0.65rem;
+  font-weight: 600;
+}
+
+.comfy-node__collection-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.25rem;
+}
+
+.comfy-node__collection-item {
+  position: relative;
+  aspect-ratio: 1;
+}
+
+.comfy-node__collection-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-xs);
+}
+
+.comfy-node__collection-item button {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  display: grid;
+  place-items: center;
+  width: 1rem;
+  height: 1rem;
+  color: white;
+  background: rgb(0 0 0 / 65%);
+  border-radius: 999px;
+}
+
+.comfy-node__collection-add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  min-height: 1.75rem;
+  color: var(--color-signal-600);
+  font-size: 0.7rem;
+  font-weight: 600;
+  border: 1px dashed color-mix(in srgb, var(--color-signal-500) 55%, var(--ui-border));
+  border-radius: var(--radius-xs);
+}
+
+.comfy-node__collection-add:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
 }
 
 .comfy-node__gallery {
@@ -2211,4 +2282,75 @@
 
 ::view-transition-new(root) {
   z-index: 9999;
+}
+
+.app-home-page section[id] {
+  scroll-margin-top: calc(var(--app-header-offset) + 1rem);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-home-page *,
+  .app-home-page *::before,
+  .app-home-page *::after {
+    scroll-behavior: auto;
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+/* 小尺寸透明指针仅用于鼠标设备；保留编辑、拖拽和系统状态的语义。 */
+@media (hover: hover) and (pointer: fine) and (forced-colors: none) {
+  html,
+  body {
+    cursor:
+      url('/cursors/coral-arrow-v3.png') 14 8,
+      auto;
+  }
+
+  :is(
+      a[href],
+      button,
+      summary,
+      [role='button'],
+      [role='link'],
+      [role='tab'],
+      [role='checkbox'],
+      [role='radio'],
+      [role='switch'],
+      [role='combobox'],
+      [role='menuitem'],
+      label[for],
+      select,
+      input[type='checkbox'],
+      input[type='radio'],
+      input[type='button'],
+      input[type='submit'],
+      input[type='reset'],
+      .cursor-pointer
+    ):not(:disabled):not([aria-disabled='true']) {
+    cursor:
+      url('/cursors/planet-hand.png') 17 5,
+      pointer;
+  }
+
+  :is(
+      input:not([type]),
+      input[type='text'],
+      input[type='email'],
+      input[type='password'],
+      input[type='search'],
+      input[type='url'],
+      input[type='tel'],
+      input[type='number'],
+      textarea,
+      [contenteditable='true'],
+      [contenteditable='']
+    ):not(:disabled):not([aria-disabled='true']) {
+    cursor: text;
+  }
+
+  :is(button, input, textarea, select):disabled,
+  [aria-disabled='true'] {
+    cursor: not-allowed;
+  }
 }

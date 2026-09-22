@@ -106,7 +106,8 @@ export async function syncWorkflowRun(id: string) {
       const response = await viewFile(file)
       if (!response.body)
         throw new Error('Missing output')
-      const objectKey = `forkvdo/outputs/${run.ownerId}/workflows/${work.id}.${ext}`
+      const outputPrefix = String(useRuntimeConfig().ossOutputPrefix || 'huezumi/outputs').replace(/^\/+|\/+$/g, '')
+      const objectKey = `${outputPrefix}/${run.ownerId}/workflows/${work.id}.${ext}`
       const size = await archiveManagedOutput(response.body, objectKey, contentType)
       await db.transaction(async (tx) => {
         const [locked] = await tx.select().from(works).where(eq(works.id, work.id)).for('update')

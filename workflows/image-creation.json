@@ -5,7 +5,7 @@
   "nodes": [
     {
       "id": 1,
-      "type": "ForkVdoImageCollection",
+      "type": "HuezumiImageCollection",
       "pos": [
         40,
         80
@@ -76,7 +76,7 @@
       ],
       "title": "① 图片 · 单张 / 多张（可留空）",
       "properties": {
-        "Node name for S&R": "ForkVdoImageCollection"
+        "Node name for S&R": "HuezumiImageCollection"
       },
       "widgets_values": [
         "",
@@ -91,7 +91,7 @@
     },
     {
       "id": 2,
-      "type": "ForkVdoText",
+      "type": "HuezumiText",
       "pos": [
         40,
         760
@@ -121,55 +121,15 @@
       ],
       "title": "② 需求 · 说明图1 / 图2的用途",
       "properties": {
-        "Node name for S&R": "ForkVdoText"
+        "Node name for S&R": "HuezumiText"
       },
       "widgets_values": [
         "A young traveler wearing round glasses, standing by the sea at sunset, soft golden rim light, rich colors, natural composition, detailed illustration."
       ]
     },
     {
-      "id": 10,
-      "type": "ForkVdoLLMConfig",
-      "pos": [
-        380,
-        410
-      ],
-      "size": [
-        300,
-        300
-      ],
-      "order": 2,
-      "mode": 0,
-      "inputs": [
-      ],
-      "outputs": [
-        {
-          "name": "config",
-          "type": "FORKVDO_LLM_CONFIG",
-          "links": [
-            13
-          ],
-          "slot_index": 0
-        }
-      ],
-      "title": "③ 大模型连接 · 填写自己的 API / Key",
-      "properties": {
-        "Node name for S&R": "ForkVdoLLMConfig"
-      },
-      "widgets_values": [
-        "",
-        "",
-        "bearer",
-        "",
-        true,
-        120,
-        "auto"
-      ],
-      "flags": {}
-    },
-    {
       "id": 3,
-      "type": "ForkVdoPrompt",
+      "type": "HuezumiPrompt",
       "pos": [
         380,
         80
@@ -190,11 +150,6 @@
           "name": "reference_images",
           "type": "IMAGE_COLLECTION",
           "link": 1
-        },
-        {
-          "name": "llm_config",
-          "type": "FORKVDO_LLM_CONFIG",
-          "link": 13
         }
       ],
       "outputs": [
@@ -217,10 +172,10 @@
       ],
       "title": "④ 大模型 · 使用工作流连接",
       "properties": {
-        "Node name for S&R": "ForkVdoPrompt"
+        "Node name for S&R": "HuezumiPrompt"
       },
       "widgets_values": [
-        "workflow",
+        "image_agent",
         "",
         "",
         "",
@@ -230,7 +185,7 @@
     },
     {
       "id": 4,
-      "type": "ForkVdoPromptText",
+      "type": "HuezumiPromptText",
       "pos": [
         720,
         80
@@ -265,7 +220,7 @@
       ],
       "title": "⑤ 正向提示词 · 追加或替换",
       "properties": {
-        "Node name for S&R": "ForkVdoPromptText"
+        "Node name for S&R": "HuezumiPromptText"
       },
       "widgets_values": [
         "append",
@@ -274,7 +229,7 @@
     },
     {
       "id": 5,
-      "type": "ForkVdoPromptText",
+      "type": "HuezumiPromptText",
       "pos": [
         720,
         410
@@ -309,7 +264,7 @@
       ],
       "title": "⑥ 反向提示词 · 可留空",
       "properties": {
-        "Node name for S&R": "ForkVdoPromptText"
+        "Node name for S&R": "HuezumiPromptText"
       },
       "widgets_values": [
         "append",
@@ -318,7 +273,7 @@
     },
     {
       "id": 6,
-      "type": "ForkVdoImagePlan",
+      "type": "HuezumiImagePlan",
       "pos": [
         1060,
         80
@@ -363,7 +318,7 @@
       ],
       "title": "⑦ 整合 · generate生图 / edit编辑 / inpaint重绘",
       "properties": {
-        "Node name for S&R": "ForkVdoImagePlan"
+        "Node name for S&R": "HuezumiImagePlan"
       },
       "widgets_values": [
         "generate",
@@ -424,7 +379,7 @@
     },
     {
       "id": 8,
-      "type": "ForkVdoImageGenerate",
+      "type": "HuezumiImageGenerate",
       "pos": [
         1400,
         80
@@ -469,7 +424,7 @@
       ],
       "title": "⑨ 生成 · 编码 / 采样 / 解码",
       "properties": {
-        "Node name for S&R": "ForkVdoImageGenerate"
+        "Node name for S&R": "HuezumiImageGenerate"
       },
       "widgets_values": [
         0,
@@ -513,7 +468,7 @@
         "Node name for S&R": "SaveImage"
       },
       "widgets_values": [
-        "forkvdo-image-creation"
+        "huezumi-image-creation"
       ]
     }
   ],
@@ -613,14 +568,6 @@
       9,
       0,
       "IMAGE"
-    ],
-    [
-      13,
-      10,
-      0,
-      3,
-      2,
-      "FORKVDO_LLM_CONFIG"
     ]
   ],
   "groups": [],

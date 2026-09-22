@@ -12,7 +12,7 @@ export async function archiveManagedOutput(body: ReadableStream<Uint8Array>, obj
     throw new Error('Storage not configured')
   const maxBytes = Number(useRuntimeConfig().ossMaxOutputBytes || 1073741824)
   const timeout = Number(useRuntimeConfig().ossTransferTimeoutMs || 300000)
-  const directory = await mkdtemp(join(tmpdir(), 'forkvdo-workflow-'))
+  const directory = await mkdtemp(join(tmpdir(), 'huezumi-workflow-'))
   const path = join(directory, 'output')
   const reader = body.getReader()
   const abort = new AbortController()

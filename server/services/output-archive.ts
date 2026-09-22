@@ -39,7 +39,7 @@ function getOutputArchiveConfig(): OutputArchiveConfig {
   const config = useRuntimeConfig()
   return {
     maxBytes: positiveInteger(config.ossMaxOutputBytes, 1024 * 1024 * 1024),
-    outputPrefix: String(config.ossOutputPrefix || 'forkvdo/outputs').replace(/^\/+|\/+$/g, ''),
+    outputPrefix: String(config.ossOutputPrefix || 'huezumi/outputs').replace(/^\/+|\/+$/g, ''),
     transferTimeoutMs: positiveInteger(config.ossTransferTimeoutMs, 300_000),
   }
 }
@@ -144,7 +144,7 @@ async function uploadOutputFile(
   uploader: OssUploader,
   generationId: string,
   path: string,
-  format: VideoFormat,
+  format: { contentType: string, extension: string },
   config: OutputArchiveConfig,
 ) {
   const file = await stat(path).catch(() => undefined)
@@ -160,8 +160,10 @@ async function uploadOutputFile(
   }
 }
 
-export async function archiveRemoteOutput(generationId: string, source: string, ownerId?: string) {
+export async function archiveRemoteOutput(generationId: string, source: string, ownerId?: string, kind: 'video' | 'image' = 'video') {
   const config = getOutputArchiveConfig()
+  if (kind === 'image')
+    config.maxBytes = Math.min(config.maxBytes, 50 * 1024 * 1024)
   if (ownerId)
     config.outputPrefix = `${config.outputPrefix}/${ownerId}`
   const uploader = requireUploader()
@@ -175,7 +177,7 @@ export async function archiveRemoteOutput(generationId: string, source: string, 
     throw new OutputArchiveError('OUTPUT_TRANSFER_FAILED')
   }
 
-  const directory = await mkdtemp(join(tmpdir(), 'forkvdo-output-'))
+  const directory = await mkdtemp(join(tmpdir(), 'huezumi-output-'))
   const path = join(directory, 'video')
   try {
     let response: Response
@@ -192,7 +194,11 @@ export async function archiveRemoteOutput(generationId: string, source: string, 
     const declared = Number(response.headers.get('content-length') || 0)
     if (!Number.isFinite(declared) || declared < 0 || declared > config.maxBytes)
       throw new OutputArchiveError('OUTPUT_TRANSFER_FAILED')
-    const format = videoFormat(response.headers.get('content-type'), sourceUrl)
+    const mime = response.headers.get('content-type')?.split(';')[0]?.trim().toLowerCase()
+    const extension = ({ 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp' } as Record<string, string>)[mime || '']
+    if (kind === 'image' && !extension)
+      throw new OutputArchiveError('OUTPUT_TRANSFER_FAILED')
+    const format = kind === 'image' ? { contentType: mime!, extension: extension! } : videoFormat(response.headers.get('content-type'), sourceUrl)
     await writeResponseBody(response, path, config.maxBytes)
     return await uploadOutputFile(uploader, generationId, path, format, config)
   }

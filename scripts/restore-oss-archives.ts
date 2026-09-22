@@ -39,12 +39,12 @@ async function loadEnvFile() {
   }
 }
 function configValue(values: EnvValues, name: string) {
-  return process.env[`FORKVDO_LEGACY_${name}`] || values[`FORKVDO_LEGACY_${name}`] || ''
+  return process.env[`HUEZUMI_LEGACY_${name}`] || values[`HUEZUMI_LEGACY_${name}`] || ''
 }
 function requiredConfig(values: EnvValues, name: string) {
   const value = configValue(values, name).trim()
   if (!value)
-    throw new Error(`缺少旧 OSS 配置：FORKVDO_LEGACY_${name}`)
+    throw new Error(`缺少旧 OSS 配置：HUEZUMI_LEGACY_${name}`)
   return value
 }
 function parseArgs() {
@@ -142,7 +142,7 @@ async function main() {
   const regionValue = requiredConfig(envValues, 'REGION')
   const endpoint = configValue(envValues, 'ENDPOINT').trim()
   const configuredPublicBaseUrl = configValue(envValues, 'PUBLIC_BASE_URL').trim()
-  const prefix = (configValue(envValues, 'OUTPUT_PREFIX') || 'forkvdo/outputs').replace(/^\/+|\/+$/g, '')
+  const prefix = (configValue(envValues, 'OUTPUT_PREFIX') || 'huezumi/outputs').replace(/^\/+|\/+$/g, '')
   const publicBaseUrl = configuredPublicBaseUrl || `https://${bucket}.${endpoint.replace(/^https?:\/\//, '').replace(/\/+$/, '')}`
   const client = new OSS({
     region: normalizeRegion(regionValue),

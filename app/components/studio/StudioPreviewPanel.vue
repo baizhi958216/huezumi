@@ -62,9 +62,9 @@ watch(() => props.task?.id, () => {
         </UBadge>
       </div>
     </div>
-    <div ref="viewport" class="relative flex min-h-0 w-full flex-1 items-center justify-center overflow-hidden rounded-xl border border-default/40 bg-zinc-100/60 p-3 dark:bg-zinc-950/40">
-      <div class="relative flex select-none items-center justify-center overflow-hidden rounded-xl border border-default/80 bg-white shadow-xs transition-[width,height] duration-400 dark:bg-zinc-900" :style="stageDimensions">
-        <span class="pointer-events-none absolute left-2.5 top-2.5 z-10 rounded border border-default/70 bg-zinc-100 px-1.5 py-0.5 font-mono text-[10px] text-muted dark:bg-zinc-800">{{ ratioLabel }}</span><video v-if="task?.status === 'SUCCEEDED' && task.videoUrl" :src="task.videoUrl" controls autoplay loop class="relative z-10 size-full rounded-xl object-contain" @loadedmetadata="onVideoLoaded" />
+    <div ref="viewport" class="relative flex min-h-0 w-full flex-1 items-center justify-center overflow-hidden rounded-xl border border-default/40 bg-muted/60 p-3 dark:bg-muted/40">
+      <div class="relative flex select-none items-center justify-center overflow-hidden rounded-xl border border-default/80 bg-elevated shadow-xs transition-[width,height] duration-400 dark:bg-elevated" :style="stageDimensions">
+        <span class="pointer-events-none absolute left-2.5 top-2.5 z-10 rounded border border-default/70 bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted dark:bg-zinc-800">{{ ratioLabel }}</span><video v-if="task?.status === 'SUCCEEDED' && task.videoUrl" :src="task.videoUrl" controls autoplay loop class="relative z-10 size-full rounded-xl object-contain" @loadedmetadata="onVideoLoaded" />
       </div>
       <div v-if="task?.status !== 'SUCCEEDED' || !task?.videoUrl" class="pointer-events-none absolute inset-0 z-20 flex items-center justify-center p-6 text-center">
         <div class="pointer-events-auto flex w-full max-w-60 flex-col items-center">

@@ -1,5 +1,6 @@
 import type { ComfyWorkflowJSON } from '#shared/types/comfyui'
 import type { GenerationRequest, GenerationStatus } from '#shared/types/generation'
+import type { ImageGenerationRequest } from '#shared/types/image-generation'
 import type { ConnectionSettings, PlatformSettings, RunRequest } from '#shared/types/platform'
 import type { TextCreationContent, TextCreationKind, TextCreationRequest } from '#shared/types/text-creation'
 import type { PriceFormula } from '#shared/utils/pricing'
@@ -89,7 +90,7 @@ export const quotes = pgTable('quotes', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: uuid('user_id').notNull().references(() => users.id),
   requestHash: text('request_hash').notNull(),
-  request: jsonb('request').$type<GenerationRequest | TextCreationRequest>().notNull(),
+  request: jsonb('request').$type<GenerationRequest | TextCreationRequest | ImageGenerationRequest>().notNull(),
   ruleId: uuid('rule_id').references(() => pricingRules.id),
   priceVersion: integer('price_version').notNull(),
   estimatedCredits: integer('estimated_credits').notNull(),
@@ -258,7 +259,7 @@ export const platformConnections = pgTable('platform_connections', {
   id: uuid('id').primaryKey().defaultRandom(),
   importKey: text('import_key').unique(),
   name: text('name').notNull(),
-  kind: text('kind').$type<'video' | 'text'>().notNull(),
+  kind: text('kind').$type<'video' | 'text' | 'image'>().notNull(),
   provider: text('provider').notNull(),
   enabled: boolean('enabled').notNull().default(true),
   currentVersionId: uuid('current_version_id'),
@@ -291,7 +292,7 @@ export const textPrices = pgTable('text_prices', {
 export const runs = pgTable('runs', {
   id: uuid('id').primaryKey().defaultRandom(),
   ownerId: uuid('owner_id').notNull().references(() => users.id),
-  kind: text('kind').$type<'video' | 'text' | 'workflow'>().notNull(),
+  kind: text('kind').$type<'video' | 'text' | 'image' | 'workflow'>().notNull(),
   projectId: uuid('project_id').references(() => creativeProjects.id),
   generationId: uuid('generation_id').unique().references(() => generations.id, { onDelete: 'cascade' }),
   promptId: text('prompt_id').unique(),
@@ -331,6 +332,7 @@ export const works = pgTable('works', {
     filename: string
     subfolder?: string
     type: 'output'
+    url?: string
   }>(),
   availability: text('availability').$type<'available' | 'pending' | 'unavailable'>().notNull().default('pending'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

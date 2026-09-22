@@ -17,14 +17,14 @@ export interface ComfyRuntime {
  * 运行时状态挂在 globalThis 上：dev 下 Nitro 会热重载模块，
  * 进程句柄和日志必须跨模块实例存活，否则会重复拉起 ComfyUI。
  */
-const globalRef = globalThis as typeof globalThis & { __forkvdoComfyRuntime?: ComfyRuntime }
+const globalRef = globalThis as typeof globalThis & { __huezumiComfyRuntime?: ComfyRuntime }
 
 export function getRuntime(): ComfyRuntime {
-  globalRef.__forkvdoComfyRuntime ??= {
+  globalRef.__huezumiComfyRuntime ??= {
     log: [],
     install: { phase: 'idle', log: [] },
   }
-  return globalRef.__forkvdoComfyRuntime
+  return globalRef.__huezumiComfyRuntime
 }
 
 export function appendLog(target: string[], text: string) {

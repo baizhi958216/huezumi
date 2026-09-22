@@ -1,18 +1,20 @@
+name: huezumi
+
 services:
   postgres:
     image: postgres:17-alpine
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-forkvdo}
-      POSTGRES_USER: ${POSTGRES_USER:-forkvdo}
+      POSTGRES_DB: ${POSTGRES_DB:-huezumi}
+      POSTGRES_USER: ${POSTGRES_USER:-huezumi}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
     ports:
       - '127.0.0.1:${POSTGRES_HOST_PORT:-55432}:5432'
     volumes:
-      - forkvdo-postgres-dev:/var/lib/postgresql/data
+      - huezumi-postgres-dev:/var/lib/postgresql/data
     healthcheck:
       test:
         - CMD-SHELL
-        - pg_isready -U ${POSTGRES_USER:-forkvdo} -d ${POSTGRES_DB:-forkvdo}
+        - pg_isready -U ${POSTGRES_USER:-huezumi} -d ${POSTGRES_DB:-huezumi}
       interval: 5s
       timeout: 5s
       retries: 20
@@ -32,14 +34,14 @@ services:
     environment:
       AWS_ACCESS_KEY_ID: ${LOCAL_OSS_ACCESS_KEY_ID:?set LOCAL_OSS_ACCESS_KEY_ID in .env}
       AWS_SECRET_ACCESS_KEY: ${LOCAL_OSS_ACCESS_KEY_SECRET:?set LOCAL_OSS_ACCESS_KEY_SECRET in .env}
-      S3_BUCKET: ${LOCAL_OSS_BUCKET:-forkvdo}
+      S3_BUCKET: ${LOCAL_OSS_BUCKET:-huezumi}
       WEED_ADMIN_USER: ${LOCAL_OSS_ACCESS_KEY_ID:?set LOCAL_OSS_ACCESS_KEY_ID in .env}
       WEED_ADMIN_PASSWORD: ${LOCAL_OSS_ACCESS_KEY_SECRET:?set LOCAL_OSS_ACCESS_KEY_SECRET in .env}
     ports:
       - '127.0.0.1:${LOCAL_OSS_API_PORT:-9100}:9000'
       - '127.0.0.1:${LOCAL_OSS_CONSOLE_PORT:-9101}:9001'
     volumes:
-      - forkvdo-seaweedfs-dev:/data
+      - huezumi-seaweedfs-dev:/data
     healthcheck:
       test: [CMD, curl, -f, http://localhost:9000/healthz]
       interval: 5s
@@ -47,5 +49,7 @@ services:
       retries: 20
 
 volumes:
-  forkvdo-postgres-dev:
-  forkvdo-seaweedfs-dev:
+  huezumi-postgres-dev:
+    name: huezumi-postgres-dev
+  huezumi-seaweedfs-dev:
+    name: huezumi-seaweedfs-dev

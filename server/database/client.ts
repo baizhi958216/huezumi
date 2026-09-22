@@ -7,7 +7,7 @@ interface DatabaseRuntime {
   db: ReturnType<typeof drizzle<typeof schema>>
 }
 
-const globalDatabase = globalThis as typeof globalThis & { __forkvdoDatabase?: DatabaseRuntime }
+const globalDatabase = globalThis as typeof globalThis & { __huezumiDatabase?: DatabaseRuntime }
 
 export function databaseUrl() {
   const config = useRuntimeConfig()
@@ -18,14 +18,14 @@ export function databaseUrl() {
 }
 
 export function useDatabasePool() {
-  if (!globalDatabase.__forkvdoDatabase) {
+  if (!globalDatabase.__huezumiDatabase) {
     const pool = new Pool({ connectionString: databaseUrl(), max: 10, connectionTimeoutMillis: 5000, statement_timeout: 5000 })
-    globalDatabase.__forkvdoDatabase = { pool, db: drizzle(pool, { schema }) }
+    globalDatabase.__huezumiDatabase = { pool, db: drizzle(pool, { schema }) }
   }
-  return globalDatabase.__forkvdoDatabase.pool
+  return globalDatabase.__huezumiDatabase.pool
 }
 
 export function useDatabase() {
   useDatabasePool()
-  return globalDatabase.__forkvdoDatabase!.db
+  return globalDatabase.__huezumiDatabase!.db
 }

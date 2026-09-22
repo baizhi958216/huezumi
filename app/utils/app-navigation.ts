@@ -31,10 +31,11 @@ export function getAppNavigation(role: AppNavigationRole): AppNavigationItem[] {
 
 export function getStudioNavigation(role: AppNavigationRole): AppNavigationItem[] {
   return [
-    { label: '文案剧本', to: '/studio', icon: 'i-lucide-file-pen-line' },
+    { label: '文案生成', to: '/studio', icon: 'i-lucide-file-pen-line' },
     { label: '视频生成', to: '/studio/video', icon: 'i-lucide-video' },
+    { label: '图片生成', to: '/studio/image', icon: 'i-lucide-image-plus' },
     ...(role === 'admin'
-      ? [{ label: '图片与工作流', to: '/studio/workflow', icon: 'i-lucide-workflow' }]
+      ? [{ label: '工作流 · 高级', to: '/studio/workflow', icon: 'i-lucide-workflow' }]
       : []),
   ]
 }

@@ -13,6 +13,7 @@ import { useDatabase } from '../../../../database/client'
 import { sessions, users } from '../../../../database/schema'
 import { getComfyBaseUrl, getComfyConfig } from '../../../../services/comfyui/config'
 import { hashToken } from '../../../../utils/auth'
+import { sessionTokenFromHeader } from '../../../../utils/session-cookie'
 
 interface UpstreamSocket {
   send: (data: string) => void
@@ -40,10 +41,10 @@ async function isAuthorized(request: {
   const protocol = request.headers.get('x-forwarded-proto') || (process.env.NODE_ENV === 'production' ? 'https' : 'http')
   if (origin && host && origin !== `${protocol}://${host}`)
     return false
-  const token = request.headers.get('cookie')?.split(';').map(item => item.trim()).find(item => item.startsWith('forkvdo_session='))?.slice('forkvdo_session='.length)
+  const token = sessionTokenFromHeader(request.headers.get('cookie'))
   if (!token)
     return false
-  const [admin] = await useDatabase().select({ id: users.id }).from(sessions).innerJoin(users, eq(users.id, sessions.userId)).where(and(eq(sessions.tokenHash, hashToken(decodeURIComponent(token))), gt(sessions.expiresAt, new Date()), eq(users.status, 'active'), eq(users.role, 'admin'))).limit(1)
+  const [admin] = await useDatabase().select({ id: users.id }).from(sessions).innerJoin(users, eq(users.id, sessions.userId)).where(and(eq(sessions.tokenHash, hashToken(token)), gt(sessions.expiresAt, new Date()), eq(users.status, 'active'), eq(users.role, 'admin'))).limit(1)
   return Boolean(admin)
 }
 function createGlobalSocket(url: string): WebSocketLike | undefined {

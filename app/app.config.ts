@@ -2,13 +2,16 @@ export default defineAppConfig({
   ui: {
     colors: {
       primary: 'signal',
-      neutral: 'zinc',
+      neutral: 'stone',
+      secondary: 'lime',
+      info: 'amber',
+      success: 'lime',
     },
 
     // 统一的视觉基线：所有组件共用同一套圆角、字重与内边距节奏
     button: {
       slots: {
-        base: 'rounded-md font-550 tracking-normal transition duration-150 active:translate-y-px disabled:opacity-40 disabled:saturate-0 aria-disabled:opacity-40 aria-disabled:saturate-0',
+        base: 'rounded-xl font-550 tracking-normal transition duration-150 active:translate-y-px disabled:opacity-40 disabled:saturate-0 aria-disabled:opacity-40 aria-disabled:saturate-0',
       },
       defaultVariants: {
         size: 'md',
@@ -17,7 +20,7 @@ export default defineAppConfig({
 
     card: {
       slots: {
-        root: 'rounded-lg border border-default bg-default shadow-soft',
+        root: 'rounded-xl border border-default bg-default shadow-soft',
         body: 'p-5',
         header: 'p-5 pb-0',
         footer: 'p-5 pt-0',
@@ -44,7 +47,7 @@ export default defineAppConfig({
 
     badge: {
       slots: {
-        base: 'rounded-md font-550',
+        base: 'rounded-xl font-550',
       },
     },
 
@@ -81,7 +84,7 @@ export default defineAppConfig({
       slots: {
         wrapper: 'min-w-0 pe-8',
         overlay: 'fixed inset-0 bg-black/60 dark:bg-black/80 backdrop-blur-md',
-        content: 'rounded-2xl border border-default/70 dark:border-white/10 bg-elevated/95 dark:bg-[#0c0d10]/95 shadow-cinema backdrop-blur-2xl divide-y-0',
+        content: 'rounded-2xl border border-default/70 dark:border-white/10 bg-elevated/95 dark:bg-elevated/95 shadow-cinema backdrop-blur-2xl divide-y-0',
       },
       variants: {
         transition: {

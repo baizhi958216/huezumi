@@ -156,6 +156,9 @@ function formatDate(value?: string) {
 
           <!-- Bottom Actions -->
           <div class="space-y-2 pt-4 border-t border-default">
+            <UButton v-if="work.kind === 'image' && work.runId && !work.promptId" block color="primary" icon="i-lucide-image-plus" :to="`/studio/image?run=${work.runId}`">
+              返回图片创作台
+            </UButton>
             <UButton
               v-if="work.kind === 'video' && work.runId && !work.promptId"
               block

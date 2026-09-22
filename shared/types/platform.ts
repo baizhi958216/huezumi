@@ -1,7 +1,8 @@
 import type { GenerationRecord, GenerationRequest, GenerationStatus, ProviderCapability } from './generation'
+import type { ImageGenerationRequest } from './image-generation'
 import type { TextCreationRequest, TextDocumentVersionRecord } from './text-creation'
 
-export type RunKind = 'video' | 'text' | 'workflow'
+export type RunKind = 'video' | 'text' | 'image' | 'workflow'
 export interface Page<T> {
   items: T[]
   nextCursor: string | null
@@ -16,6 +17,8 @@ export interface ConnectionSettings {
   auth?: 'bearer' | 'none'
   apiProtocol?: 'auto' | 'chat_completions' | 'responses'
   timeoutSeconds?: number
+  supportsVision?: boolean
+  webSearch?: boolean
 }
 export interface ConnectionSecrets {
   apiKey?: string
@@ -25,7 +28,7 @@ export interface ConnectionSecrets {
 export interface ConnectionSummary {
   id: string
   name: string
-  kind: 'video' | 'text'
+  kind: 'video' | 'text' | 'image'
   provider: string
   enabled: boolean
   revisionId: string
@@ -41,10 +44,13 @@ export interface PlatformSettings {
   platformDailyCreditBudget: number
   defaultVideoConnectionId?: string
   defaultTextConnectionId?: string
+  workflowAgentConnectionId?: string
+  defaultImageConnectionId?: string
+  workflowVideoConnectionId?: string
 }
 export interface ModelOption {
   id: string
-  kind: 'video' | 'text'
+  kind: 'video' | 'text' | 'image'
   connectionId: string
   provider: string
   label: string
@@ -54,10 +60,10 @@ export interface ModelOption {
   capability?: ProviderCapability
 }
 export interface RunRequest {
-  kind: 'video' | 'text'
+  kind: 'video' | 'text' | 'image'
   connectionId: string
   model: string
-  input: GenerationRequest | TextCreationRequest
+  input: GenerationRequest | TextCreationRequest | ImageGenerationRequest
   projectId?: string
   sourceVersionId?: string
   sourceExcerpt?: string
@@ -82,6 +88,7 @@ export interface RunSummary {
     url?: string
   }>
   generation?: GenerationRecord
+  imageRequest?: { connectionId: string, model: string, input: ImageGenerationRequest }
   documentVersion?: TextDocumentVersionRecord
   needsReview?: boolean
   error?: string

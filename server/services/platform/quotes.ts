@@ -1,13 +1,16 @@
 import type { RunRequest } from '#shared/types/platform'
-import { and, desc, eq } from 'drizzle-orm'
+import { isSupportedImageModel } from '#shared/types/image-generation'
+import { imageCredits, isImagePrice } from '#shared/utils/image-pricing'
+import { and, desc, eq, sql } from 'drizzle-orm'
 import { useDatabase } from '../../database/client'
-import { creativeDocuments, creativeDocumentVersions, creativeProjects, quotes, textPrices } from '../../database/schema'
+import { creativeDocuments, creativeDocumentVersions, creativeProjects, pricingRules, quotes, textPrices } from '../../database/schema'
 import { requestHash } from '../../utils/request-hash'
 import { resolveProviderMediaUrls } from '../assets'
 import { createQuote } from '../billing'
 import { assertRequestSupported } from '../providers'
 import { getCapability } from '../providers/catalog'
 import { currentConnection } from './connections'
+import { resolveImageInputs } from './image-input'
 import { runRequestSchema } from './schemas'
 
 export async function validateRunContext(ownerId: string, request: RunRequest) {
@@ -55,6 +58,17 @@ export async function quoteRun(ownerId: string, input: unknown) {
     assertRequestSupported(capability, await resolveProviderMediaUrls(ownerId, request.input))
     id = (await createQuote(ownerId, request.input)).id
     await useDatabase().update(quotes).set({ platformRequest: request, requestHash: requestHash(request), connectionVersionId: version.id }).where(eq(quotes.id, id))
+  }
+  else if (request.kind === 'image') {
+    if (connection.provider !== 'dashscope' || !isSupportedImageModel(request.model))
+      throw createError({ statusCode: 422, statusMessage: '请选择已支持的百炼千问图片模型' })
+    await resolveImageInputs(ownerId, request.input)
+    const prices = await useDatabase().select().from(pricingRules).where(and(eq(pricingRules.provider, 'dashscope'), eq(pricingRules.model, request.model), eq(pricingRules.active, true), sql`${pricingRules.effectiveFrom} <= now()`, sql`(${pricingRules.effectiveTo} is null or ${pricingRules.effectiveTo} > now())`)).orderBy(desc(pricingRules.version), desc(pricingRules.createdAt))
+    const price = prices.find(p => p.resolution === request.input.size) || prices.find(p => p.resolution === '*')
+    if (!price || !isImagePrice(price.formula))
+      throw createError({ statusCode: 422, statusMessage: '此图片模型尚未配置按张计费规则' })
+    const [quote] = await useDatabase().insert(quotes).values({ kind: 'image', userId: ownerId, request: request.input, platformRequest: request, requestHash: requestHash(request), connectionVersionId: version.id, ruleId: price.id, priceVersion: price.version, estimatedCredits: imageCredits(price.formula, request.input.count), expiresAt: new Date(Date.now() + 600000) }).returning()
+    id = quote!.id
   }
   else {
     const [price] = await useDatabase().select().from(textPrices).where(and(eq(textPrices.connectionId, connection.id), eq(textPrices.model, request.model), eq(textPrices.length, request.input.length))).orderBy(desc(textPrices.version)).limit(1)

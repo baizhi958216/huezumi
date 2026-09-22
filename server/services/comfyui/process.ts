@@ -6,7 +6,7 @@ import { spawn } from 'node:child_process'
 import process from 'node:process'
 import { fetchSystemStats } from './client'
 import { getComfyConfig, resolvePythonBin } from './config'
-import { ensureForkvdoCustomNode } from './custom-nodes'
+import { ensureHuezumiCustomNode } from './custom-nodes'
 import { comfyChildEnvironment } from './environment'
 import { isComfyInstalled } from './installer'
 import {
@@ -117,12 +117,20 @@ export async function startComfy(): Promise<ComfyUIStatus> {
     return getComfyStatus()
   }
 
+  // 探活会让出执行权；启动钩子和手动请求可能在此期间创建了进程。
+  if (runtime.starting) {
+    await runtime.starting
+    return getComfyStatus()
+  }
+  if (isChildAlive(runtime.child))
+    return getComfyStatus()
+
   const python = resolvePythonBin(config)
   if (!python) {
     throw createError({ statusCode: 500, statusMessage: '未找到可用的 Python 解释器，请配置 NUXT_COMFYUI_PYTHON' })
   }
 
-  ensureForkvdoCustomNode(config)
+  ensureHuezumiCustomNode(config)
 
   runtime.error = undefined
   appendRuntimeLog(`[comfyui] 启动：${python} main.py --listen ${config.host} --port ${config.port}`)
@@ -165,6 +173,19 @@ export async function startComfy(): Promise<ComfyUIStatus> {
     runtime.starting = undefined
   }
   return getComfyStatus()
+}
+
+/** Restart the managed local process, for example after upgrading custom nodes. */
+export async function restartComfy(): Promise<ComfyUIStatus> {
+  const config = getComfyConfig()
+  if (config.mode === 'remote')
+    throw createError({ statusCode: 409, statusMessage: '远程 ComfyUI 需要在执行端管理进程重启' })
+  const runtime = getRuntime()
+  if (await probeComfy(config.probeTimeoutMs) && !isChildAlive(runtime.child))
+    throw createError({ statusCode: 409, statusMessage: '当前 ComfyUI 由外部进程启动，请先停止该进程，再从工作流页面启动' })
+  if (isChildAlive(runtime.child))
+    await stopComfy()
+  return await startComfy()
 }
 
 /** 停止本地进程：先 SIGTERM，宽限期后 SIGKILL。 */

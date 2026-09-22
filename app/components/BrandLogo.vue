@@ -3,24 +3,9 @@ withDefaults(defineProps<{ compact?: boolean }>(), { compact: false })
 </script>
 
 <template>
-  <span class="brand-logo">
-    <img
-      v-if="compact"
-      src="/favicon.svg"
-      alt=""
-      width="32"
-      height="32"
-      class="brand-logo__mark"
-      aria-hidden="true"
-    >
-    <img
-      v-else
-      src="/images/forkvdo-logo-nav.png"
-      alt="forkvdo"
-      width="2029"
-      height="530"
-      class="brand-logo__wordmark"
-    >
+  <span class="brand-logo" aria-label="绘小宙">
+    <img src="/favicon.svg" alt="" width="36" height="36" class="brand-logo__mark" aria-hidden="true">
+    <span v-if="!compact" class="brand-logo__name">绘小宙<span class="brand-logo__star" aria-hidden="true">✦</span></span>
   </span>
 </template>
 
@@ -28,21 +13,24 @@ withDefaults(defineProps<{ compact?: boolean }>(), { compact: false })
 .brand-logo {
   display: inline-flex;
   align-items: center;
+  gap: 0.5rem;
+  white-space: nowrap;
 }
-
 .brand-logo__mark {
-  width: 2rem;
-  height: 2rem;
+  width: 2.25rem;
+  height: 2.25rem;
   flex: none;
 }
-
-.brand-logo__wordmark {
-  width: auto;
-  height: 1.9rem;
-  transition: filter 180ms ease;
+.brand-logo__name {
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--ui-text-highlighted);
 }
-
-:global(.dark .brand-logo__wordmark) {
-  filter: invert(1) hue-rotate(180deg) brightness(1.1);
+.brand-logo__star {
+  margin-left: 0.25rem;
+  color: var(--color-signal-500);
+  font-size: 0.8rem;
+  vertical-align: top;
 }
 </style>

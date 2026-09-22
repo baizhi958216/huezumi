@@ -7,8 +7,15 @@ import WorkDetailModal from '~/components/projects/WorkDetailModal.vue'
 
 const platform = usePlatformApi()
 const query = ref('')
-const kind = ref('')
+const route = useRoute()
+const { user } = useAuth()
+const kind = ref(['image', 'video', 'text'].includes(String(route.query.kind)) ? String(route.query.kind) : '')
 const projectId = ref('')
+// Select reserves the empty string for clearing; keep the API filter unchanged.
+const selectedProject = computed({
+  get: () => projectId.value || '__all_projects__',
+  set: (value: string) => { projectId.value = value === '__all_projects__' ? '' : value },
+})
 const viewMode = ref<'grid' | 'masonry' | 'list'>('grid')
 
 const { items: projects, cursor: projectCursor, loadMore: moreProjects, refresh: refreshProjects } = await useProjectOptions()
@@ -52,7 +59,7 @@ watch(page, () => {
 const items = computed(() => [...(page.value?.items || []), ...more.value])
 
 useIntervalFn(async () => {
-  if (active.value?.items.some(r => ['PENDING', 'RUNNING'].includes(r.status))) {
+  if (active.value?.items.some(r => ['PENDING', 'RUNNING'].includes(r.status) || (r.kind === 'image' && r.stage === 'archiving'))) {
     await refreshActive()
     await refresh()
   }
@@ -175,16 +182,17 @@ const kindTabs = [
   { value: 'image', label: '图片', icon: 'i-lucide-image' },
 ]
 
-const creationItems = [
+const creationItems = computed(() => [
   [
     { label: '文本与剧本创作', icon: 'i-lucide-sparkles', to: '/studio' },
     { label: '视频生成任务', icon: 'i-lucide-film', to: '/studio/video' },
-    { label: 'ComfyUI 工作流画布', icon: 'i-lucide-workflow', to: '/studio/workflow' },
+    { label: '图片生成', icon: 'i-lucide-image-plus', to: '/studio/image' },
+    ...(user.value?.role === 'admin' ? [{ label: '工作流 · 高级', icon: 'i-lucide-workflow', to: '/studio/workflow' }] : []),
   ],
-]
+])
 
 const projectSelectItems = computed(() => [
-  { label: '全部项目', value: '' },
+  { label: '全部项目', value: '__all_projects__' },
   ...projects.value.map(p => ({ label: p.name, value: p.id })),
 ])
 </script>
@@ -207,7 +215,7 @@ const projectSelectItems = computed(() => [
           </UBadge>
         </div>
         <p class="mt-1 text-xs text-muted">
-          管理所有由文生视频、剧本生成及工作流产生的创意作品资产与版本
+          收好每一个故事、画面与动态瞬间，让小宇宙一点点长大。
         </p>
       </div>
 
@@ -320,7 +328,7 @@ const projectSelectItems = computed(() => [
         <!-- Project Selector & View Mode Switcher -->
         <div class="flex items-center gap-2">
           <USelect
-            v-model="projectId"
+            v-model="selectedProject"
             :items="projectSelectItems"
             class="w-40 sm:w-48"
             size="sm"
@@ -391,10 +399,10 @@ const projectSelectItems = computed(() => [
         <UIcon name="i-lucide-clapperboard" class="size-7" />
       </div>
       <h3 class="mt-4 text-base font-semibold text-highlighted">
-        没有符合条件的作品
+        {{ query || kind || projectId ? '没有符合条件的作品' : '你的小宇宙，还差第一件作品' }}
       </h3>
       <p class="mt-1 max-w-sm text-xs text-muted">
-        {{ query || kind || projectId ? '可尝试调整或重置搜索词与筛选条件' : '开始创作你的第一个短视频、剧本或概念图片' }}
+        {{ query || kind || projectId ? '可尝试调整或重置搜索词与筛选条件' : '从一段故事、一个角色或一份参考素材开始，收藏你的第一份作品' }}
       </p>
       <div class="mt-5 flex gap-2">
         <UButton

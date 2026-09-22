@@ -7,9 +7,9 @@ import { and, eq, gt, isNull, sql } from 'drizzle-orm'
 import { useDatabase } from '../database/client'
 import { assets, sessions, users, wallets } from '../database/schema'
 import { readSettings } from '../services/platform/connections'
+import { SESSION_COOKIE_NAME, sessionTokenFromCookies } from './session-cookie'
 
 const scrypt = promisify(scryptCallback)
-const COOKIE_NAME = 'forkvdo_session'
 const SESSION_DAYS = 30
 export interface AuthUser {
   id: string
@@ -47,7 +47,7 @@ export async function createSession(event: Parameters<typeof setCookie>[0], user
   const rawToken = randomBytes(32).toString('base64url')
   const expiresAt = new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000)
   await useDatabase().insert(sessions).values({ userId, tokenHash: hashToken(rawToken), expiresAt })
-  setCookie(event, COOKIE_NAME, rawToken, {
+  setCookie(event, SESSION_COOKIE_NAME, rawToken, {
     httpOnly: true,
     sameSite: 'lax',
     secure: process.env.NODE_ENV === 'production',
@@ -56,13 +56,13 @@ export async function createSession(event: Parameters<typeof setCookie>[0], user
   })
 }
 export async function destroySession(event: Parameters<typeof getCookie>[0]) {
-  const token = getCookie(event, COOKIE_NAME)
+  const token = getCookie(event, SESSION_COOKIE_NAME)
   if (token)
     await useDatabase().delete(sessions).where(eq(sessions.tokenHash, hashToken(token)))
-  deleteCookie(event, COOKIE_NAME, { path: '/' })
+  deleteCookie(event, SESSION_COOKIE_NAME, { path: '/' })
 }
 export async function optionalUser(event: Parameters<typeof getCookie>[0]): Promise<AuthUser | null> {
-  const token = getCookie(event, COOKIE_NAME)
+  const token = sessionTokenFromCookies(name => getCookie(event, name))
   if (!token)
     return null
   const [row] = await useDatabase()

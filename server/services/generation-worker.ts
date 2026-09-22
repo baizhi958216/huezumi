@@ -7,6 +7,7 @@ import { resolveProviderMediaUrls } from './assets'
 import { releaseGenerationCredits, settleGenerationCredits } from './billing'
 import { enqueueGeneration, withGenerationLock } from './generation-queue'
 import { archiveRemoteOutput, OutputArchiveError } from './output-archive'
+import { runImageJob } from './platform/image-worker'
 import { failRunJob, runTextJob } from './platform/text-worker'
 import { syncVideoWork, syncWorkflowRun } from './platform/works'
 import { getVideoProvider } from './providers'
@@ -15,6 +16,8 @@ import { configuredVideoProvider } from './providers/configured'
 const POLL_DELAY_MS = 12000
 export async function runGenerationJob(job: GenerationJob) {
   return await withGenerationLock(job.generationId, async () => {
+    if (job.kind === 'image')
+      return await runImageJob(job.generationId)
     if (job.kind === 'text')
       return await runTextJob(job.generationId)
     if (job.kind === 'workflow')
@@ -26,7 +29,7 @@ export async function runGenerationJob(job: GenerationJob) {
 }
 export async function handleFailedGeneration(job: GenerationJob) {
   await withGenerationLock(job.generationId, async () => {
-    if (job.kind === 'text' || job.kind === 'workflow')
+    if (job.kind === 'image' || job.kind === 'text' || job.kind === 'workflow')
       return await failRunJob(job.generationId)
     await useDatabase().update(generations).set({
       status: 'UNKNOWN',

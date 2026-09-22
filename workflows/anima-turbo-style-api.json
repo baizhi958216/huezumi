@@ -83,7 +83,7 @@
   "11": {
     "class_type": "SaveImage",
     "inputs": {
-      "filename_prefix": "forkvdo-anima-turbo-style",
+      "filename_prefix": "huezumi-anima-turbo-style",
       "images": ["10", 0]
     }
   }

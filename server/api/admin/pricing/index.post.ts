@@ -1,3 +1,5 @@
+import { isSupportedImageModel } from '#shared/types/image-generation'
+import { isImagePrice } from '#shared/utils/image-pricing'
 import { z } from 'zod'
 import { useDatabase } from '../../../database/client'
 import { auditLogs, pricingRules } from '../../../database/schema'
@@ -18,6 +20,8 @@ export default defineEventHandler(async (event) => {
   const parsed = schema.safeParse(await readBody(event))
   if (!parsed.success)
     throw createError({ statusCode: 422, statusMessage: parsed.error.issues[0]?.message || '价格规则无效' })
+  if (parsed.data.provider === 'dashscope' && isSupportedImageModel(parsed.data.model) && (!isImagePrice(parsed.data.formula) || parsed.data.formula.fixedCredits! > 1000000))
+    throw createError({ statusCode: 422, statusMessage: '图片按张定价需使用正数固定额度（不超过 1000000），不能混用视频计费公式' })
   const [created] = await useDatabase().insert(pricingRules).values({ ...parsed.data, createdBy: admin.id }).returning()
   await useDatabase().insert(auditLogs).values({ actorUserId: admin.id, action: 'pricing.create', targetType: 'pricing_rule', targetId: created!.id, detail: { provider: created!.provider, model: created!.model, version: created!.version } })
   return created

@@ -1,1 +1,0 @@
-CREATE UNIQUE INDEX "pricing_version_unique" ON "pricing_rules" USING btree ("provider","model","resolution","version");

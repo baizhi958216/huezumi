@@ -13,7 +13,7 @@
 
 `POST /api/files` 继续由服务端接收 multipart 文件，并使用服务端 `ali-oss` SDK 将素材上传到阿里云 OSS。OSS 配置完整时响应返回 OSS 公网 URL；AccessKey 只从私有 runtime config 读取。为兼容旧接口和提供短期兜底，服务端仍保留本地元数据与文件副本。
 
-默认对象使用服务端 UUID 作为文件名、`forkvdo/uploads` 作为前缀，并使用 `public-read` 对象 ACL，使百炼可以直接读取返回地址。若使用自定义域名或内网上传端点，通过独立的公网基地址配置生成最终 URL。
+默认对象使用服务端 UUID 作为文件名、`huezumi/uploads` 作为前缀，并使用 `public-read` 对象 ACL，使百炼可以直接读取返回地址。若使用自定义域名或内网上传端点，通过独立的公网基地址配置生成最终 URL。
 
 ## 备选方案
 

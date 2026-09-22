@@ -12,14 +12,14 @@ export default defineNuxtConfig({
     pageTransition: { name: 'page', mode: 'out-in' },
     head: {
       htmlAttrs: { lang: 'zh-CN' },
-      title: 'forkvdo — AI 视频生成平台',
+      title: '绘小宙 — 创作属于自己的小宇宙',
       meta: [
-        { name: 'description', content: '支持文字、图片、视频和音频输入的 AI 视频生成平台。一套任务结构接入多家模型供应商。' },
-        { name: 'theme-color', content: '#f7f8fa', media: '(prefers-color-scheme: light)' },
-        { name: 'theme-color', content: '#08090b', media: '(prefers-color-scheme: dark)' },
-        { property: 'og:title', content: 'forkvdo — AI 视频生成平台' },
-        { property: 'og:description', content: '支持文生视频、首尾帧和多模态参考生成，最高 4K / 30 秒。' },
-        { property: 'og:image', content: '/images/hero-cinematic.png' },
+        { name: 'description', content: '写故事、构思角色、探索画面、生成视频。绘小宙，陪你创作属于自己的小宇宙。' },
+        { name: 'theme-color', content: '#fffaf3', media: '(prefers-color-scheme: light)' },
+        { name: 'theme-color', content: '#211b18', media: '(prefers-color-scheme: dark)' },
+        { property: 'og:title', content: '绘小宙 — 创作属于自己的小宇宙' },
+        { property: 'og:description', content: '让每个小小的灵感都被看见，从故事与角色，到画面与视频。' },
+        { property: 'og:image', content: '/images/huixiaozhou-universe.png' },
       ],
       link: [
         { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' },
@@ -43,12 +43,12 @@ export default defineNuxtConfig({
     ossEndpoint: '',
     ossSecure: '',
     ossPublicBaseUrl: '',
-    ossPrefix: 'forkvdo/uploads',
-    ossOutputPrefix: 'forkvdo/outputs',
+    ossPrefix: 'huezumi/uploads',
+    ossOutputPrefix: 'huezumi/outputs',
     ossMaxOutputBytes: 1073741824,
     ossTransferTimeoutMs: 300000,
     ossSignedUrlTtlSeconds: 86400,
-    // ComfyUI 工作流：本地托管或连接其他机器上已运行的服务
+    // 启动时自动探活：本地已安装则按需启动，远程服务由外部管理
     comfyuiMode: 'auto',
     comfyuiDir: '',
     comfyuiPython: '',

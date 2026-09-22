@@ -7,6 +7,7 @@ const props = defineProps<{
   icon: string
   type: MediaType
   values: MediaInput[]
+  allowUrl?: boolean
   accept?: string
   max?: number
   maxBytes?: number
@@ -249,7 +250,7 @@ async function upload(event: Event) {
           </div>
         </div>
 
-        <div class="flex flex-col gap-1.5 sm:flex-row">
+        <div v-if="allowUrl !== false" class="flex flex-col gap-1.5 sm:flex-row">
           <UInput
             v-model="urlDraft"
             :placeholder="values.length ? '继续粘贴公网 URL' : hint"
@@ -286,7 +287,7 @@ async function upload(event: Event) {
           </UButton>
         </div>
         <p class="type-caption mt-1 text-[11px] text-dimmed">
-          {{ max !== undefined ? `最多 ${max} 份，可多选文件或逐个添加 URL` : '可多选文件或逐个添加 URL' }}
+          {{ max !== undefined ? `最多 ${max} 份，` : '' }}{{ allowUrl === false ? '可多选文件上传' : '可多选文件或逐个添加 URL' }}
         </p>
         <p v-if="needsDuration" class="type-caption mt-1 text-[11px] text-dimmed">
           本地上传会自动读取视频时长；粘贴 URL 时请填写时长，RollDek 按该时长计费。
