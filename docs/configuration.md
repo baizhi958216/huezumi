@@ -1,73 +1,74 @@
 # 平台配置
 
-## 后台操作
+## 配置来源
 
-`/admin/settings` 默认展示连接列表、运营摘要和文本价格。通过「新建连接 / 编辑」「编辑设置」「发布价格」打开对应弹窗；连接历史版本和只读部署状态也按需查看。`/admin` 的视频价格发布与用户额度调整使用独立弹窗，页面保留用户、价格和任务列表。
+| 来源                   | 内容                                                     | 修改方式                           |
+| ---------------------- | -------------------------------------------------------- | ---------------------------------- |
+| 私有 `.env` / 部署环境 | 数据库、主密钥、对象存储、worker、ComfyUI 地址           | 运维配置并重启对应进程             |
+| PostgreSQL             | 文本/图片/视频连接、连接版本、用途分配、价格、注册和预算 | 管理后台                           |
+| 工作流 JSON            | 节点、连线、模型文件选择和任务输入                       | 管理员编辑器；公共模板不含真实密钥 |
 
-编辑弹窗使用临时草稿：取消或关闭后重开恢复已保存值，提交失败在弹窗内保留输入并提示错误，保存成功后关闭并更新摘要。提交期间禁用表单和关闭操作，避免重复提交；连接凭据不回显，关闭弹窗即清空临时密钥。
+平台请求不会回退读取旧供应商环境配置。独立 ComfyUI 的环境连接仅用于非平台任务兼容，见 [节点指南](../comfyui/custom_nodes/huezumi_prompt/README.md)。
 
-## 本机开发
+## 必要基础设施配置
 
-`.env.example` 仅列出部署必要项。启动 PostgreSQL 和 SeaweedFS 后，执行：
+以 [.env.example](../.env.example) 和 [.env.production.example](../.env.production.example) 为准。`nuxt.config.ts` 定义可覆盖的 runtime config；不是每个 Nuxt 覆盖项都已经在生产 Compose 中透传，新增覆盖时要同步检查 Compose。
+
+| 配置                                                                      | 作用 / 默认                                                  |
+| ------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| `NUXT_DATABASE_URL`                                                       | PostgreSQL URL，必需；生产 Compose 从 POSTGRES_* 组装        |
+| `NUXT_CONNECTION_ENCRYPTION_KEY`                                          | 32 字节随机值的标准 Base64；Web/worker 一致，随备份保管      |
+| `NUXT_PUBLIC_APP_URL`                                                     | 默认 `http://localhost:3000`；生产填写实际 HTTPS 地址        |
+| `NUXT_WORKER_ENABLED`                                                     | 默认 false；开发示例 true，生产 web=false、worker=true       |
+| `NUXT_WORKER_CONCURRENCY`                                                 | 默认 4，运行期限定 1–32                                      |
+| `NUXT_OSS_ACCESS_KEY_ID`、`NUXT_OSS_ACCESS_KEY_SECRET`、`NUXT_OSS_BUCKET` | 应用访问私有存储的凭据与桶                                   |
+| `NUXT_OSS_REGION`、`NUXT_OSS_ENDPOINT`、`NUXT_OSS_SECURE`                 | 阿里云 OSS 或 S3 兼容端点；本地示例 us-east-1 / HTTP / false |
+| `NUXT_OSS_PREFIX`、`NUXT_OSS_OUTPUT_PREFIX`                               | 默认 `huezumi/uploads` / `huezumi/outputs`                   |
+| `NUXT_OSS_PUBLIC_BASE_URL`                                                | 上传展示地址覆盖，不替代鉴权与签名                           |
+| `NUXT_OSS_MAX_OUTPUT_BYTES`                                               | 默认 1073741824（1 GiB），归档大小上限                       |
+| `NUXT_OSS_TRANSFER_TIMEOUT_MS`                                            | 默认 300000，归档传输超时                                    |
+| `NUXT_OSS_SIGNED_URL_TTL_SECONDS`                                         | 默认 86400；供应商还需在有效期内可访问                       |
+
+开发 Compose 使用 `POSTGRES_DB` / `POSTGRES_USER` / `POSTGRES_PASSWORD`、`POSTGRES_HOST_PORT`（55432）、`LOCAL_OSS_BUCKET` / `LOCAL_OSS_ACCESS_KEY_ID` / `LOCAL_OSS_ACCESS_KEY_SECRET`、`LOCAL_OSS_API_PORT`（9100）和 `LOCAL_OSS_CONSOLE_PORT`（9101）。Nuxt 的连接值必须与之匹配。
+
+## ComfyUI 配置
+
+| 配置                                                             | 作用 / 默认                                                     |
+| ---------------------------------------------------------------- | --------------------------------------------------------------- |
+| `NUXT_COMFYUI_MODE`                                              | auto/local/remote；默认 auto，生产必须 remote                   |
+| `NUXT_COMFYUI_REMOTE_BASE_URL`                                   | remote 私有执行端地址；生产 Compose 为 `http://comfyui:8188`    |
+| `NUXT_COMFYUI_DIR`、`NUXT_COMFYUI_PYTHON`                        | 本地目录默认 vendor/ComfyUI；目录内 venv 优先于显式 Python 路径 |
+| `NUXT_COMFYUI_HOST`、`NUXT_COMFYUI_PORT`                         | 默认 127.0.0.1 / 8188                                           |
+| `NUXT_COMFYUI_ARGS`                                              | 本地启动附加参数                                                |
+| `NUXT_COMFYUI_CUSTOM_NODE_SOURCE_DIR`                            | 自定义节点源目录覆盖                                            |
+| `NUXT_COMFYUI_START_TIMEOUT_MS`、`NUXT_COMFYUI_PROBE_TIMEOUT_MS` | 默认 180000 / 1500                                              |
+| `COMFYUI_MODELS_DIR`                                             | 生产 Compose 必填的宿主模型路径，只读挂载                       |
+| `COMFYUI_REF`                                                    | 生产 Compose / 执行端镜像基线为 v0.37.0                         |
+
+独立执行端兼容项包括 `HUEZUMI_LLM_CONNECTIONS_JSON` 与 `HUEZUMI_DASHSCOPE_*`；本地 Nuxt 启动子进程可接收 `NUXT_COMFYUI_LLM_CONNECTIONS_JSON` 与兼容 `NUXT_DASHSCOPE_*`。这些不是当前平台连接的推荐配置方式，生产 Compose 不向 ComfyUI 传平台主密钥或供应商环境 Key。
+
+## 后台连接与价格
+
+1. 管理员在 `/admin/settings` 新建连接，类型为 text、image 或 video，填写供应商、模型列表、默认模型和凭据。默认模型必须属于列表。
+2. 文本连接支持自动 / Chat Completions / Responses；联网要求 Responses 或自动协议及上游工具支持。独立图片台使用 dashscope 连接，OpenAI-compatible 图片连接用于 `HuezumiApiImage` 工作流。
+3. 分配文本、图片、视频、工作流 Agent 和工作流视频用途；工作流视频要求百炼。默认图片连接同时供图片工作流使用，选 OpenAI-compatible 不会让它进入独立图片台报价目录。
+4. 为文本连接的每个模型/篇幅发布固定价格，为图片模型发布正数按张价格，为视频发布匹配 provider/model/resolution 的规则。不能把图片按张公式与视频按秒公式混用。
+5. 配置注册方式（默认 invite）、赠送额度（0）、用户活动任务上限（3）和平台日预算（100000）。这些值由数据库保存，旧 `NUXT_REGISTRATION_MODE` 等不是运行期覆盖。
+
+编辑使用临时草稿，失败保留输入。凭据不回显，更新时省略 secrets 沿用原值；保存连接产生新版本，新报价使用新版本，既有任务保留原引用。显式撤销版本会把相关未完成文本/图片/视频任务转为待核对。
+
+Agent 未分配时 Qwen Agent 可走离线规则；普通 `HuezumiPrompt` 选择非 manual 且没有手动连接时需要分配后台 Agent。不要把两者的降级行为混为一谈。
+
+## 主密钥与检查
+
+更换 API Key 应编辑连接；不要同时更换加密主密钥。丢失或直接替换主密钥将导致既有连接无法解密。后台只读部署页展示存在性，配置检查不打印配置值：
 
 ```bash
-node --env-file=.env --import tsx scripts/db-migrate.ts
-pnpm config:import -- --compact-env
-node --env-file=.env --import tsx scripts/backfill-platform.ts
 pnpm config:check
-pnpm dev
+# 在已具备生产运行期变量的环境中执行
+pnpm config:check --production
 ```
 
-导入工具从旧环境配置读取供应商、文本连接和运营设置，创建加密连接版本；重复执行不覆盖后台修改。未单独配置文本连接时，仅在这次导入中复制旧 ComfyUI 默认连接，之后两者独立。工具不设置商业价格；管理员必须在 `/admin/settings` 发布每个文本模型与篇幅的价格。
+`--production` 还检查 OSS 必要项、remote 模式和执行端地址。宿主 `.env.production.example` 没写完整的容器运行期变量；Compose 会注入数据库 URL 与 remote 地址，因此不能把宿主直接执行检查的结果等同于容器配置。
 
-首次导入自动生成缺失的加密主密钥。写回前生成 `.env.backup-*` 私有备份，权限为 `0600`；导入失败不提交数据库事务。Git 与 Docker 均忽略这些备份。请保管原始数据库备份和主密钥，不要把主密钥加入公开配置。每次更换部署机器，Web/worker 必须使用原主密钥；直接更换会使已有连接无法解密。
-
-数据库是文本/图片/视频/Agent 连接、用途分配、默认模型、注册方式、赠送额度、并发任务上限和平台日预算的唯一事实源。平台提交的 ComfyUI 任务也从数据库读取连接；旧执行端环境变量仅用于独立运行的兼容场景，导入工具暂时保留这些旧项。
-
-## 生产
-
-以 `.env.production.example` 为模板，在部署目录填写私有基础设施配置。生产 Compose 显式把主密钥、数据库及 OSS 配置传给应用进程；ComfyUI 挂载模型卷，通过任务的私有数据接收所需连接快照，无需配置供应商 Key。`NUXT_WORKER_CONCURRENCY` 为唯一 worker 并发覆盖名。
-
-```bash
-docker compose -f docker-compose.production.yml config --quiet
-docker compose -f docker-compose.production.yml up -d --build
-```
-
-Web 不消费队列，worker 消费旧视频和新文本/工作流消息。已有部署应先备份、迁移、导入与回填，然后切换匹配版本。`docker-compose.yml` 仅是旧单进程入口，不代表完整生产拓扑。
-
-## 高级覆盖项
-
-| 分组         | 配置项                                                                                                   | 默认值/作用                                                                   |
-| ------------ | -------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| 数据库容器   | `POSTGRES_DB`、`POSTGRES_USER`、`POSTGRES_HOST_PORT`                                                     | 新安装 huezumi / huezumi / 55432（旧默认保留）                                |
-| 队列         | `NUXT_WORKER_ENABLED`、`NUXT_WORKER_CONCURRENCY`                                                         | false / 4；本地示例启用 worker                                                |
-| 对象存储     | `NUXT_OSS_PUBLIC_BASE_URL`、`NUXT_OSS_PREFIX`、`NUXT_OSS_OUTPUT_PREFIX`                                  | 展示地址、uploads/outputs 前缀                                                |
-| 归档         | `NUXT_OSS_MAX_OUTPUT_BYTES`、`NUXT_OSS_TRANSFER_TIMEOUT_MS`                                              | 1 GiB / 300000 ms                                                             |
-| 签名         | `NUXT_OSS_SIGNED_URL_TTL_SECONDS`                                                                        | 86400 秒；供应商仍需公网 HTTPS 可达                                           |
-| 本地存储容器 | `LOCAL_OSS_BUCKET`、`LOCAL_OSS_API_PORT`、`LOCAL_OSS_CONSOLE_PORT`                                       | 新安装 huezumi / 9100 / 9101（旧默认保留）                                    |
-| ComfyUI 本地 | `NUXT_COMFYUI_DIR`、`NUXT_COMFYUI_PYTHON`、`NUXT_COMFYUI_HOST`、`NUXT_COMFYUI_PORT`、`NUXT_COMFYUI_ARGS` | vendor/ComfyUI、自动发现解释器、127.0.0.1、8188、无额外参数                   |
-| ComfyUI 远程 | `NUXT_COMFYUI_MODE`、`NUXT_COMFYUI_REMOTE_BASE_URL`                                                      | 生产要求 remote 和私有地址                                                    |
-| ComfyUI 开发 | `NUXT_COMFYUI_CUSTOM_NODE_SOURCE_DIR`、`NUXT_COMFYUI_START_TIMEOUT_MS`、`NUXT_COMFYUI_PROBE_TIMEOUT_MS`  | 项目自定义节点、180000 / 1500 ms                                              |
-| ComfyUI 连接 | `NUXT_COMFYUI_LLM_CONNECTIONS_JSON`、`NUXT_DASHSCOPE_*`                                                  | 宿主机注入子进程；remote 使用 `HUEZUMI_LLM_CONNECTIONS_JSON` 与 `DASHSCOPE_*` |
-
-## 在管理面板配置 API 与用途
-
-1. 打开 `/admin/settings`，点击「新建连接」，选择文本、图片 API 或视频类型，填写 Base URL、模型列表、默认模型和 Key。视频保留各供应商适配器；文本使用 Chat Completions / Responses；图片使用 OpenAI-compatible `/images/generations`。
-2. 打开「用途分配与设置」，分别选择文本创作、图片 API、视频创作、工作流视频（百炼）和工作流 Agent 的连接。可以为同一供应商建立多条连接，使用不同地址和 Key。
-3. 保存后，新报价和新提交的工作流使用当前连接版本。编辑连接时 Key 留空沿用旧值；已提交任务保留原快照。停用或撤销的连接不能用于新任务。
-
-工作流库新增「图片 API · 后台连接」，通过 `HuezumiApiImage` 节点生成图片并保存输出。该入口目前支持文生图，图片服务需支持 `/images/generations`，并返回 `data[0].b64_json` 或 HTTPS 图片 URL；可用尺寸取决于供应商。现有本地 Qwen Image 工作流继续使用本地模型，Agent 单独使用分配的文本连接。Wan 3.0 工作流使用「工作流视频」中的百炼连接。
-
-首次升级需更新本地/远程 ComfyUI 的 `huezumi_prompt` 节点包并重启一次。此后修改 API、Key 或用途分配无需重启。平台在发送任何凭据前检查执行端是否支持私有连接；旧节点包会被拒绝并提示升级。连接随任务放入 ComfyUI 的敏感数据槽，不写入节点输入、工作流、图片元信息、公开队列或历史；执行上下文按任务隔离，结束后清除。ComfyUI 应仅供平台通过私有网络访问。
-
-Agent 可选择支持视觉和联网检索的文本连接；需要联网时使用 Responses 或自动协议。未分配 Agent 时 Qwen Agent 使用离线规则，`manual` 提示词节点也可独立运行。平台提交不会回退到 `.env` 中的旧供应商配置。
-
-`.env` 仍需保留数据库、对象存储、执行端地址和 `NUXT_CONNECTION_ENCRYPTION_KEY` 等基础设施配置。加密主密钥只配置一次，不能随 API Key 一起更换；数据库备份应与主密钥一起保管。图片 API 工作流沿用现有工作流任务的免平台额度结算方式，供应商仍可能计费。
-
-不需要覆盖默认值时不必写入 `.env`。平台后台不会修改这些部署项。配置检查只报告项名、存在性和来源，不打印值。
-
-## 历史 OSS 恢复
-
-恢复工具只读取明确的 `HUEZUMI_LEGACY_*` 配置（如 `HUEZUMI_LEGACY_ACCESS_KEY_ID`、`HUEZUMI_LEGACY_BUCKET`），不再从当前 `NUXT_OSS_*` 猜测旧连接，也不支持依靠同名变量的前后顺序选择配置。原有历史播放地址保持兼容。
-
-英文工程名与变量、节点、存储迁移策略见 [Huezumi 工程命名](engineering-name.md)。
+旧配置导入会备份并可能重写 `.env`，只在迁移场景按 [运维指南](operations.md) 执行。工程标识见 [命名约定](engineering-name.md)。

@@ -1,6 +1,8 @@
 # 图片创作节点与工作流
 
-唯一创作模板：[图片创作 · 生图 / 原图编辑 / 局部重绘](../../../workflows/image-creation.json)。它替代原来的两个 Anima 大模型模板；已保存的旧工作流与 `HuezumiPrompt` / `HuezumiImageCollection` 节点仍兼容。
+本包提供标准图片创作、Qwen Image 2.1 Agent、图片 API 和百炼视频节点。预设总览见 [工作流指南](../../../docs/workflows.md)。
+
+平台任务优先使用 [后台分配连接](#后台分配连接)，独立执行端环境和手动连接仅作兼容。以下标准图片链路对应 [图片创作 · 生图 / 原图编辑 / 局部重绘](../../../workflows/image-creation.json)；已保存的 `HuezumiPrompt` / `HuezumiImageCollection` 工作流仍兼容。
 
 ```text
 图片集合 ─┬→ 大模型 ← 需求文本
@@ -16,10 +18,10 @@
 1. 更新节点包并重启 ComfyUI，在平台刷新服务/节点定义，从公开工作流载入“图片创作”。已有副本先保存当前修改，再重新载入，以显示新增的协议控件。
 2. **图片**：可不上传、上传一张或多张。一个集合节点内最多添加十张，节点直接显示缩略图、数量和添加/移除控件；按实际非空素材顺序编号，图片尺寸可以不同，只接受静态图片。检查器仍支持单选替换与多选依次填入空位。
 3. **需求**：写最终画面要求，明确图1、图2是人物、配色、风格还是构图参考。
-4. **大模型**：在“③ 大模型连接”节点填写兼容 Chat Completions 或 Responses 的地址、API Key、模型名和视觉能力，再将它连接到“④ 大模型”节点。`api_protocol` 默认自动识别，也可显式选择协议。连接配置会随工作流副本保存；含 Key 的工作流必须保持私有，导出 JSON 也会包含该 Key。`manual` 仍可直接使用需求文本，不联网、不分析参考图。大模型模式有图时需视觉模型。
+4. **大模型**：当前模板的 `HuezumiPrompt` 使用后台分配的工作流 Agent。无需在图内填写 API Key；无后台连接时显式选择 `manual`，直接使用需求文本，不联网、不分析参考图。大模型模式有图时需视觉模型。旧手动 `HuezumiLLMConfig` 节点仍兼容，但凭据会随副本及导出保存，不能公开。
 5. **正负提示词**：`append` 保留大模型结果并追加文本；`replace` 完全替换。反向词可以为空，正向词不能为空。运行后可查看和复制最终文本。要完全跳过 LLM，应选择 `manual`，只替换下游文本不会取消上游调用。
 6. **创作设置**：选择下表中的模式。所有模式一次生成一张图片，多图输入不是批量生图。
-7. **生图模型**：选择已安装且包含匹配编码器/VAE 的 checkpoint。模板默认本机已有的 `anythingv5nijimix_25BEST.safetensors`；其他机器需自行选择已有模型，不会自动下载。512×512 是模板起始尺寸，换用 SDXL 时自行调整适合模型的尺寸与参数。
+7. **生图模型**：选择已安装且包含匹配编码器/VAE 的 checkpoint。模板默认文件名为 `anythingv5nijimix_25BEST.safetensors`；其他机器需自行选择已有模型，不会自动下载。512×512 是模板起始尺寸，换用 SDXL 时自行调整适合模型的尺寸与参数。
 8. **生成**：调整种子、步数、CFG、采样器和调度器；`control_after_generate=fixed` 可保留种子，`randomize` 为下次运行换种子。运行后在输出区查看图片。
 
 | mode     | 行为                                               | 需要填写                                             |
@@ -38,7 +40,7 @@
 
 需要 Anima 等分体模型时，在同一张工作流中将 checkpoint 节点替换为配套的 `UNETLoader`、文本编码器 loader 与 `VAELoader`，分别连到生成节点的 MODEL、CLIP、VAE，并修改提示词说明和采样参数。生成 latent 按 VAE 通道数、维数、压缩倍率创建，未固定为 SD 的四通道。
 
-这不是任意模型的通用适配器：要求特殊参考图条件、专用 guidance、额外条件或专用 inpaint UNet 的模型，应将生成部分换成该模型原生链路。多张参考图目前只进入 LLM；编辑时只有指定原图进入扩散模型，不承诺多图融合或人物身份精确一致。云端图片生成 API 不在本次范围内。
+这不是任意模型的通用适配器：要求特殊参考图条件、专用 guidance、额外条件或专用 inpaint UNet 的模型，应将生成部分换成该模型原生链路。多张参考图目前只进入 LLM；编辑时只有指定原图进入扩散模型，不承诺多图融合或人物身份精确一致。此标准扩散链路不调用云图片 API；云图片使用下文的 `HuezumiApiImage` 节点。
 
 ## Qwen Image 2.1 创作策划 Agent
 
@@ -46,13 +48,13 @@
 
 - **从零创作**：自动在参考图前加入一张目标画布，`auto` 会根据“电脑壁纸、手机壁纸、头像、竖版封面”等语义选择画幅，其他需求默认 4:3。这样透明 Logo 或超宽品牌图不会再决定输出比例。由于画布占用一个图片槽，从零创作最多上传 9 张参考图。
 - **图片编辑**：不增加画布，保持上传图1为编辑主图，其余图片作为品牌、内容或风格参考。
-- **Agent 模式**：优先使用执行端统一配置中名称为 `image_agent`、`purpose=image_agent/qwen_image_agent` 或 `defaultForImageAgent=true` 的连接；仅有一个连接时直接使用该连接。连接需支持视觉输入。
+- **Agent 模式**：平台任务使用后台工作流 Agent 私有快照。独立执行端才按 `image_agent`、`purpose=image_agent/qwen_image_agent` 或 `defaultForImageAgent=true` 选择环境连接；只有一个环境连接时直接使用。连接需支持视觉输入。
 - **离线降级**：未配置 Agent 时仍可执行，节点会用规则整理自然语言、隔离 Logo 与目标画布并禁止默认拼贴，但不会声称已经联网或获得最新品牌资料。
 - **联网研究**：连接设置 `webSearch=true` 后使用 Responses 的 `web_search` 工具；`apiProtocol=chat_completions` 会被明确拒绝。是否允许联网完全由后端控制，画布没有 API/Key/模型控件。
 - **默认性能配置**：参考图工作流使用 `QwenImage21Cache(device=cpu, dtype=int8)`，把 KV 缓存压缩到约默认精度的一半，并把默认编码分辨率/采样步数设为 768/20；需要最终高分辨率交付时再手动提高。
 - **透明度按需开启**：RGBA VAE 仍负责生成，但输出节点只有在需求明确包含“透明底、透明背景、抠图、alpha”等表达时保留透明通道；普通需求会在保存前移除 alpha，得到完全不透明的 RGB PNG。
 
-本机由 Nuxt 启动 ComfyUI 时，在服务端环境配置 `NUXT_COMFYUI_LLM_CONNECTIONS_JSON`；独立或远程执行端使用 `HUEZUMI_LLM_CONNECTIONS_JSON`：
+以下环境示例仅供独立/非平台任务兼容。由 Nuxt 启动本地 ComfyUI 时可在服务端环境配置 `NUXT_COMFYUI_LLM_CONNECTIONS_JSON`；独立或远程执行端使用 `HUEZUMI_LLM_CONNECTIONS_JSON`：
 
 ```json
 {
@@ -72,9 +74,9 @@
 
 也可以把单独部署的 Qwen-VL Instruct 服务作为 OpenAI-compatible `image_agent`，但它必须是可生成文本的推理服务。工作流里 `CLIPLoader` 加载的 Qwen3-VL 权重只输出扩散条件，不能直接复用为聊天 Agent；不带搜索工具的本地服务还需要另外接入检索能力。
 
-## 大模型连接
+## 手动与独立执行端连接
 
-模板提供 `HuezumiLLMConfig` 节点，适合用户在工作流副本中配置自己的连接：
+节点包保留 `HuezumiLLMConfig`，用于旧版或自建私有工作流；当前标准模板已改用后台连接：
 
 ```text
 大模型连接(base_url / api_key / auth / model_name / supports_vision / api_protocol)
@@ -91,7 +93,7 @@ Base URL 填 origin 或以 `/v1` 结尾的地址，程序只补一次 `/v1`。�
 
 新协议控件追加在原有六个控件后；旧副本与旧 API prompt 缺省使用 `auto`，不需要重建工作流。连接节点中的 API Key 会进入工作流 JSON；因此不要把该工作流设为公开，也不要把导出的 JSON 发送给不可信的人。
 
-如果不希望把 Key 放入工作流，可继续使用下方的执行端环境连接。
+平台任务应使用后台用途分配；独立执行端可使用下方环境连接，避免把 Key 放进图中。
 
 执行端环境变量 `HUEZUMI_LLM_CONNECTIONS_JSON`：
 
@@ -131,7 +133,7 @@ Base URL 填 origin 或以 `/v1` 结尾的地址，程序只补一次 `/v1`。�
 
 协议兼容不等于服务允许任意客户端。2026-09-08 实测 `gpt-6-astra` 的 Chat Completions 请求返回 404，标准 Responses 请求返回 `invalid codex request`。这是服务对请求/客户端的限制，不能仅靠改模型、Key 或 URL 解决；出现指定客户端提示时，应使用供应商支持的客户端接入，或改用支持通用 API 请求的服务。当前节点提供通用 HTTP 协议，不运行 Codex CLI。`/v1/models` 成功只说明模型列表可访问，不能保证生成请求获准。
 
-本地托管模式在 `.env` 填 `NUXT_COMFYUI_LLM_CONNECTIONS_JSON`，Nuxt 启动 ComfyUI 时将它注入上述执行端变量。remote 模式直接在远端 ComfyUI 容器/主机设置。`webSearch=true` 仅适用于支持 Responses `web_search` 的端点；普通 OpenAI-compatible 服务不要开启。更改环境配置后重启执行进程。常规运行复用成功提示词，修改 `refresh_token` 再运行可强制更新；修改图片字节（包括同名文件替换）也会使缓存失效。
+仅对独立/非平台任务的兼容配置，本地托管模式可在 `.env` 填 `NUXT_COMFYUI_LLM_CONNECTIONS_JSON`，Nuxt 启动 ComfyUI 时将它注入上述执行端变量。remote 模式直接在远端 ComfyUI 容器/主机设置。`webSearch=true` 仅适用于支持 Responses `web_search` 的端点；普通 OpenAI-compatible 服务不要开启。更改环境配置后重启执行进程。常规运行复用成功提示词，修改 `refresh_token` 再运行可强制更新；修改图片字节（包括同名文件替换）也会使缓存失效。
 
 ## 安装和验证
 
@@ -147,7 +149,7 @@ Python 测试使用临时合成素材、模拟 LLM，不联网、不加载模型
 
 ### 百炼 Wan 3.0 视频节点
 
-公开预设复用两个 `HuezumiText` 节点，分别编写正向和反向提示词并连到生成节点；生成节点原有文本控件保留给旧副本和断开连线后的编辑。`HuezumiBailianImage`、`HuezumiBailianVideo`、`HuezumiBailianAudio` 是可选文件节点，空槽输出 `None`。`HuezumiBailianWan3Video` 使用执行进程的 `HUEZUMI_DASHSCOPE_API_KEY`、`HUEZUMI_DASHSCOPE_WORKSPACE_ID`、`HUEZUMI_DASHSCOPE_REGION`，将已选素材上传到百炼模型绑定的临时 OSS，异步生成后立即保存 MP4；它把视频文件名送给 `HuezumiBailianVideoOutput`，由独立输出节点登记画布右侧预览。旧工作流没有输出节点时，生成节点自身仍登记视频。连接和 API Key 不从画布读取；反向提示词作为正向文本的“避免出现”约束发送，因为 Wan 3.0 API 没有独立反向字段。每次明确运行会创建新的收费任务。
+公开预设复用两个 `HuezumiText` 节点，分别编写正向和反向提示词并连到生成节点；生成节点原有文本控件保留给旧副本和断开连线后的编辑。`HuezumiBailianImage`、`HuezumiBailianVideo`、`HuezumiBailianAudio` 是可选文件节点，空槽输出 `None`。`HuezumiBailianWan3Video` 在平台任务中使用后台工作流视频连接；仅独立任务兼容执行进程的 `HUEZUMI_DASHSCOPE_API_KEY`、`HUEZUMI_DASHSCOPE_WORKSPACE_ID`、`HUEZUMI_DASHSCOPE_REGION`，将已选素材上传到百炼模型绑定的临时 OSS，异步生成后立即保存 MP4；它把视频文件名送给 `HuezumiBailianVideoOutput`，由独立输出节点登记画布右侧预览。旧工作流没有输出节点时，生成节点自身仍登记视频。连接和 API Key 不从画布读取；反向提示词作为正向文本的“避免出现”约束发送，因为 Wan 3.0 API 没有独立反向字段。每次明确运行会创建新的收费任务。
 
 ## 工程更名兼容
 
@@ -159,4 +161,4 @@ Python 测试使用临时合成素材、模拟 LLM，不联网、不加载模型
 
 `runtime_connections.py` 注册 ComfyUI 敏感队列字段并按执行任务隔离配置。要求执行器支持 `SENSITIVE_EXTRA_DATA_KEYS` 和 `PromptExecutor.execute_async`；不支持时节点初始化失败，平台也会在能力检查时阻止发送凭据。执行端需部署在私有网络。
 
-新增 `HuezumiApiImage` 文生图节点，使用后台图片连接调用兼容 `/images/generations` 的服务。内置「图片 API · 后台连接」工作流可直接使用。普通图片创作模板的 Agent 也改为后台分配；旧版自建工作流中的手动连接仍兼容，独立 ComfyUI 的环境配置仅供非平台任务使用。
+`HuezumiApiImage` 文生图节点使用后台图片连接，按 provider 调用百炼原生图片协议或兼容 `/images/generations` 的服务。内置「图片 API · 后台连接」工作流可直接使用。普通图片创作模板的 Agent 也改为后台分配；旧版自建工作流中的手动连接仍兼容，独立 ComfyUI 的环境配置仅供非平台任务使用。
