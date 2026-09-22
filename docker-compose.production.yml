@@ -15,7 +15,7 @@ services:
       timeout: 5s
       retries: 20
 
-  migrate:
+  db-init:
     build: .
     environment: &app-env
       NUXT_CONNECTION_ENCRYPTION_KEY: ${NUXT_CONNECTION_ENCRYPTION_KEY:?set NUXT_CONNECTION_ENCRYPTION_KEY}
@@ -30,7 +30,7 @@ services:
       NUXT_DATABASE_URL: postgresql://${POSTGRES_USER:-huezumi}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-huezumi}
       NUXT_COMFYUI_MODE: remote
       NUXT_COMFYUI_REMOTE_BASE_URL: http://comfyui:8188
-    command: [pnpm, 'db:migrate']
+    command: [pnpm, 'db:init']
     depends_on:
       postgres:
         condition: service_healthy
@@ -43,7 +43,7 @@ services:
     ports:
       - '3000:3000'
     depends_on:
-      migrate:
+      db-init:
         condition: service_completed_successfully
 
   worker:
@@ -53,7 +53,7 @@ services:
       NUXT_WORKER_ENABLED: 'true'
       NUXT_WORKER_CONCURRENCY: ${NUXT_WORKER_CONCURRENCY:-4}
     depends_on:
-      migrate:
+      db-init:
         condition: service_completed_successfully
 
   comfyui:
