@@ -7,7 +7,9 @@ import WorkDetailModal from '~/components/projects/WorkDetailModal.vue'
 
 const platform = usePlatformApi()
 const query = ref('')
-const kind = ref('')
+const route = useRoute()
+const { user } = useAuth()
+const kind = ref(['image', 'video', 'text'].includes(String(route.query.kind)) ? String(route.query.kind) : '')
 const projectId = ref('')
 // Select reserves the empty string for clearing; keep the API filter unchanged.
 const selectedProject = computed({
@@ -57,7 +59,7 @@ watch(page, () => {
 const items = computed(() => [...(page.value?.items || []), ...more.value])
 
 useIntervalFn(async () => {
-  if (active.value?.items.some(r => ['PENDING', 'RUNNING'].includes(r.status))) {
+  if (active.value?.items.some(r => ['PENDING', 'RUNNING'].includes(r.status) || (r.kind === 'image' && r.stage === 'archiving'))) {
     await refreshActive()
     await refresh()
   }
@@ -180,13 +182,14 @@ const kindTabs = [
   { value: 'image', label: '图片', icon: 'i-lucide-image' },
 ]
 
-const creationItems = [
+const creationItems = computed(() => [
   [
     { label: '文本与剧本创作', icon: 'i-lucide-sparkles', to: '/studio' },
     { label: '视频生成任务', icon: 'i-lucide-film', to: '/studio/video' },
-    { label: 'ComfyUI 工作流画布', icon: 'i-lucide-workflow', to: '/studio/workflow' },
+    { label: '图片生成', icon: 'i-lucide-image-plus', to: '/studio/image' },
+    ...(user.value?.role === 'admin' ? [{ label: '工作流 · 高级', icon: 'i-lucide-workflow', to: '/studio/workflow' }] : []),
   ],
-]
+])
 
 const projectSelectItems = computed(() => [
   { label: '全部项目', value: '__all_projects__' },
