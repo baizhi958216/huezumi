@@ -63,32 +63,34 @@ const cases = [
     <!-- 开放式艺术展陈画廊 (无外层卡片框体，沉浸大画幅图注) -->
     <div class="gallery-exhibition">
       <figure v-for="(item, index) in cases" :key="item.title" class="gallery-piece">
-        <div class="gallery-piece__viewport">
-          <img
-            :src="item.image"
-            :alt="item.alt"
-            width="1448"
-            height="1086"
-            loading="lazy"
-            decoding="async"
-            class="gallery-piece__img"
-          >
-          <div class="gallery-piece__tags">
-            <span class="gallery-tag gallery-tag--type">{{ item.tag }}</span>
+        <div class="gallery-piece__motion">
+          <div class="gallery-piece__viewport">
+            <img
+              :src="item.image"
+              :alt="item.alt"
+              width="1448"
+              height="1086"
+              loading="lazy"
+              decoding="async"
+              class="gallery-piece__img"
+            >
+            <div class="gallery-piece__tags">
+              <span class="gallery-tag gallery-tag--type">{{ item.tag }}</span>
+            </div>
           </div>
-        </div>
 
-        <figcaption class="gallery-piece__caption">
-          <div class="gallery-piece__header">
-            <span class="gallery-piece__index">0{{ index + 1 }}</span>
-            <h3 class="gallery-piece__title">
-              {{ item.title }}
-            </h3>
-          </div>
-          <p class="gallery-piece__description">
-            {{ item.description }}
-          </p>
-        </figcaption>
+          <figcaption class="gallery-piece__caption">
+            <div class="gallery-piece__header">
+              <span class="gallery-piece__index">0{{ index + 1 }}</span>
+              <h3 class="gallery-piece__title">
+                {{ item.title }}
+              </h3>
+            </div>
+            <p class="gallery-piece__description">
+              {{ item.description }}
+            </p>
+          </figcaption>
+        </div>
       </figure>
     </div>
   </section>

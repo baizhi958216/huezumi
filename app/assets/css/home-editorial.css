@@ -394,6 +394,12 @@
 
 .gallery-piece {
   margin: 0;
+}
+
+/* The figure owns grid placement and its paper-like tilt. The inner layer is
+   the complete visible card so scroll motion never separates its contents
+   from the frame. */
+.gallery-piece__motion {
   display: flex;
   flex-direction: column;
   padding: 0.75rem 0.75rem 1.5rem;
@@ -401,6 +407,7 @@
   border-radius: var(--radius-xl);
   background: var(--ui-bg-elevated);
   box-shadow: var(--shadow-card);
+  will-change: transform, opacity;
 }
 
 .gallery-piece__viewport {
@@ -1191,6 +1198,10 @@
     transition: none !important;
     scroll-behavior: auto !important;
   }
+}
+
+.home-scroll-animations {
+  display: none;
 }
 
 @media (max-width: 640px) {

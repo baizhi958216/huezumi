@@ -13,5 +13,6 @@ useSeoMeta({
     <HomeUseCases />
     <HomeWorkflow />
     <HomeFaqCta />
+    <HomeScrollAnimations />
   </div>
 </template>
