@@ -11,10 +11,12 @@ export const connectionSettingsSchema = z.object({
   auth: z.enum(['bearer', 'none']).optional(),
   apiProtocol: z.enum(['auto', 'chat_completions', 'responses']).optional(),
   timeoutSeconds: z.number().int().min(5).max(300).optional(),
-}).strict().refine(v => v.models.includes(v.defaultModel), '默认模型必须属于模型列表')
+  supportsVision: z.boolean().optional(),
+  webSearch: z.boolean().optional(),
+}).strict().refine(v => v.models.includes(v.defaultModel), '默认模型必须属于模型列表').refine(v => !v.webSearch || v.apiProtocol !== 'chat_completions', '联网搜索需要使用 Responses 或自动协议')
 export const connectionSchema = z.object({
   name: z.string().trim().min(1).max(80),
-  kind: z.enum(['video', 'text']),
+  kind: z.enum(['video', 'text', 'image']),
   provider: z.string().min(1).max(50),
   enabled: z.boolean().default(true),
   settings: connectionSettingsSchema,
@@ -27,4 +29,7 @@ export const settingsSchema = z.object({
   platformDailyCreditBudget: z.number().int().min(0).max(2000000000).default(100000),
   defaultVideoConnectionId: z.uuid().optional(),
   defaultTextConnectionId: z.uuid().optional(),
+  workflowAgentConnectionId: z.uuid().optional(),
+  defaultImageConnectionId: z.uuid().optional(),
+  workflowVideoConnectionId: z.uuid().optional(),
 }).strict()

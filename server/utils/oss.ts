@@ -12,7 +12,7 @@ interface OssUploadResult {
 export interface OssUploader {
   upload: (key: string, data: Uint8Array, contentType: string) => Promise<OssUploadResult>
   uploadFile: (key: string, path: string, contentType: string, timeoutMs: number) => Promise<OssUploadResult>
-  sign: (key: string, expiresSeconds: number) => Promise<string>
+  sign: (key: string, expiresSeconds: number, downloadName?: string) => Promise<string>
   delete: (key: string) => Promise<void>
 }
 
@@ -115,11 +115,12 @@ export function createOssUploader(): OssUploader | undefined {
       }
       await client!.delete(key)
     },
-    async sign(key, expiresSeconds) {
+    async sign(key, expiresSeconds, downloadName) {
+      const disposition = downloadName ? `attachment; filename*=UTF-8''${encodeURIComponent(downloadName)}` : undefined
       if (s3Client) {
-        return await getSignedUrl(s3Client, new GetObjectCommand({ Bucket: bucket, Key: key }), { expiresIn: expiresSeconds })
+        return await getSignedUrl(s3Client, new GetObjectCommand({ Bucket: bucket, Key: key, ResponseContentDisposition: disposition }), { expiresIn: expiresSeconds })
       }
-      return client!.signatureUrl(key, { expires: expiresSeconds })
+      return client!.signatureUrl(key, { expires: expiresSeconds, ...(disposition ? { response: { 'content-disposition': disposition } } : {}) })
     },
     async upload(key, data, contentType) {
       if (s3Client) {

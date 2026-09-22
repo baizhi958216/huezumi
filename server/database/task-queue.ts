@@ -4,11 +4,11 @@ import { createHash } from 'node:crypto'
 import { PgBoss } from 'pg-boss'
 
 export interface GenerationJob {
-  kind: 'submit' | 'poll' | 'text' | 'workflow'
+  kind: 'submit' | 'poll' | 'text' | 'image' | 'workflow'
   generationId: string
 }
-export const QUEUE_NAME = 'forkvdo-generations'
-export const DEAD_LETTER_QUEUE = 'forkvdo-generation-failures'
+export const QUEUE_NAME = 'huezumi-generations'
+export const DEAD_LETTER_QUEUE = 'huezumi-generation-failures'
 export async function openTaskQueue(connectionString: string, options: {
   migrate?: boolean
   schema?: string
@@ -70,7 +70,7 @@ export async function withPostgresGenerationLock<T>(pool: Pool, generationId: st
   try {
     const { rows } = await client.query<{
       acquired: boolean
-    }>('select pg_try_advisory_lock(hashtextextended($1, 0)) as acquired', [`forkvdo:generation:${generationId}`])
+    }>('select pg_try_advisory_lock(hashtextextended($1, 0)) as acquired', [`huezumi:generation:${generationId}`])
     acquired = rows[0]?.acquired === true
     if (!acquired)
       throw new Error('Generation is already being processed; retry later')
@@ -79,7 +79,7 @@ export async function withPostgresGenerationLock<T>(pool: Pool, generationId: st
   finally {
     try {
       if (acquired && !broken)
-        await client.query('select pg_advisory_unlock(hashtextextended($1, 0))', [`forkvdo:generation:${generationId}`])
+        await client.query('select pg_advisory_unlock(hashtextextended($1, 0))', [`huezumi:generation:${generationId}`])
     }
     catch {
       // 销毁连接可释放会话锁，不能把未知锁状态的连接放回池中。
