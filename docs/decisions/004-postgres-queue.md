@@ -3,7 +3,7 @@
 - 状态：accepted
 - 日期：2026-09-12
 - 决策者：项目维护者要求移除 Redis
-- 关联规格：[PostgreSQL 队列](../../spec/2026-09-12-postgres-queue.md)
+- 原关联规格：`spec/2026-09-12-postgres-queue.md`（未随当前检出提供）
 
 ## 背景
 

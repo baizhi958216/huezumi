@@ -1,6 +1,6 @@
 # ADR-005：创作文档独立于视频生成记录
 
-- 状态：accepted
+- 状态：accepted；末尾同步免费文本的阶段性限制已由 [ADR-006](006-platform-governance.md) 取代
 - 日期：2026-09-17
 
 ## 背景

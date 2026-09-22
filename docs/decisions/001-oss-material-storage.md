@@ -1,9 +1,11 @@
 # ADR-001：上传素材使用服务端 OSS 转存
 
-- 状态：accepted
+- 状态：superseded（由 [ADR-002](002-multi-user-production-architecture.md) 的私有存储方案取代）
 - 日期：2026-09-01
 - 决策者：
-- 关联规格：`spec/2026-09-01-oss-material-storage.md`
+- 原关联规格：`spec/2026-09-01-oss-material-storage.md`（未随当前检出提供）
+
+> 历史决策正文保留如下。当前使用 `/api/assets` 上传和私有对象，不能再按公开 ACL 或 `POST /api/files` 操作。
 
 ## 背景
 

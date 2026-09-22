@@ -1,6 +1,6 @@
 # ADR-006：平台连接、执行身份与作品边界
 
-- 状态：accepted
+- 状态：accepted；ComfyUI 独立连接配置部分由 [ADR-007](007-workflow-private-connections.md) 取代
 - 日期：2026-09-18
 
 ## 决策

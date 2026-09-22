@@ -1,6 +1,6 @@
 # ADR-002：多用户生产数据与任务架构
 
-- 状态：accepted
+- 状态：accepted；队列部分被 [ADR-004](004-postgres-queue.md) 取代
 - 日期：2026-09-05
 
 ## 背景
