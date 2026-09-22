@@ -146,7 +146,8 @@ async function submit() {
 
         <!-- 表单主体（带方向感知的平滑滑动过渡面板） -->
         <form class="relative mt-5" @submit.prevent="submit">
-          <div class="relative overflow-hidden">
+          <!-- 为输入框的外扩 focus 光晕预留空间，避免被切换面板的裁切边界截断。 -->
+          <div class="relative -m-1 overflow-hidden p-1">
             <Transition
               :name="slideDirection"
               mode="out-in"
