@@ -1,6 +1,8 @@
 # MiniMax H3 本地验证（2026-09-12）
 
-本次按用户要求下载公开权重并实测本地节点，以真实采样进度出现后中断为验收边界，不验收最终视频或音频质量。对应规格：[`spec/2026-09-12-minimax-h3-local-node-verification.md`](../spec/2026-09-12-minimax-h3-local-node-verification.md)。
+> 历史资料：迁入归档于 2026-09-22。以下硬件、版本、下载和采样结果来自旧记录，本轮未复验。所述 vendor 证据及脚本不随仓库分发；不能作为当前环境可用性保证。
+
+本次按用户要求下载公开权重并实测本地节点，以真实采样进度出现后中断为验收边界，不验收最终视频或音频质量。原记录关联 `spec/2026-09-12-minimax-h3-local-node-verification.md`，该历史规格未随当前检出提供。
 
 ## 环境与范围
 
@@ -102,7 +104,7 @@ PyTorch 2.14.0 的小张量探针确认 BF16、FP16、FP8 E4M3/E5M2 和 INT8 均
 
 原生 `UNETLoader` 加载 INT8 ConvRot 权重成功，但默认 MPS 在第一次采样计算中报 `NotImplementedError: aten::_int_mm`。失败 prompt：`59efa8e5-3f9f-453a-9cf4-3dd64e74c82b`。因此不能把加载成功视为原生 INT8 在 MPS 上可运行。无回退的 Turbo 重试随后被主动中断，未记作通过。
 
-本次后续重试在 ComfyUI **服务进程启动前**设置 `PYTORCH_ENABLE_MPS_FALLBACK=1`；只在测试客户端设置此变量不会改变已经运行的 ComfyUI。该回退使用本机 CPU 执行缺失算子，不能称为纯 MPS 推理。回退实测结果待补充。
+本次后续重试在 ComfyUI **服务进程启动前**设置 `PYTORCH_ENABLE_MPS_FALLBACK=1`；只在测试客户端设置此变量不会改变已经运行的 ComfyUI。该回退使用本机 CPU 执行缺失算子，不能称为纯 MPS 推理。后续回退结果记录在下一段。
 
 启用回退后，官方 INT8 ConvRot 的两个主模型都到达第 1 步采样并被定向中断：FL2VA 纯文生 prompt `9a71a1ea-9db1-4006-bca0-930a7be3402b` 用时 173.25 秒；Ref2VA 图/视频/配套音频/独立音频 prompt `b23cc006-6946-4eff-a642-74aceb117fc9` 用时 645.40 秒。后者的第 1 步约 585 秒。两条记录说明 CPU 回退可用，但不适合作为此机器的交互式预览路径。
 

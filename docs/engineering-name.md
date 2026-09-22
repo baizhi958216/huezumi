@@ -1,19 +1,21 @@
 # Huezumi 工程命名
 
-中文品牌为「绘小宙」，网页导航、登录文案和站点标题使用中文。英文品牌为 **Huezumi**，包名为 `huezumi`，自定义节点包为 `comfyui/custom_nodes/huezumi_prompt/`。
+中文品牌「绘小宙」用于网页导航、登录与站点标题；英文品牌 Huezumi，包名 `huezumi`。当前代码不读取旧品牌 Cookie 或节点包别名。
 
-## 统一标识
+| 类别                               | 当前标识                                              |
+| ---------------------------------- | ----------------------------------------------------- |
+| Python 节点包                      | `comfyui/custom_nodes/huezumi_prompt/`                |
+| 节点 / 插槽                        | `Huezumi*` / `HUEZUMI_*`                              |
+| Nuxt 部署变量                      | `NUXT_*`                                              |
+| 独立执行端连接                     | `HUEZUMI_LLM_CONNECTIONS_JSON`、`HUEZUMI_DASHSCOPE_*` |
+| 历史导入专用                       | `HUEZUMI_LEGACY_*`，不作为运行期品牌回退              |
+| 默认数据库 / 本地桶 / Compose 项目 | `huezumi`                                             |
+| 开发显式卷名                       | `huezumi-postgres-dev`、`huezumi-seaweedfs-dev`       |
+| 默认新对象前缀                     | `huezumi/uploads`、`huezumi/outputs`                  |
+| 会话 Cookie                        | `huezumi_session`                                     |
+| 主队列 / 死信队列                  | `huezumi-generations`、`huezumi-generation-failures`  |
+| 任务锁前缀                         | `huezumi:generation:`                                 |
 
-节点 ID 使用 `Huezumi*`，插槽使用 `HUEZUMI_*`，执行端配置使用 `HUEZUMI_LLM_CONNECTIONS_JSON`、`HUEZUMI_DASHSCOPE_*`。Nuxt 配置仍使用 `NUXT_*`。历史数据导入工具使用 `HUEZUMI_LEGACY_*`；这些变量不是品牌兼容入口。
+已有数据库、桶和对象前缀可以继续使用明确配置的名称。工程重命名不自动搬迁对象、数据卷、绝对路径或 Git remote；不要根据新示例覆盖旧部署配置。
 
-数据库和本地对象桶默认名为 `huezumi`。Compose 项目名固定为 `huezumi`，开发卷为 `huezumi-postgres-dev`、`huezumi-seaweedfs-dev`。云端既有业务桶可以继续使用自身名称。新对象默认前缀为 `huezumi/uploads`、`huezumi/outputs`，明确配置的前缀仍优先。
-
-登录只使用 `huezumi_session`；HTTP 和 WebSocket 共享解析规则。队列为 `huezumi-generations`、`huezumi-generation-failures`，互斥锁使用 `huezumi:generation:*`。
-
-## 升级
-
-本次是完整切换，不保留旧品牌别名、环境变量回退、节点包链接或旧 Cookie 读取。已有部署必须先备份数据库、私有配置与数据卷，停止应用和执行端，确认任务已结束，然后迁移工作流 ID、插槽、对象路径与数据库引用。对象先复制并验证，再切换引用和删除源对象。更新本地节点挂载后重启。已有登录需要重新登录。
-
-不要用示例文件覆盖私有 `.env`，也不要用 `docker compose down -v` 代替迁移。源目录可搬迁，但必须同步 IDE 项目路径、本地挂载和任何绝对路径配置。Git remote 与历史提交不由工程更名自动重写。
-
-历史规格中的名称已按当前命名统一，数字与当时的验收事实保持原样；当前行为以本文和完整切换规格为准。
+如果迁移更旧品牌的数据，先盘点实际标识与引用，再提供专门的迁移方案；不能仅重命名目录就认为数据库、工作流插槽和对象引用已更新。保留备份，验证复制结果后再切换引用，具体数据操作见 [运维指南](operations.md)。
