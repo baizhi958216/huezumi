@@ -5,13 +5,11 @@
   "packageManager": "pnpm@10.15.1",
   "scripts": {
     "build": "nuxt build",
-    "db:generate": "drizzle-kit generate",
-    "db:migrate": "tsx scripts/db-migrate.ts",
     "admin:create": "tsx scripts/admin-create.ts",
     "data:migrate": "tsx scripts/migrate-legacy.ts",
     "data:restore-oss": "tsx scripts/restore-oss-archives.ts",
-    "check": "node harness/run.mjs",
-    "check:full": "node harness/run.mjs --full",
+    "check": "pnpm test && pnpm lint && pnpm typecheck",
+    "check:full": "pnpm check && pnpm build",
     "dev": "nuxt dev",
     "generate": "nuxt generate",
     "lint": "eslint .",
@@ -19,11 +17,13 @@
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
     "test": "vitest run",
-    "test:postgres": "node --env-file=.env harness/postgres.mjs",
+    "test:postgres": "node --env-file-if-exists=.env --import tsx scripts/test-postgres.ts",
     "typecheck": "nuxt typecheck",
     "config:import": "tsx scripts/config-import.ts",
     "config:check": "tsx scripts/config-check.ts",
-    "data:backfill": "tsx scripts/backfill-platform.ts"
+    "data:backfill": "tsx scripts/backfill-platform.ts",
+    "db:push": "node --env-file-if-exists=.env node_modules/drizzle-kit/bin.cjs push",
+    "db:init": "pnpm db:push && node --env-file-if-exists=.env --import tsx scripts/db-queue-init.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1127.0",
