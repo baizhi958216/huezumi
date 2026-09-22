@@ -1,6 +1,6 @@
 FROM pytorch/pytorch:2.7.1-cuda12.8-cudnn9-runtime
 
-ARG COMFYUI_REF=v0.3.59
+ARG COMFYUI_REF=v0.37.0
 RUN apt-get update \
   && apt-get install -y --no-install-recommends curl git \
   && rm -rf /var/lib/apt/lists/* \
@@ -11,7 +11,7 @@ RUN git clone --depth 1 --branch "${COMFYUI_REF}" https://github.com/comfyanonym
   && pip install --no-cache-dir -r /opt/ComfyUI/requirements.txt \
   && chown -R comfy:comfy /opt/ComfyUI
 
-COPY --chown=comfy:comfy comfyui/custom_nodes/forkvdo_prompt /opt/ComfyUI/custom_nodes/forkvdo_prompt
+COPY --chown=comfy:comfy comfyui/custom_nodes/huezumi_prompt /opt/ComfyUI/custom_nodes/huezumi_prompt
 
 USER comfy
 WORKDIR /opt/ComfyUI

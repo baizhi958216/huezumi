@@ -1,14 +1,16 @@
+name: huezumi
+
 services:
   postgres:
     image: postgres:17-alpine
     environment:
-      POSTGRES_DB: forkvdo
-      POSTGRES_USER: forkvdo
+      POSTGRES_DB: ${POSTGRES_DB:-huezumi}
+      POSTGRES_USER: ${POSTGRES_USER:-huezumi}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: [CMD-SHELL, pg_isready -U forkvdo]
+      test: [CMD-SHELL, 'pg_isready -U ${POSTGRES_USER:-huezumi} -d ${POSTGRES_DB:-huezumi}']
       interval: 5s
       timeout: 5s
       retries: 20
@@ -25,7 +27,7 @@ services:
       NUXT_OSS_ENDPOINT: ${NUXT_OSS_ENDPOINT:-}
       NUXT_OSS_SECURE: ${NUXT_OSS_SECURE:-true}
       NUXT_OSS_PUBLIC_BASE_URL: ${NUXT_OSS_PUBLIC_BASE_URL:-}
-      NUXT_DATABASE_URL: postgresql://forkvdo:${POSTGRES_PASSWORD}@postgres:5432/forkvdo
+      NUXT_DATABASE_URL: postgresql://${POSTGRES_USER:-huezumi}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-huezumi}
       NUXT_COMFYUI_MODE: remote
       NUXT_COMFYUI_REMOTE_BASE_URL: http://comfyui:8188
     command: [pnpm, 'db:migrate']
@@ -59,13 +61,8 @@ services:
       context: .
       dockerfile: docker/comfyui/Dockerfile
       args:
-        COMFYUI_REF: ${COMFYUI_REF:-v0.3.59}
+        COMFYUI_REF: ${COMFYUI_REF:-v0.37.0}
     gpus: all
-    environment:
-      FORKVDO_LLM_CONNECTIONS_JSON: ${FORKVDO_LLM_CONNECTIONS_JSON:-}
-      FORKVDO_DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:-}
-      FORKVDO_DASHSCOPE_WORKSPACE_ID: ${DASHSCOPE_WORKSPACE_ID:-}
-      FORKVDO_DASHSCOPE_REGION: ${DASHSCOPE_REGION:-cn-beijing}
     volumes:
       - ${COMFYUI_MODELS_DIR:?set COMFYUI_MODELS_DIR}:/opt/ComfyUI/models:ro
       - comfy-input:/opt/ComfyUI/input

@@ -83,7 +83,7 @@ try {
     next += `\nNUXT_CONNECTION_ENCRYPTION_KEY=${masterKey}\n`
   if (process.argv.includes('--compact-env')) {
     const retained: Record<string, string> = {}
-    const keep = (k: string) => k === 'NUXT_CONNECTION_ENCRYPTION_KEY' || k === 'NUXT_DATABASE_URL' || k === 'NUXT_PUBLIC_APP_URL' || k.startsWith('POSTGRES_') || k.startsWith('LOCAL_OSS_') || k.startsWith('NUXT_OSS_') || k.startsWith('NUXT_COMFYUI_') || k.startsWith('FORKVDO_') || k.startsWith('DASHSCOPE_') || ['NUXT_DASHSCOPE_API_KEY', 'NUXT_DASHSCOPE_WORKSPACE_ID', 'NUXT_DASHSCOPE_REGION'].includes(k) || k.startsWith('NUXT_WORKER_')
+    const keep = (k: string) => k === 'NUXT_CONNECTION_ENCRYPTION_KEY' || k === 'NUXT_DATABASE_URL' || k === 'NUXT_PUBLIC_APP_URL' || k.startsWith('POSTGRES_') || k.startsWith('LOCAL_OSS_') || k.startsWith('NUXT_OSS_') || k.startsWith('NUXT_COMFYUI_') || k.startsWith('HUEZUMI_') || k.startsWith('DASHSCOPE_') || ['NUXT_DASHSCOPE_API_KEY', 'NUXT_DASHSCOPE_WORKSPACE_ID', 'NUXT_DASHSCOPE_REGION'].includes(k) || k.startsWith('NUXT_WORKER_')
     for (const [key, value] of Object.entries(parseEnv(next))) {
       if (keep(key) && value !== '')
         retained[key] = value
