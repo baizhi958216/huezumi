@@ -36,6 +36,8 @@ function selectTonePreset(preset: string) {
 <template>
   <UModal
     v-model:open="open"
+    title="文案设置"
+    description="调整篇幅、风格、受众与所属项目。"
     :ui="{ content: 'sm:max-w-lg max-w-[94vw] overflow-hidden' }"
   >
     <template #header>
