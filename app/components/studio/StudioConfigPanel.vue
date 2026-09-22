@@ -1,14 +1,10 @@
 <script setup lang="ts">
 import type { AspectRatio, GenerationMode, MediaInput, MediaType, ModelSpec, ProviderCapability, Resolution } from '#shared/types/generation'
-import { useEventListener } from '@vueuse/core'
-import StudioActionBar from './config/StudioActionBar.vue'
 import StudioMediaZone from './config/StudioMediaZone.vue'
-import StudioModeSegment from './config/StudioModeSegment.vue'
 import StudioPromptArea from './config/StudioPromptArea.vue'
 import StudioSettingsModal from './config/StudioSettingsModal.vue'
-import StudioSpecPills from './config/StudioSpecPills.vue'
 
-const props = defineProps<{
+defineProps<{
   capability?: ProviderCapability
   selectedModel?: ModelSpec
   effectiveCapability?: ProviderCapability
@@ -22,11 +18,12 @@ const props = defineProps<{
   durationSliderValue: number | number[]
   selectedModelName: string
   submitting: boolean
+  active: boolean
+  modelAvailable: boolean
   errorMessage: string
   quote?: { estimatedCredits: number, sourceLabel: string }
   mediaValues: (type: MediaType) => MediaInput[]
   mediaSlotMax: (type: MediaType) => number | undefined
-  setMedia: (type: MediaType, values: MediaInput[]) => void
   projectOptions?: Array<{ id: string, name: string }>
   projectCursor?: string | null
   sourceText?: string
@@ -80,54 +77,27 @@ watch(settingsModalOpen, (val) => {
   }
 })
 
-const hasAdvancedSettings = computed(() => Boolean(
-  (negativePrompt.value && negativePrompt.value.trim().length > 0)
-  || seed.value !== undefined
-  || watermark.value === true
-  || promptExtend.value === false,
-))
-
-// 快捷键支持：按 Cmd+Enter / Ctrl+Enter 直接触发生成或报价
-useEventListener(window, 'keydown', (event: KeyboardEvent) => {
-  if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
-    if (!props.submitting && props.capability?.enabled) {
-      event.preventDefault()
-      emit('generate')
-    }
-  }
-})
+const { user } = useAuth()
+const promptIdeas = [
+  { label: '电影镜头', prompt: '夜幕下，一列复古列车穿过盐湖，镜头贴近水面缓慢跟随，远处闪电照亮群山，电影级光影。' },
+  { label: '商品展示', prompt: '柔光棚拍，一款耳机悬浮旋转，镜头缓缓靠近金属细节，简洁背景，适合产品展示。' },
+]
 </script>
 
 <template>
-  <UCard
-    class="flex flex-col overflow-hidden h-full border-default/80"
-    :ui="{ body: 'flex flex-col flex-1 min-h-0 p-0 sm:p-0' }"
-  >
-    <!-- 1. Sticky Header: 标题、在线状态与模式切换 -->
-    <div class="shrink-0 border-b border-default px-4 py-3.5 sm:px-5">
-      <div class="flex items-start justify-between gap-3">
-        <div>
-          <p class="type-kicker text-[11px] font-semibold tracking-wider text-dimmed uppercase">
-            视频生成
-          </p>
-          <h1 class="mt-0.5 text-base sm:text-lg font-650 tracking-[-0.015em] text-highlighted">
-            新建任务
-          </h1>
-        </div>
-        <UBadge :color="capability?.enabled ? 'success' : 'warning'" variant="subtle" size="sm">
-          {{ capability?.enabled ? `${capability.name} 在线` : '未配置凭据' }}
-        </UBadge>
+  <UCard class="studio-composer" :ui="{ body: 'flex min-h-0 flex-1 flex-col p-0 sm:p-0' }">
+    <StudioPanelHeader title="视频生成" description="从静止的灵感，到流动的故事。" icon="i-lucide-video" />
+    <div class="studio-composer__body">
+      <StudioModePicker v-if="modeOptions.length" v-model="mode" :items="modeOptions" label="视频生成模式" />
+      <div class="grid grid-cols-2 gap-3">
+        <UFormField label="服务平台">
+          <USelect v-model="providerId" :items="providerItems" placeholder="选择平台" class="w-full" />
+        </UFormField>
+        <UFormField label="生成模型">
+          <USelect v-model="model" :items="modelItems" placeholder="选择视频模型" class="w-full" />
+        </UFormField>
       </div>
-
-      <StudioModeSegment
-        v-model="mode"
-        :mode-options="modeOptions"
-        class="mt-3"
-      />
-    </div>
-
-    <!-- 2. Scrollable Body: 聚焦于核心创作（提示词、素材、参数胶囊） -->
-    <div class="panel-scroll studio-scroll flex-1 min-h-0 space-y-4 px-4 py-4 sm:px-5 overflow-y-auto">
+      <UAlert v-if="user && !modelAvailable" color="warning" variant="subtle" description="暂无可用视频模型，请选择其他模型，或联系管理员配置连接与价格。" />
       <!-- 提示词输入与片段关联 -->
       <StudioPromptArea
         v-model:prompt="prompt"
@@ -148,29 +118,20 @@ useEventListener(window, 'keydown', (event: KeyboardEvent) => {
         @set-media="(type, values) => emit('setMedia', type, values)"
       />
 
-      <!-- 参数摘要胶囊栏（点击直达设置弹窗） -->
-      <StudioSpecPills
-        :selected-model-name="selectedModelName"
-        :resolution="resolution"
-        :ratio="ratio"
-        :duration="duration"
-        :smart-duration="smartDuration"
-        :audio="audio"
-        :supports-audio="effectiveCapability?.supportsAudio"
-        :has-advanced-settings="hasAdvancedSettings"
-        :disabled="submitting"
-        @open-settings="openSettings"
-      />
+      <StudioPromptIdeas v-model="prompt" :items="promptIdeas" :maxlength="20000" />
+      <div class="grid grid-cols-2 gap-3">
+        <UFormField label="画幅">
+          <USelect v-model="ratio" :items="ratioOptions.map(value => ({ label: value === 'adaptive' ? '自适应' : value, value }))" class="w-full" />
+        </UFormField>
+        <UFormField label="清晰度">
+          <USelect v-model="resolution" :items="resolutionOptions" class="w-full" />
+        </UFormField>
+      </div>
+      <UButton color="neutral" variant="outline" icon="i-lucide-settings-2" block @click="openSettings()">
+        更多设置 · {{ smartDuration ? '智能时长' : `${duration} 秒` }}{{ audio ? ' · 有声' : '' }}
+      </UButton>
     </div>
-
-    <!-- 3. Sticky Action Footer: 常驻底部操作栏 -->
-    <StudioActionBar
-      :submitting="submitting"
-      :error-message="errorMessage"
-      :quote="quote"
-      :capability="capability"
-      @generate="emit('generate')"
-    />
+    <StudioGenerateAction :submitting="submitting" :active="active" :disabled="!!user && !modelAvailable" :quote="quote" :error-message="errorMessage" @generate="emit('generate')" />
 
     <!-- 4. 参数设置弹窗（规格、模型与高级选项收纳） -->
     <StudioSettingsModal

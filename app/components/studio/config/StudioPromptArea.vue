@@ -79,25 +79,15 @@ const reusedFromId = defineModel<string | undefined>('reusedFromId')
       </div>
     </div>
 
-    <!-- 提示词输入核心区 -->
-    <UFormField size="sm">
-      <template #label>
-        <div class="flex items-center gap-1.5">
-          <span class="font-medium">提示词</span>
-          <span class="text-[10px] text-dimmed font-normal">支持主体、动作、镜头与光影描写</span>
-        </div>
-      </template>
-      <template #hint>
-        <span class="text-[11px] font-mono text-dimmed">{{ prompt.length }} / 20K</span>
-      </template>
+    <UFormField label="画面与镜头描述" :hint="`${prompt.length} / 20K`">
       <UTextarea
         v-model="prompt"
-        :rows="3"
+        :rows="4"
         autoresize
-        :maxrows="6"
-        size="sm"
-        class="w-full text-xs leading-relaxed"
-        placeholder="说明主体、场景、动作、镜头和声音要求（支持按 ⌘+Enter 快速生成）"
+        :maxrows="10"
+        :maxlength="20000"
+        class="w-full"
+        placeholder="描述主体、动作与镜头。例如：海边的白色灯塔，海鸥掠过镜头，缓慢推进，柔和的晨光…"
       />
     </UFormField>
   </div>

@@ -37,7 +37,7 @@ watch(providerCatalog, () => {
 }, { immediate: true })
 const model = ref('')
 const mode = ref<GenerationMode>('text')
-const prompt = ref('夜幕下，一列复古列车穿过无边的盐湖。镜头贴近水面低速跟随，远处闪电短暂照亮群山，电影级光影，细腻胶片颗粒。')
+const prompt = ref('')
 const negativePrompt = ref('')
 const media = ref<MediaInput[]>([])
 const resolution = ref<Resolution>('1080P')
@@ -50,8 +50,11 @@ const watermark = ref(false)
 const seed = ref<number | undefined>()
 const advancedOpen = ref(false)
 const submitting = ref(false)
+const quoteRevision = ref(0)
 const errorMessage = ref('')
 const task = ref<GenerationRecord>()
+const active = computed(() => !!task.value && ['PENDING', 'RUNNING'].includes(task.value.status))
+const modelAvailable = computed(() => modelCatalog.value?.some(item => item.connectionId === providerId.value && item.model === model.value && item.available))
 const quote = ref<PlatformQuote & {
   idempotencyKey: string
   sourceLabel: string
@@ -167,15 +170,6 @@ function setMedia(type: MediaType, values: MediaInput[]) {
 function mediaValues(type: MediaType) {
   return media.value.filter(item => item.type === type)
 }
-const progress = computed(() => {
-  if (!task.value)
-    return 0
-  if (task.value.status === 'PENDING')
-    return 18
-  if (task.value.status === 'RUNNING')
-    return 62
-  return 100
-})
 const polling = useIntervalFn(async () => {
   if (!task.value || ['SUCCEEDED', 'FAILED', 'UNKNOWN'].includes(task.value.status)) {
     polling.pause()
@@ -191,9 +185,17 @@ const polling = useIntervalFn(async () => {
   }
 }, 12000, { immediate: false })
 async function generate() {
-  errorMessage.value = ''
-  if (!capability.value)
+  if (submitting.value || active.value)
     return
+  if (!user.value) {
+    authDialogOpen.value = true
+    return
+  }
+  errorMessage.value = ''
+  if (!capability.value || !modelAvailable.value) {
+    errorMessage.value = '请选择可用的视频模型'
+    return
+  }
   if (!prompt.value.trim() && !media.value.length) {
     errorMessage.value = '提示词与参考素材至少填写一项'
     return
@@ -229,7 +231,10 @@ async function generate() {
       seed: seed.value,
     }
     if (!quote.value || new Date(quote.value.expiresAt).getTime() <= Date.now()) {
+      const revision = quoteRevision.value
       const response = await platform.quote({ kind: 'video', connectionId: providerId.value!, model: model.value, input: request, projectId: projectId.value || undefined, sourceVersionId: sourceVersionId.value, sourceExcerpt: sourceExcerpt.value })
+      if (revision !== quoteRevision.value)
+        return
       quote.value = { ...response, sourceLabel: `价格版本 ${response.priceVersion}`, idempotencyKey: crypto.randomUUID() }
       return
     }
@@ -247,9 +252,10 @@ async function generate() {
     submitting.value = false
   }
 }
-watch([projectId, providerId, model, mode, prompt, negativePrompt, media, resolution, ratio, effectiveDuration, audio, promptExtend, watermark, seed], () => {
+watch([projectId, providerId, model, mode, prompt, negativePrompt, media, resolution, ratio, effectiveDuration, audio, promptExtend, watermark, seed, sourceVersionId, sourceExcerpt], () => {
   quote.value = undefined
-}, { deep: true })
+  quoteRevision.value++
+}, { deep: true, flush: 'sync' })
 async function refreshTaskExplicitly() {
   if (!task.value)
     return
@@ -354,8 +360,8 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="min-h-[calc(100svh-var(--app-header-offset))] overflow-x-hidden bg-muted/35 py-3 md:py-4 xl:h-[calc(100svh-var(--app-header-offset))]">
-    <div class="creation-content grid h-full gap-4 xl:grid-cols-[400px_1fr] 2xl:grid-cols-[420px_1fr]">
+  <StudioWorkspace>
+    <template #composer>
       <StudioConfigPanel
         v-model:project-id="projectId"
         v-model:source-version-id="sourceVersionId"
@@ -388,11 +394,12 @@ onMounted(async () => {
         :duration-slider-value="durationSliderValue"
         :selected-model-name="selectedModelName"
         :submitting="submitting"
+        :active="active"
+        :model-available="!!modelAvailable"
         :error-message="errorMessage"
         :quote="quote"
         :media-values="mediaValues"
         :media-slot-max="mediaSlotMax"
-        :set-media="setMedia"
         :project-options="projectOptions"
         :project-cursor="projectCursor"
         :source-text="sourceText"
@@ -400,19 +407,13 @@ onMounted(async () => {
         @fill-excerpt-to-prompt="prompt = sourceExcerpt || ''"
         @update:duration-slider-value="durationSliderValue = $event"
         @generate="generate"
+        @set-media="setMedia"
       />
-      <StudioPreviewPanel
-        v-model:prompt="prompt"
-        :task="task"
-        :selected-model-name="selectedModelName"
-        :resolution="resolution"
-        :ratio="ratio"
-        :smart-duration="smartDuration"
-        :duration="duration"
-        :audio="audio"
-        :progress="progress"
-        @refresh="refreshTaskExplicitly"
-      />
-    </div>
-  </div>
+    </template>
+    <StudioPreviewPanel
+      :task="task"
+      :ratio="ratio"
+      @refresh="refreshTaskExplicitly"
+    />
+  </StudioWorkspace>
 </template>
