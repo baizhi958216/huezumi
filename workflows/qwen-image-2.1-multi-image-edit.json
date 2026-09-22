@@ -1,0 +1,272 @@
+{
+  "name": "Qwen Image 2.1 · 智能多图创作与编辑",
+  "last_node_id": 13,
+  "last_link_id": 19,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "UNETLoader",
+      "pos": [40, 40],
+      "size": [320, 120],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [{ "name": "unet_name", "type": "COMBO", "link": null }],
+      "outputs": [{ "name": "MODEL", "type": "MODEL", "links": [15], "slot_index": 0 }],
+      "title": "① Qwen Image 2.1 · 编辑模型（INT8）",
+      "properties": { "Node name for S&R": "UNETLoader" },
+      "widgets_values": ["qwen_image_2.1_int8_convrot.safetensors", "default"]
+    },
+    {
+      "id": 2,
+      "type": "CLIPLoader",
+      "pos": [40, 200],
+      "size": [320, 140],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [{ "name": "clip_name", "type": "COMBO", "link": null }],
+      "outputs": [{ "name": "CLIP", "type": "CLIP", "links": [2], "slot_index": 0 }],
+      "title": "② Qwen3-VL 8B · 多图理解编码器",
+      "properties": { "Node name for S&R": "CLIPLoader" },
+      "widgets_values": ["qwen3vl_8b_int8_convrot.safetensors", "qwen_image", "default"]
+    },
+    {
+      "id": 3,
+      "type": "VAELoader",
+      "pos": [40, 380],
+      "size": [320, 100],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [{ "name": "vae_name", "type": "COMBO", "link": null }],
+      "outputs": [{ "name": "VAE", "type": "VAE", "links": [3, 9], "slot_index": 0 }],
+      "title": "③ Qwen Image 2.1 · RGBA VAE",
+      "properties": { "Node name for S&R": "VAELoader" },
+      "widgets_values": ["qwen_image_2.1_vae_bf16.safetensors"]
+    },
+    {
+      "id": 4,
+      "type": "HuezumiImageCollection",
+      "pos": [40, 540],
+      "size": [360, 360],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [{ "name": "images", "type": "IMAGE_COLLECTION", "links": [4, 18], "slot_index": 0 }],
+      "title": "④ 多图参考 · 节点内添加（上限 10 张）",
+      "properties": { "Node name for S&R": "HuezumiImageCollection" },
+      "widgets_values": ["", "", "", "", "", "", "", "", "", ""]
+    },
+    {
+      "id": 10,
+      "type": "HuezumiQwenImage21Agent",
+      "pos": [480, 500],
+      "size": [440, 400],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        { "name": "images", "type": "IMAGE_COLLECTION", "link": 4 },
+        { "name": "user_request", "type": "STRING", "link": null },
+        { "name": "aspect_ratio", "type": "COMBO", "link": null },
+        { "name": "refresh_token", "type": "INT", "link": null }
+      ],
+      "outputs": [
+        { "name": "prompt", "type": "STRING", "links": [13], "slot_index": 0 },
+        { "name": "negative_prompt", "type": "STRING", "links": [14], "slot_index": 1 },
+        { "name": "prepared_images", "type": "IMAGE_COLLECTION", "links": [], "slot_index": 2 },
+        { "name": "preserve_alpha", "type": "BOOLEAN", "links": [], "slot_index": 3 },
+        { "name": "plan", "type": "QWEN_IMAGE21_PLAN", "links": [19], "slot_index": 4 }
+      ],
+      "title": "⑤ 创作策划 Agent · 自然语言 / 联网研究 / 自动画布",
+      "properties": { "Node name for S&R": "HuezumiQwenImage21Agent" },
+      "widgets_values": [
+        "别的公司都有中秋礼盒，PEROPERO 也想要有。请生成一张 PEROPERO 公司的中秋礼盒设计；如可联网，请查找品牌官方资料并结合上传素材。",
+        "auto",
+        0
+      ]
+    },
+    {
+      "id": 13,
+      "type": "HuezumiQwenImage21Prepare",
+      "pos": [1000, 780],
+      "size": [440, 240],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        { "name": "images", "type": "IMAGE_COLLECTION", "link": 18 },
+        { "name": "manual_mode", "type": "COMBO", "link": null },
+        { "name": "aspect_ratio", "type": "COMBO", "link": null },
+        { "name": "preserve_alpha", "type": "BOOLEAN", "link": null },
+        { "name": "agent_plan", "type": "QWEN_IMAGE21_PLAN", "link": 19 }
+      ],
+      "outputs": [
+        { "name": "prepared_images", "type": "IMAGE_COLLECTION", "links": [12], "slot_index": 0 },
+        { "name": "preserve_alpha", "type": "BOOLEAN", "links": [17], "slot_index": 1 }
+      ],
+      "title": "手动回退 · Agent 可选 / 图片准备 / 透明度",
+      "properties": { "Node name for S&R": "HuezumiQwenImage21Prepare" },
+      "widgets_values": ["auto", "auto", false]
+    },
+    {
+      "id": 11,
+      "type": "QwenImage21Cache",
+      "pos": [1000, 40],
+      "size": [360, 150],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        { "name": "model", "type": "MODEL", "link": 15 },
+        { "name": "device", "type": "COMBO", "link": null },
+        { "name": "dtype", "type": "COMBO", "link": null }
+      ],
+      "outputs": [{ "name": "MODEL", "type": "MODEL", "links": [1], "slot_index": 0 }],
+      "title": "⑥ 参考图缓存 · CPU / INT8 节省内存",
+      "properties": { "Node name for S&R": "QwenImage21Cache" },
+      "widgets_values": ["cpu", "int8"]
+    },
+    {
+      "id": 5,
+      "type": "HuezumiQwenImage21Encode",
+      "pos": [1000, 220],
+      "size": [440, 520],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        { "name": "clip", "type": "CLIP", "link": 2 },
+        { "name": "vae", "type": "VAE", "link": 3 },
+        { "name": "images", "type": "IMAGE_COLLECTION", "link": 12 },
+        { "name": "prompt", "type": "STRING", "link": 13 },
+        { "name": "negative_prompt", "type": "STRING", "link": 14 }
+      ],
+      "outputs": [
+        { "name": "positive", "type": "CONDITIONING", "links": [5], "slot_index": 0 },
+        { "name": "negative", "type": "CONDITIONING", "links": [6], "slot_index": 1 },
+        { "name": "latent", "type": "LATENT", "links": [7], "slot_index": 2 }
+      ],
+      "title": "⑦ Qwen 编码 · Agent 可选 / 可手写 Prompt",
+      "properties": { "Node name for S&R": "HuezumiQwenImage21Encode" },
+      "widgets_values": [
+        "",
+        "",
+        768
+      ]
+    },
+    {
+      "id": 6,
+      "type": "KSampler",
+      "pos": [1520, 260],
+      "size": [340, 420],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [
+        { "name": "model", "type": "MODEL", "link": 1 },
+        { "name": "positive", "type": "CONDITIONING", "link": 5 },
+        { "name": "negative", "type": "CONDITIONING", "link": 6 },
+        { "name": "latent_image", "type": "LATENT", "link": 7 },
+        { "name": "seed", "type": "INT", "link": null },
+        { "name": "steps", "type": "INT", "link": null },
+        { "name": "cfg", "type": "FLOAT", "link": null },
+        { "name": "sampler_name", "type": "COMBO", "link": null },
+        { "name": "scheduler", "type": "COMBO", "link": null }
+      ],
+      "outputs": [{ "name": "LATENT", "type": "LATENT", "links": [8], "slot_index": 0 }],
+      "title": "⑧ 生成采样 · 20 步 / CFG 1",
+      "properties": { "Node name for S&R": "KSampler" },
+      "widgets_values": [0, "randomize", 20, 1, "euler", "simple", 1]
+    },
+    {
+      "id": 7,
+      "type": "VAEDecode",
+      "pos": [1940, 300],
+      "size": [280, 140],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [
+        { "name": "samples", "type": "LATENT", "link": 8 },
+        { "name": "vae", "type": "VAE", "link": 9 }
+      ],
+      "outputs": [{ "name": "IMAGE", "type": "IMAGE", "links": [16], "slot_index": 0 }],
+      "title": "⑨ 解码 · 保留 RGBA",
+      "properties": { "Node name for S&R": "VAEDecode" },
+      "widgets_values": []
+    },
+    {
+      "id": 12,
+      "type": "HuezumiQwenImage21Finalize",
+      "pos": [2280, 280],
+      "size": [320, 140],
+      "flags": {},
+      "order": 10,
+      "mode": 0,
+      "inputs": [
+        { "name": "images", "type": "IMAGE", "link": 16 },
+        { "name": "preserve_alpha", "type": "BOOLEAN", "link": 17 }
+      ],
+      "outputs": [{ "name": "images", "type": "IMAGE", "links": [10], "slot_index": 0 }],
+      "title": "⑩ 输出背景 · 未明确要求时强制不透明",
+      "properties": { "Node name for S&R": "HuezumiQwenImage21Finalize" },
+      "widgets_values": []
+    },
+    {
+      "id": 8,
+      "type": "SaveImage",
+      "pos": [2640, 240],
+      "size": [300, 180],
+      "flags": {},
+      "order": 11,
+      "mode": 0,
+      "inputs": [{ "name": "images", "type": "IMAGE", "link": 10 }],
+      "outputs": [{ "name": "images", "type": "IMAGE", "links": [11], "slot_index": 0 }],
+      "title": "⑪ 保存生成结果 PNG",
+      "properties": { "Node name for S&R": "SaveImage" },
+      "widgets_values": ["huezumi-qwen-image-2.1-edit"]
+    },
+    {
+      "id": 9,
+      "type": "PreviewImage",
+      "pos": [3000, 240],
+      "size": [320, 300],
+      "flags": {},
+      "order": 12,
+      "mode": 0,
+      "inputs": [{ "name": "images", "type": "IMAGE", "link": 11 }],
+      "outputs": [{ "name": "images", "type": "IMAGE", "links": [], "slot_index": 0 }],
+      "title": "⑫ 输出预览 · 生成后显示",
+      "properties": { "Node name for S&R": "PreviewImage" },
+      "widgets_values": []
+    }
+  ],
+  "links": [
+    [1, 11, 0, 6, 0, "MODEL"],
+    [2, 2, 0, 5, 0, "CLIP"],
+    [3, 3, 0, 5, 1, "VAE"],
+    [4, 4, 0, 10, 0, "IMAGE_COLLECTION"],
+    [5, 5, 0, 6, 1, "CONDITIONING"],
+    [6, 5, 1, 6, 2, "CONDITIONING"],
+    [7, 5, 2, 6, 3, "LATENT"],
+    [8, 6, 0, 7, 0, "LATENT"],
+    [9, 3, 0, 7, 1, "VAE"],
+    [10, 12, 0, 8, 0, "IMAGE"],
+    [11, 8, 0, 9, 0, "IMAGE"],
+    [12, 13, 0, 5, 2, "IMAGE_COLLECTION"],
+    [13, 10, 0, 5, 3, "STRING"],
+    [14, 10, 1, 5, 4, "STRING"],
+    [15, 1, 0, 11, 0, "MODEL"],
+    [16, 7, 0, 12, 0, "IMAGE"],
+    [17, 13, 1, 12, 1, "BOOLEAN"],
+    [18, 4, 0, 13, 0, "IMAGE_COLLECTION"],
+    [19, 10, 4, 13, 4, "QWEN_IMAGE21_PLAN"]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": { "ds": { "scale": 0.78, "offset": [40, 20] } },
+  "version": 1
+}

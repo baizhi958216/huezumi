@@ -716,9 +716,9 @@ onBeforeUnmount(() => {
 
     <div v-if="originalWorkflowState" class="comfy-shell__notice" role="status">
       {{ originalWorkflowState === 'loading'
-        ? '正在读取本次视频的原始工作流…'
+        ? '正在读取本次作品的原始工作流…'
         : originalWorkflowState === 'loaded'
-          ? '已载入本次视频生成时的画布快照；保存会创建私有副本。'
+          ? '已载入本次作品生成时的画布快照；保存会创建私有副本。'
           : runError }}
     </div>
 
@@ -755,7 +755,7 @@ onBeforeUnmount(() => {
           @connect="onConnect"
         >
           <template #node-comfy="nodeProps">
-            <WorkflowNodeCard v-bind="nodeProps" />
+            <WorkflowNodeCard v-bind="nodeProps" @upload="onUpload" />
           </template>
         </VueFlow>
 

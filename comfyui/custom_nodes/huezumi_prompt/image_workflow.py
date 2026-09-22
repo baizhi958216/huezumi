@@ -15,7 +15,7 @@ from PIL import Image, ImageOps
 from .nodes import API_PROTOCOLS, _input_image_choices, _read_file_item
 
 
-class ForkVdoLLMConfig:
+class HuezumiLLMConfig:
     """Keep a user-owned OpenAI-compatible connection inside a workflow copy."""
 
     @classmethod
@@ -31,10 +31,10 @@ class ForkVdoLLMConfig:
             "api_protocol": (list(API_PROTOCOLS), {"default": "auto", "tooltip": "auto 在 Chat Completions 返回 404/405 时尝试 Responses；仅支持指定客户端的服务还需相应客户端接入"}),
         }}
 
-    RETURN_TYPES = ("FORKVDO_LLM_CONFIG",)
+    RETURN_TYPES = ("HUEZUMI_LLM_CONFIG",)
     RETURN_NAMES = ("config",)
     FUNCTION = "configure"
-    CATEGORY = "forkvdo/connection"
+    CATEGORY = "huezumi/connection"
     DESCRIPTION = "配置兼容 Chat Completions 或 Responses 的接口、API Key 和模型。包含密钥的工作流必须保持私有。"
 
     def configure(self, base_url, api_key, auth, model_name, supports_vision, timeout_seconds, api_protocol="auto"):
@@ -51,7 +51,7 @@ class ForkVdoLLMConfig:
         },)
 
 
-class ForkVdoText:
+class HuezumiText:
     @classmethod
     def INPUT_TYPES(cls):
         return {"required": {"text": ("STRING", {"default": "", "multiline": True})}}
@@ -59,14 +59,14 @@ class ForkVdoText:
     RETURN_TYPES = ("STRING",)
     RETURN_NAMES = ("text",)
     FUNCTION = "execute"
-    CATEGORY = "forkvdo/text"
+    CATEGORY = "huezumi/text"
     DESCRIPTION = "写下需求，并通过连线交给大模型。说明图1、图2的角色，以及需要保留和修改的内容。"
 
     def execute(self, text):
         return (text,)
 
 
-class ForkVdoPromptText:
+class HuezumiPromptText:
     @classmethod
     def INPUT_TYPES(cls):
         return {"required": {
@@ -77,7 +77,7 @@ class ForkVdoPromptText:
     RETURN_TYPES = ("STRING",)
     RETURN_NAMES = ("prompt",)
     FUNCTION = "execute"
-    CATEGORY = "forkvdo/text"
+    CATEGORY = "huezumi/text"
     DESCRIPTION = "独立查看、追加或替换正向/反向提示词。运行后展示最终文本；反向提示词可以为空。"
 
     def execute(self, operation, text, prompt=""):
@@ -113,7 +113,7 @@ def _load_mask(filename):
         return torch.from_numpy(np.array(image).astype(np.float32) / 255).unsqueeze(0)
 
 
-class ForkVdoImagePlan:
+class HuezumiImagePlan:
     @classmethod
     def INPUT_TYPES(cls):
         return {"required": {
@@ -133,7 +133,7 @@ class ForkVdoImagePlan:
     RETURN_TYPES = ("IMAGE_PLAN",)
     RETURN_NAMES = ("plan",)
     FUNCTION = "prepare"
-    CATEGORY = "forkvdo/image"
+    CATEGORY = "huezumi/image"
     DESCRIPTION = "整合提示词、图片与创作模式。多图用于大模型理解；编辑仅作用于 source_index 指定的原图。局部重绘必须提供遮罩。"
 
     @classmethod
@@ -199,7 +199,7 @@ def _finish_image(generated, plan):
     return image
 
 
-class ForkVdoImageGenerate:
+class HuezumiImageGenerate:
     @classmethod
     def INPUT_TYPES(cls):
         import nodes
@@ -216,7 +216,7 @@ class ForkVdoImageGenerate:
     RETURN_TYPES = ("IMAGE",)
     RETURN_NAMES = ("image",)
     FUNCTION = "generate"
-    CATEGORY = "forkvdo/image"
+    CATEGORY = "huezumi/image"
     DESCRIPTION = "复用 ComfyUI 文本编码、KSampler 和 VAE。接入匹配的 MODEL/CLIP/VAE；默认 checkpoint 支持 SD1.5/SDXL。特殊编辑模型需其专用链路。"
 
     def generate(self, model, clip, vae, plan, seed, steps, cfg, sampler_name, scheduler):
@@ -249,11 +249,11 @@ class ForkVdoImageGenerate:
         return (_finish_image(generated, plan),)
 
 
-NODE_CLASS_MAPPINGS = {cls.__name__: cls for cls in (ForkVdoLLMConfig, ForkVdoText, ForkVdoPromptText, ForkVdoImagePlan, ForkVdoImageGenerate)}
+NODE_CLASS_MAPPINGS = {cls.__name__: cls for cls in (HuezumiLLMConfig, HuezumiText, HuezumiPromptText, HuezumiImagePlan, HuezumiImageGenerate)}
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "ForkVdoLLMConfig": "大模型连接 · 用户自定义 API / Key",
-    "ForkVdoText": "需求文本",
-    "ForkVdoPromptText": "提示词 · 追加 / 替换",
-    "ForkVdoImagePlan": "创作设置 · 生图 / 编辑 / 重绘",
-    "ForkVdoImageGenerate": "生成图片",
+    "HuezumiLLMConfig": "大模型连接 · 用户自定义 API / Key",
+    "HuezumiText": "需求文本",
+    "HuezumiPromptText": "提示词 · 追加 / 替换",
+    "HuezumiImagePlan": "创作设置 · 生图 / 编辑 / 重绘",
+    "HuezumiImageGenerate": "生成图片",
 }

@@ -151,7 +151,7 @@
       "outputs": [{ "name": "images", "type": "IMAGE", "links": [], "slot_index": 0 }],
       "title": "Save Anima Result",
       "properties": { "Node name for S&R": "SaveImage" },
-      "widgets_values": ["forkvdo-anima-turbo-style"]
+      "widgets_values": ["huezumi-anima-turbo-style"]
     }
   ],
   "links": [

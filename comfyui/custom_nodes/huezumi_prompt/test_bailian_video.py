@@ -1,6 +1,7 @@
 """Deterministic Wan 3.0 node checks; no credentials or paid calls."""
 
 import importlib.util
+import os
 from pathlib import Path
 import sys
 import tempfile
@@ -13,13 +14,21 @@ ROOT = Path(__file__).parent
 VIDEO_NAME = "Bailian_Wan3_0123456789abcdef0123456789abcdef.mp4"
 paths = types.ModuleType("folder_paths")
 sys.modules["folder_paths"] = paths
-spec = importlib.util.spec_from_file_location("bailian_video_test", ROOT / "bailian_video.py")
+package = types.ModuleType("bailian_test_package")
+package.__path__ = [str(ROOT)]
+sys.modules[package.__name__] = package
+spec = importlib.util.spec_from_file_location(f"{package.__name__}.bailian_video", ROOT / "bailian_video.py")
 video = importlib.util.module_from_spec(spec)
 sys.modules[spec.name] = video
 spec.loader.exec_module(video)
 
 
 class BailianVideoTests(unittest.TestCase):
+    def test_execution_environment(self):
+        with patch.dict(os.environ, {"HUEZUMI_DASHSCOPE_API_KEY": "new-key",
+                                    "HUEZUMI_DASHSCOPE_WORKSPACE_ID": "new-space"}, clear=True):
+            self.assertEqual(video._config(), ("new-key", "https://new-space.cn-beijing.maas.aliyuncs.com/api/v1"))
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
@@ -46,11 +55,11 @@ class BailianVideoTests(unittest.TestCase):
              patch.object(video, "_request_json", side_effect=request), \
              patch.object(video, "_save_video", return_value=VIDEO_NAME), \
              patch.object(video.time, "sleep"):
-            result = video.ForkVdoBailianWan3Video().generate(**self.kwargs, **media)
+            result = video.HuezumiBailianWan3Video().generate(**self.kwargs, **media)
         return captured[0][2], result
 
     def test_empty_sources_and_deleted_nodes_use_text_to_video(self):
-        sources = (video.ForkVdoBailianImage(), video.ForkVdoBailianVideo(), video.ForkVdoBailianAudio())
+        sources = (video.HuezumiBailianImage(), video.HuezumiBailianVideo(), video.HuezumiBailianAudio())
         self.assertEqual([source.select("")[0] for source in sources], [None, None, None])
         payload, result = self.run_graph(reference_image=None, reference_video=None, reference_audio=None)
         self.assertNotIn("media", payload["input"])
@@ -65,12 +74,12 @@ class BailianVideoTests(unittest.TestCase):
         self.assertEqual(payload["input"]["prompt"], "a walking character")
         self.kwargs["positive_prompt"] = ""
         with self.assertRaisesRegex(RuntimeError, "正向提示词"):
-            video.ForkVdoBailianWan3Video().generate(**self.kwargs)
+            video.HuezumiBailianWan3Video().generate(**self.kwargs)
 
     def test_optional_combinations_map_only_selected_media(self):
-        image = video.ForkVdoBailianImage().select("one.png")[0]
-        motion = video.ForkVdoBailianVideo().select("motion.mp4")[0]
-        voice = video.ForkVdoBailianAudio().select("voice.wav")[0]
+        image = video.HuezumiBailianImage().select("one.png")[0]
+        motion = video.HuezumiBailianVideo().select("motion.mp4")[0]
+        voice = video.HuezumiBailianAudio().select("voice.wav")[0]
         for selected, types in (({"reference_image": image}, ["reference_image"]),
                                 ({"reference_video": motion, "reference_audio": voice},
                                  ["reference_video", "reference_audio"]),
@@ -84,11 +93,11 @@ class BailianVideoTests(unittest.TestCase):
     def test_invalid_inputs_fail_before_network(self):
         with patch.object(video, "_config", side_effect=AssertionError("network config read")):
             with self.assertRaisesRegex(RuntimeError, "片段时长"):
-                video.ForkVdoBailianWan3Video().generate(**{**self.kwargs, "duration": 1})
+                video.HuezumiBailianWan3Video().generate(**{**self.kwargs, "duration": 1})
         with self.assertRaisesRegex(RuntimeError, "文件不存在"):
-            video.ForkVdoBailianImage().select("missing.png")
+            video.HuezumiBailianImage().select("missing.png")
         with self.assertRaisesRegex(RuntimeError, "文件不存在"):
-            video.ForkVdoBailianImage().select("../outside.png")
+            video.HuezumiBailianImage().select("../outside.png")
 
     def test_failed_task_does_not_create_second_submission(self):
         calls = []
@@ -102,7 +111,7 @@ class BailianVideoTests(unittest.TestCase):
              patch.object(video, "_request_json", side_effect=request), \
              patch.object(video.time, "sleep"):
             with self.assertRaisesRegex(RuntimeError, "百炼任务未完成") as caught:
-                video.ForkVdoBailianWan3Video().generate(**self.kwargs)
+                video.HuezumiBailianWan3Video().generate(**self.kwargs)
         self.assertEqual(calls, ["POST", "GET"])
         self.assertNotIn("upstream-secret", str(caught.exception))
         self.assertNotIn("private-key", str(caught.exception))
@@ -131,11 +140,11 @@ class BailianVideoTests(unittest.TestCase):
         with patch.object(video.requests, "get", return_value=response):
             name = video._save_video("https://dashscope-result-bj.oss-cn-beijing.aliyuncs.com/video.mp4")
         self.assertEqual((self.root / name).read_bytes(), b"video fixture")
-        preview = video.ForkVdoBailianVideoOutput().preview(name)
+        preview = video.HuezumiBailianVideoOutput().preview(name)
         self.assertEqual(preview["ui"]["videos"][0]["filename"], name)
 
     def test_output_node_rejects_missing_or_outside_files(self):
-        output = video.ForkVdoBailianVideoOutput()
+        output = video.HuezumiBailianVideoOutput()
         with self.assertRaisesRegex(RuntimeError, "文件名无效"):
             output.preview("../outside.mp4")
         with self.assertRaisesRegex(RuntimeError, "文件不存在"):

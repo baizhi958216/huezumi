@@ -125,7 +125,7 @@
       "outputs": [{ "name": "images", "type": "IMAGE", "links": [], "slot_index": 0 }],
       "title": "Save Quality Result",
       "properties": { "Node name for S&R": "SaveImage" },
-      "widgets_values": ["forkvdo-anima-aesthetic-quality"]
+      "widgets_values": ["huezumi-anima-aesthetic-quality"]
     }
   ],
   "links": [

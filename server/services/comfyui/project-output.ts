@@ -45,13 +45,13 @@ export function workflowProjectsFromHistory(owned: OwnedExecution, entry?: Comfy
     return []
 
   const prompt = entry.prompt?.[2] ?? {}
-  const generator = Object.values(prompt).find(node => node.class_type === 'ForkVdoBailianWan3Video')
+  const generator = Object.values(prompt).find(node => node.class_type === 'HuezumiBailianWan3Video')
   const inputs = generator?.inputs ?? {}
   const mediaTypes: WorkflowProjectRecord['mediaTypes'] = []
   for (const [type, kind] of [
-    ['ForkVdoBailianImage', 'image'],
-    ['ForkVdoBailianVideo', 'video'],
-    ['ForkVdoBailianAudio', 'audio'],
+    ['HuezumiBailianImage', 'image'],
+    ['HuezumiBailianVideo', 'video'],
+    ['HuezumiBailianAudio', 'audio'],
   ] as const) {
     if (Object.values(prompt).some(node => node.class_type === type && typeof node.inputs.file === 'string' && node.inputs.file.trim()))
       mediaTypes.push(kind)

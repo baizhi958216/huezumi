@@ -1,4 +1,4 @@
-"""One-shot multimodal prompt nodes for forkvdo.
+"""One-shot multimodal prompt nodes for huezumi.
 
 Connections can come from the execution host or from the user-owned workflow
 configuration node. The latter is intentionally opt-in so a workflow copy can
@@ -22,8 +22,10 @@ from PIL import Image
 
 import folder_paths
 
+from .runtime_connections import runtime_connections, connection_revision
 
-MAX_COLLECTION_SLOTS = 8
+
+MAX_COLLECTION_SLOTS = 10
 DEFAULT_MAX_IMAGES = 8
 DEFAULT_MAX_IMAGE_BYTES = 20 * 1024 * 1024
 DEFAULT_MAX_TOTAL_BYTES = 60 * 1024 * 1024
@@ -31,7 +33,7 @@ DEFAULT_TIMEOUT_SECONDS = 120
 API_PROTOCOLS = ("auto", "chat_completions", "responses")
 
 PROMPT_SCHEMA = {
-    "name": "forkvdo_image_prompts",
+    "name": "huezumi_image_prompts",
     "strict": True,
     "schema": {
         "type": "object",
@@ -61,9 +63,13 @@ Guidelines:
 
 
 def _connection_config() -> dict[str, dict[str, Any]]:
-    raw = os.environ.get("FORKVDO_LLM_CONNECTIONS_JSON", "").strip()
+    runtime = runtime_connections()
+    if runtime is not None:
+        agent = runtime.get("agent")
+        return {"image_agent": agent} if agent else {}
+    raw = (os.environ.get("HUEZUMI_LLM_CONNECTIONS_JSON", "")).strip()
     if not raw:
-        raise RuntimeError("未配置大模型连接，请在 ComfyUI 执行端设置 FORKVDO_LLM_CONNECTIONS_JSON")
+        raise RuntimeError("未配置大模型连接，请在 ComfyUI 执行端设置 HUEZUMI_LLM_CONNECTIONS_JSON")
     try:
         payload = json.loads(raw)
     except (TypeError, ValueError):
@@ -87,7 +93,7 @@ def _configured_connections() -> dict[str, dict[str, Any]]:
 
 
 def _connection_ids() -> list[str]:
-    return ["manual", "workflow"] + sorted(key for key in _configured_connections() if key not in {"manual", "workflow"})
+    return ["manual", "workflow", "image_agent"] + sorted(key for key in _configured_connections() if key not in {"manual", "workflow", "image_agent"})
 
 
 def _input_image_choices() -> list[str]:
@@ -101,12 +107,17 @@ def _input_image_choices() -> list[str]:
 def _image_slots() -> dict[str, tuple[list[str], dict[str, Any]]]:
     choices = _input_image_choices()
     return {
-        f"image_{index}": (choices, {"image_upload": True, "tooltip": f"第 {index} 张图片；留空表示不使用"})
+        f"image_{index}": (choices, {
+            "image_upload": True,
+            "image_collection": True,
+            "image_collection_max": MAX_COLLECTION_SLOTS,
+            "tooltip": f"第 {index} 张图片；留空表示不使用",
+        })
         for index in range(1, MAX_COLLECTION_SLOTS + 1)
     }
 
 
-class ForkVdoImageCollection:
+class HuezumiImageCollection:
     """Collect ordered uploaded files and/or IMAGE links for one prompt run."""
 
     @classmethod
@@ -125,7 +136,7 @@ class ForkVdoImageCollection:
     RETURN_TYPES = ("IMAGE_COLLECTION",)
     RETURN_NAMES = ("images",)
     FUNCTION = "collect"
-    CATEGORY = "forkvdo/reference"
+    CATEGORY = "huezumi/reference"
     DESCRIPTION = "按顺序合并多张参考图片；可通过 previous 串联多个集合节点。"
 
     @classmethod
@@ -384,7 +395,7 @@ def _post_json(url: str, api_key: str, payload: dict[str, Any], timeout: int) ->
         raise RuntimeError("大模型返回不是有效 JSON 或 SSE，请检查 API 协议和兼容端点") from None
 
 
-def _responses_payload(model: str, messages: list[dict[str, Any]]) -> dict[str, Any]:
+def _responses_payload(model: str, messages: list[dict[str, Any]], enable_web_search: bool = False) -> dict[str, Any]:
     instructions: list[str] = []
     inputs: list[dict[str, Any]] = []
     for message in messages:
@@ -403,7 +414,7 @@ def _responses_payload(model: str, messages: list[dict[str, Any]]) -> dict[str, 
             else:
                 raise RuntimeError("Responses 输入包含不支持的内容类型")
         inputs.append({"role": message["role"], "content": parts})
-    return {
+    payload = {
         "model": model,
         "instructions": "\n\n".join(instructions),
         "input": inputs,
@@ -411,6 +422,10 @@ def _responses_payload(model: str, messages: list[dict[str, Any]]) -> dict[str, 
         "stream": True,
         "text": {"format": {"type": "json_schema", **PROMPT_SCHEMA}},
     }
+    if enable_web_search:
+        payload["tools"] = [{"type": "web_search"}]
+        payload["tool_choice"] = "auto"
+    return payload
 
 
 def _responses_text(payload: Any) -> str:
@@ -466,7 +481,10 @@ def _call_model(connection: dict[str, Any], model: str, messages: list[dict[str,
     protocol = str(connection.get("apiProtocol") or "auto").strip()
     if protocol not in API_PROTOCOLS:
         raise RuntimeError("大模型 API 协议无效，请选择 auto、chat_completions 或 responses")
-    if protocol in {"auto", "chat_completions"}:
+    enable_web_search = bool(connection.get("webSearch", False))
+    if enable_web_search and protocol == "chat_completions":
+        raise RuntimeError("联网 Agent 需要 Responses 协议；请将后端连接的 apiProtocol 设为 responses 或 auto")
+    if protocol in {"auto", "chat_completions"} and not enable_web_search:
         payload = {
             "model": model,
             "messages": messages,
@@ -480,19 +498,19 @@ def _call_model(connection: dict[str, Any], model: str, messages: list[dict[str,
                 raise
         else:
             return _parse_prompt_result(_response_text(response))
-    payload = _responses_payload(model, messages)
+    payload = _responses_payload(model, messages, enable_web_search=enable_web_search)
     response = _request_model(f"{base_url}/responses", api_key, payload, timeout, "text")
     return _parse_prompt_result(_responses_text(response))
 
 
-class ForkVdoPrompt:
+class HuezumiPrompt:
     @classmethod
     def INPUT_TYPES(cls):
         connections = _configured_connections()
         first_connection = connections.get(sorted(connections.keys())[0], {}) if connections else {}
         return {
             "required": {
-                "connection_id": (_connection_ids(), {"tooltip": "workflow 表示使用已连接的工作流配置；云端连接标识仍从 ComfyUI 执行端环境读取"}),
+                "connection_id": (_connection_ids(), {"tooltip": "workflow 表示使用已连接的工作流配置；image_agent 使用管理面板分配的 Agent 连接"}),
                 "model_name": ("STRING", {"default": str(first_connection.get("defaultModel") or ""), "socketless": True}),
                 "user_request": ("STRING", {"default": "", "multiline": True, "dynamicPrompts": True}),
                 "default_rules": ("STRING", {"default": DEFAULT_RULES, "multiline": True, "dynamicPrompts": True, "socketless": True}),
@@ -501,14 +519,14 @@ class ForkVdoPrompt:
             },
             "optional": {
                 "reference_images": ("IMAGE_COLLECTION", {"tooltip": "可选；按集合节点中的图1、图2顺序发送"}),
-                "llm_config": ("FORKVDO_LLM_CONFIG", {"tooltip": "可选；连接工作流内的大模型配置后优先使用"}),
+                "llm_config": ("HUEZUMI_LLM_CONFIG", {"tooltip": "可选；连接工作流内的大模型配置后优先使用"}),
             },
         }
 
     RETURN_TYPES = ("STRING", "STRING")
     RETURN_NAMES = ("positive_prompt", "negative_prompt")
     FUNCTION = "generate"
-    CATEGORY = "forkvdo/prompt"
+    CATEGORY = "huezumi/prompt"
     DESCRIPTION = "理解文字与有序参考图，输出正负提示词。选择 manual 直接使用需求，不调用大模型；其他连接可为云端或本地视觉模型。修改 refresh_token 后再次运行可重新生成。"
 
     @classmethod
@@ -516,7 +534,8 @@ class ForkVdoPrompt:
         # The explicit refresh token is intentionally part of the cache key. Other values are
         # included so normal edits invalidate the node without making every retry call the LLM.
         digest = hashlib.sha256()
-        digest.update(os.environ.get("FORKVDO_LLM_CONNECTIONS_JSON", "").encode("utf-8"))
+        digest.update(connection_revision().encode("utf-8"))
+        digest.update((os.environ.get("HUEZUMI_LLM_CONNECTIONS_JSON", "")).encode("utf-8"))
         digest.update(json.dumps({
             "connection_id": connection_id,
             "model_name": model_name,
@@ -582,11 +601,11 @@ class ForkVdoPrompt:
 
 
 NODE_CLASS_MAPPINGS = {
-    "ForkVdoImageCollection": ForkVdoImageCollection,
-    "ForkVdoPrompt": ForkVdoPrompt,
+    "HuezumiImageCollection": HuezumiImageCollection,
+    "HuezumiPrompt": HuezumiPrompt,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "ForkVdoImageCollection": "forkvdo 图片集合",
-    "ForkVdoPrompt": "forkvdo 大模型提示词",
+    "HuezumiImageCollection": "绘小宙 图片集合",
+    "HuezumiPrompt": "绘小宙 大模型提示词",
 }

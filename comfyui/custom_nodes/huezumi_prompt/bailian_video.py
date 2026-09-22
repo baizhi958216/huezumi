@@ -10,6 +10,8 @@ import uuid
 import folder_paths
 import requests
 
+from .runtime_connections import runtime_connections
+
 
 MODELS = ("wan3.0-video-prime", "wan3.0-video")
 RESOLUTIONS = ("480P", "720P", "1080P")
@@ -41,10 +43,10 @@ def _file_path(name, kind):
 
 class _MediaSource:
     KIND = "image"
-    RETURN_TYPES = ("FORKVDO_BAILIAN_MEDIA",)
+    RETURN_TYPES = ("HUEZUMI_BAILIAN_MEDIA",)
     RETURN_NAMES = ("media",)
     FUNCTION = "select"
-    CATEGORY = "forkvdo/bailian"
+    CATEGORY = "huezumi/bailian"
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -56,25 +58,31 @@ class _MediaSource:
         return ({"kind": self.KIND, "path": str(path)} if path else None,)
 
 
-class ForkVdoBailianImage(_MediaSource):
+class HuezumiBailianImage(_MediaSource):
     KIND = "image"
     DESCRIPTION = "可选参考图。上传后可在提示词中写图1。"
 
 
-class ForkVdoBailianVideo(_MediaSource):
+class HuezumiBailianVideo(_MediaSource):
     KIND = "video"
     DESCRIPTION = "可选参考视频。上传后可在提示词中写视频1。"
 
 
-class ForkVdoBailianAudio(_MediaSource):
+class HuezumiBailianAudio(_MediaSource):
     KIND = "audio"
     DESCRIPTION = "可选参考音频。上传后可在提示词中写音频1。"
 
 
 def _config():
-    key = (os.getenv("FORKVDO_DASHSCOPE_API_KEY") or "").strip()
-    workspace = (os.getenv("FORKVDO_DASHSCOPE_WORKSPACE_ID") or "").strip()
-    region = (os.getenv("FORKVDO_DASHSCOPE_REGION") or "cn-beijing").strip()
+    runtime = runtime_connections()
+    if runtime is not None:
+        config = runtime.get("video") or {}
+        if not config.get("apiKey") or not config.get("baseUrl"):
+            raise RuntimeError("请在管理面板分配工作流视频连接")
+        return config["apiKey"], config["baseUrl"].rstrip("/")
+    key = (os.getenv("HUEZUMI_DASHSCOPE_API_KEY") or "").strip()
+    workspace = (os.getenv("HUEZUMI_DASHSCOPE_WORKSPACE_ID") or "").strip()
+    region = (os.getenv("HUEZUMI_DASHSCOPE_REGION") or "cn-beijing").strip()
     if not key or not re.fullmatch(r"[A-Za-z0-9_-]+", workspace) or not re.fullmatch(r"[a-z0-9-]+", region):
         raise RuntimeError("百炼连接未配置：请在 ComfyUI 执行端设置私有 API Key、业务空间 ID 和地域")
     return key, f"https://{workspace}.{region}.maas.aliyuncs.com/api/v1"
@@ -158,7 +166,7 @@ def _save_video(url):
             target.unlink()
 
 
-class ForkVdoBailianWan3Video:
+class HuezumiBailianWan3Video:
     @classmethod
     def INPUT_TYPES(cls):
         return {"required": {
@@ -174,16 +182,16 @@ class ForkVdoBailianWan3Video:
             "watermark": ("BOOLEAN", {"default": False}),
             "timeout_minutes": ("INT", {"default": 20, "min": 2, "max": 60}),
         }, "optional": {
-            "reference_image": ("FORKVDO_BAILIAN_MEDIA",),
-            "reference_video": ("FORKVDO_BAILIAN_MEDIA",),
-            "reference_audio": ("FORKVDO_BAILIAN_MEDIA",),
+            "reference_image": ("HUEZUMI_BAILIAN_MEDIA",),
+            "reference_video": ("HUEZUMI_BAILIAN_MEDIA",),
+            "reference_audio": ("HUEZUMI_BAILIAN_MEDIA",),
         }}
 
-    RETURN_TYPES = ("FORKVDO_BAILIAN_VIDEO",)
+    RETURN_TYPES = ("HUEZUMI_BAILIAN_VIDEO",)
     RETURN_NAMES = ("video",)
     FUNCTION = "generate"
     OUTPUT_NODE = True
-    CATEGORY = "forkvdo/bailian"
+    CATEGORY = "huezumi/bailian"
     DESCRIPTION = "通过私有执行端连接调用百炼 Wan 3.0 All-in-One。参考素材可选；空节点不参与请求。"
 
     @classmethod
@@ -253,15 +261,15 @@ class ForkVdoBailianWan3Video:
         raise RuntimeError("等待百炼任务超时，任务可能仍在运行；请勿立即重复提交")
 
 
-class ForkVdoBailianVideoOutput:
+class HuezumiBailianVideoOutput:
     @classmethod
     def INPUT_TYPES(cls):
-        return {"required": {"video": ("FORKVDO_BAILIAN_VIDEO", {"forceInput": True})}}
+        return {"required": {"video": ("HUEZUMI_BAILIAN_VIDEO", {"forceInput": True})}}
 
     RETURN_TYPES = ()
     FUNCTION = "preview"
     OUTPUT_NODE = True
-    CATEGORY = "forkvdo/bailian"
+    CATEGORY = "huezumi/bailian"
     DESCRIPTION = "读取百炼生成的视频文件，在 ComfyUI 历史和画布右侧登记预览。"
 
     def preview(self, video):
@@ -274,16 +282,16 @@ class ForkVdoBailianVideoOutput:
 
 
 NODE_CLASS_MAPPINGS = {
-    "ForkVdoBailianImage": ForkVdoBailianImage,
-    "ForkVdoBailianVideo": ForkVdoBailianVideo,
-    "ForkVdoBailianAudio": ForkVdoBailianAudio,
-    "ForkVdoBailianWan3Video": ForkVdoBailianWan3Video,
-    "ForkVdoBailianVideoOutput": ForkVdoBailianVideoOutput,
+    "HuezumiBailianImage": HuezumiBailianImage,
+    "HuezumiBailianVideo": HuezumiBailianVideo,
+    "HuezumiBailianAudio": HuezumiBailianAudio,
+    "HuezumiBailianWan3Video": HuezumiBailianWan3Video,
+    "HuezumiBailianVideoOutput": HuezumiBailianVideoOutput,
 }
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "ForkVdoBailianImage": "百炼 · 参考图",
-    "ForkVdoBailianVideo": "百炼 · 参考视频",
-    "ForkVdoBailianAudio": "百炼 · 参考音频",
-    "ForkVdoBailianWan3Video": "百炼 · Wan 3.0 视频生成",
-    "ForkVdoBailianVideoOutput": "百炼 · 视频输出 / 预览",
+    "HuezumiBailianImage": "百炼 · 参考图",
+    "HuezumiBailianVideo": "百炼 · 参考视频",
+    "HuezumiBailianAudio": "百炼 · 参考音频",
+    "HuezumiBailianWan3Video": "百炼 · Wan 3.0 视频生成",
+    "HuezumiBailianVideoOutput": "百炼 · 视频输出 / 预览",
 }

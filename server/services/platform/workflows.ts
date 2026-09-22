@@ -49,8 +49,15 @@ export async function submitWorkflow(ownerId: string, body: z.infer<typeof workf
     const status = (error as {
       statusCode?: number
     }).statusCode
-    await db.update(runs).set({ status: status === 422 ? 'FAILED' : 'UNKNOWN', stage: status === 422 ? 'complete' : 'review', error: status === 422 ? '工作流参数被执行端拒绝' : '提交结果待核对，不会自动重发。' }).where(eq(runs.id, id))
-    throw createError({ statusCode: status === 422 ? 422 : 502, statusMessage: '工作流提交未完成，请在任务列表查看状态' })
+    const validationMessage = status === 422 && error instanceof Error
+      ? error.message
+      : undefined
+    const storedError = validationMessage || (status === 422 ? '工作流参数被执行端拒绝' : '提交结果待核对，不会自动重发。')
+    await db.update(runs).set({ status: status === 422 ? 'FAILED' : 'UNKNOWN', stage: status === 422 ? 'complete' : 'review', error: storedError }).where(eq(runs.id, id))
+    throw createError({
+      statusCode: status === 422 ? 422 : 502,
+      statusMessage: validationMessage || '工作流提交未完成，请在任务列表查看状态',
+    })
   }
   finally {
     publishOutbox().catch(() => console.error('Workflow synchronization deferred'))

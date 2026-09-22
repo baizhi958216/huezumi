@@ -25,7 +25,7 @@ function normalizeVisibility(value: string): ComfyWorkflowVisibility {
 /** A workflow-owned key is intentionally visible to its owner, but never to a public copy. */
 export function hasEmbeddedLlmSecret(graph: ComfyWorkflowJSON): boolean {
   return graph.nodes?.some((node) => {
-    if (node.type !== 'ForkVdoLLMConfig')
+    if (node.type !== 'HuezumiLLMConfig')
       return false
     const apiKey = node.widgets_values?.[1]
     return typeof apiKey === 'string' && apiKey.trim().length > 0
@@ -80,7 +80,8 @@ function loadBuiltinWorkflows(): BuiltinWorkflowEntry[] {
       try {
         const content = readFileSync(fullPath, 'utf8')
         const graph = JSON.parse(content) as ComfyWorkflowJSON
-        const id = `builtin-${file.replace(/\.json$/, '')}`
+        const basename = file.replace(/\.json$/, '')
+        const id = `builtin-${basename.replace(/[^\w-]/g, '-')}`
         const stats = statSync(fullPath)
         entries.push({
           id,

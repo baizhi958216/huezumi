@@ -35,7 +35,15 @@ const controlAfterGenerateItems: string[] = [...CONTROL_AFTER_GENERATE_OPTIONS]
 const selectedData = computed<ComfyNodeData | null>(() => props.selectedNode?.data ?? null)
 
 const selectedWidgets = computed(() => selectedData.value?.widgetSpecs ?? [])
-const selectedInputSlots = computed(() => selectedData.value?.inputSlots ?? [])
+const selectedInputSlots = computed(() => {
+  const data = selectedData.value
+  if (!data)
+    return []
+  const isImageCollection = data.widgetSpecs.some(widget => widget.options.image_collection === true)
+  return isImageCollection
+    ? data.inputSlots.filter(slot => slot.name !== 'previous' && !/^image_\d+_input$/.test(slot.name))
+    : data.inputSlots
+})
 const selectedUploadWidgets = computed(() => selectedWidgets.value.filter(widget => widget.uploadType))
 const uploadTarget = ref('')
 const uploadError = ref('')

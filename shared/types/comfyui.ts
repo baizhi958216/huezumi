@@ -86,6 +86,14 @@ export interface ComfyInputOptions {
   /** 新版 ComfyUI 对 COMBO 使用 options 数组承载候选值；动态 COMBO 的条目是带 key 的对象。 */
   options?: unknown[]
   multiselect?: boolean
+  /** COMFY_AUTOGROW_V3 uses a named template to describe repeated sockets. */
+  template?: {
+    input?: {
+      required?: Record<string, ComfyInputSpec>
+    }
+    names?: string[]
+    min?: number
+  }
   /** 任意额外键：ComfyUI 允许节点作者自定义提示信息 */
   [key: string]: unknown
 }
@@ -160,6 +168,7 @@ export const CONTROL_AFTER_GENERATE_OPTIONS = ['randomize', 'fixed', 'increment'
 
 const WIDGET_TYPES = new Set(['INT', 'FLOAT', 'STRING', 'BOOLEAN'])
 const COMBO_TYPES = new Set(['COMBO', 'COMFY_DYNAMICCOMBO_V3'])
+const AUTOGROW_TYPES = new Set(['COMFY_AUTOGROW_V3'])
 
 function getComboChoices(options: ComfyInputOptions): string[] {
   if (!Array.isArray(options.options))
@@ -243,6 +252,18 @@ export function buildNodeTypeInfo(name: string, def: ComfyNodeDef): ComfyNodeTyp
           serialize: true,
           group,
         })
+        continue
+      }
+      if (AUTOGROW_TYPES.has(type)) {
+        const templateInput = Object.entries(options.template?.input?.required ?? {})[0]
+        const repeatedType = templateInput?.[1]?.[0]
+        if (templateInput && typeof repeatedType === 'string') {
+          for (const name of options.template?.names ?? [])
+            inputs.push({ name: `${inputName}.${name}`, type: repeatedType, group })
+        }
+        else {
+          inputs.push({ name: inputName, type, group })
+        }
         continue
       }
       if (WIDGET_TYPES.has(type)) {
@@ -430,6 +451,44 @@ export function serializeGraphToApiPrompt(
   const activeNodes = nodes.filter(
     node => node.mode !== COMFY_NODE_MODE.NEVER && node.mode !== COMFY_NODE_MODE.BYPASS,
   )
+  const activeNodeIds = new Set(activeNodes.map(node => node.id))
+  const linkFallbacks = new Map<number, [string, number]>()
+
+  // Compatibility for copies of the first Qwen 2.1 workflow: that version wired
+  // prepared_images and preserve_alpha directly from the optional Agent. When the
+  // Agent is disabled, synthesize the new preparation node at submission time so
+  // saved copies keep working without rewriting the user's graph.
+  let fallbackNodeId = Math.max(0, ...nodes.map(node => node.id)) + 1
+  for (const node of nodes) {
+    const inactive = node.mode === COMFY_NODE_MODE.NEVER || node.mode === COMFY_NODE_MODE.BYPASS
+    if (!inactive || node.type !== 'HuezumiQwenImage21Agent')
+      continue
+    const imageSlot = node.inputs?.find(input => input.name === 'images')
+    const imageLink = imageSlot?.link == null ? undefined : linkById.get(imageSlot.link)
+    if (!imageLink || !activeNodeIds.has(imageLink[1]))
+      continue
+    const legacyLinks = (graph.links ?? []).filter(link =>
+      link[1] === node.id
+      && (link[2] === 2 || link[2] === 3)
+      && activeNodeIds.has(link[3]),
+    )
+    if (!legacyLinks.length)
+      continue
+
+    const id = String(fallbackNodeId++)
+    prompt[id] = {
+      class_type: 'HuezumiQwenImage21Prepare',
+      inputs: {
+        images: [String(imageLink[1]), imageLink[2]],
+        manual_mode: 'auto',
+        aspect_ratio: String(node.widgets_values?.[1] || 'auto'),
+        preserve_alpha: false,
+      },
+      _meta: { title: 'Qwen Image 2.1 手动回退（兼容旧工作流）' },
+    }
+    for (const link of legacyLinks)
+      linkFallbacks.set(link[0], [id, link[2] === 2 ? 0 : 1])
+  }
 
   for (const node of activeNodes) {
     const def = objectInfo[node.type]
@@ -468,7 +527,15 @@ export function serializeGraphToApiPrompt(
       if (slot.link == null)
         continue
       const link = linkById.get(slot.link)
-      if (!link)
+      const fallback = linkFallbacks.get(slot.link)
+      if (fallback) {
+        inputs[slot.name] = fallback
+        continue
+      }
+      // Keep the widget literal as a fallback when its upstream node is disabled.
+      // This lets optional planner/agent nodes feed a widget without making the
+      // downstream node unusable in manual mode.
+      if (!link || !activeNodeIds.has(link[1]))
         continue
       inputs[slot.name] = [String(link[1]), link[2]]
     }

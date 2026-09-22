@@ -16,17 +16,25 @@ export default defineEventHandler(async (event) => {
   if (!owned)
     throw createError({ statusCode: 404, statusMessage: '工作流执行不存在' })
   const [saved] = await useDatabase().select().from(runs).where(and(eq(runs.promptId, promptId), eq(runs.ownerId, user.id))).limit(1)
+  let entry
+  try {
+    entry = await withComfyUpstream(() => fetchHistoryEntry(promptId))
+  }
+  catch (error) {
+    // 已落库的执行在 ComfyUI 暂时不可用时仍可查询状态；在线时则优先返回
+    // ComfyUI 的完整历史（尤其是 outputs），否则生成完成后前端无法显示预览。
+    if (!saved?.workflow)
+      throw error
+  }
+  if (entry)
+    return { promptId, ...entry }
   if (saved?.workflow)
     return { promptId, prompt: [0, promptId, {}, { extra_pnginfo: { workflow: saved.workflow } }, []], status: { status_str: saved.status === 'FAILED' ? 'error' : 'success', completed: saved.status === 'SUCCEEDED' || saved.status === 'FAILED' } }
-  const entry = await withComfyUpstream(() => fetchHistoryEntry(promptId))
-  if (!entry) {
-    return {
-      promptId,
-      status: {
-        status_str: 'success' as const,
-        completed: false,
-      },
-    }
+  return {
+    promptId,
+    status: {
+      status_str: 'success' as const,
+      completed: false,
+    },
   }
-  return { promptId, ...entry }
 })

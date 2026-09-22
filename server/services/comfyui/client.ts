@@ -7,6 +7,7 @@ import type {
   ComfyQueueState,
   ComfySystemStats,
 } from '#shared/types/comfyui'
+import { workflowRuntimeConnections } from '../platform/workflow-connections'
 import { getComfyBaseUrl, getComfyConfig } from './config'
 
 /** 上游不可用、超时或返回异常时统一抛出的错误。 */
@@ -137,6 +138,12 @@ const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{
  * 这里把它翻成 422，避免前端把失败当成功。
  */
 export async function submitPrompt(input: SubmitPromptInput): Promise<ComfyPromptResponse> {
+  const connections = await workflowRuntimeConnections(input.prompt)
+  if (connections) {
+    const capability = await request('/huezumi/runtime-capabilities').catch(() => null) as { privateConnections?: number } | null
+    if (capability?.privateConnections !== 1)
+      throw new ComfyUpstreamError('请先更新并重启 ComfyUI 的 huezumi 节点包，再使用后台连接配置', 422)
+  }
   const payload: Record<string, unknown> = { prompt: input.prompt }
   if (input.clientId)
     payload.client_id = input.clientId
@@ -146,6 +153,8 @@ export async function submitPrompt(input: SubmitPromptInput): Promise<ComfyPromp
     payload.front = true
   if (input.workflow)
     payload.extra_data = { extra_pnginfo: { workflow: input.workflow } }
+  if (connections)
+    payload.extra_data = { ...(payload.extra_data as object || {}), huezumi_connections: connections }
 
   const result = await request('/prompt', {
     method: 'POST',

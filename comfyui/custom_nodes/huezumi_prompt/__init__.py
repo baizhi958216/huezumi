@@ -1,16 +1,18 @@
-"""forkvdo prompt workflow nodes.
+"""huezumi prompt workflow nodes.
 
-This package is mounted into ComfyUI/custom_nodes by forkvdo for local runs.
+This package is mounted into ComfyUI/custom_nodes by huezumi for local runs.
 Remote ComfyUI instances should mount or copy this repository directory.
 """
 
 from .nodes import NODE_CLASS_MAPPINGS, NODE_DISPLAY_NAME_MAPPINGS
 from .image_workflow import NODE_CLASS_MAPPINGS as IMAGE_NODES, NODE_DISPLAY_NAME_MAPPINGS as IMAGE_NAMES
 from .bailian_video import NODE_CLASS_MAPPINGS as BAILIAN_NODES, NODE_DISPLAY_NAME_MAPPINGS as BAILIAN_NAMES
+from .qwen_image21 import NODE_CLASS_MAPPINGS as QWEN_IMAGE21_NODES, NODE_DISPLAY_NAME_MAPPINGS as QWEN_IMAGE21_NAMES
 
-NODE_CLASS_MAPPINGS = {**NODE_CLASS_MAPPINGS, **IMAGE_NODES, **BAILIAN_NODES}
-NODE_DISPLAY_NAME_MAPPINGS = {**NODE_DISPLAY_NAME_MAPPINGS, **IMAGE_NAMES, **BAILIAN_NAMES}
+from .api_image import NODE_CLASS_MAPPINGS as API_IMAGE_NODES, NODE_DISPLAY_NAME_MAPPINGS as API_IMAGE_NAMES
 
+NODE_CLASS_MAPPINGS = {**API_IMAGE_NODES, **NODE_CLASS_MAPPINGS, **IMAGE_NODES, **BAILIAN_NODES, **QWEN_IMAGE21_NODES}
+NODE_DISPLAY_NAME_MAPPINGS = {**API_IMAGE_NAMES, **NODE_DISPLAY_NAME_MAPPINGS, **IMAGE_NAMES, **BAILIAN_NAMES, **QWEN_IMAGE21_NAMES}
 
 def _patch_broken_pipe() -> None:
     """容错补丁：在开发环境（如 Nuxt/Nitro 热重载）下，父进程的标准输出/错误管道可能关闭。
@@ -44,3 +46,10 @@ def _patch_broken_pipe() -> None:
 _patch_broken_pipe()
 
 __all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS"]
+
+# ComfyUI itself keeps sensitive extra data out of queue/history responses.
+import execution
+from server import PromptServer
+from .runtime_connections import install_runtime_connections
+
+install_runtime_connections(execution, PromptServer.instance)
