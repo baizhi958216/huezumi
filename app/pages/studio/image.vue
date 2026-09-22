@@ -29,6 +29,19 @@ const selectedProject = computed({
 })
 const projectItems = computed(() => [{ label: '自动创建项目', value: '__auto__' }, ...projects.value.map(item => ({ label: item.name, value: item.id }))])
 const mode = ref<'text' | 'edit'>('text')
+const imageModes = [
+  { value: 'text' as const, label: '文生图', icon: 'i-lucide-sparkles' },
+  { value: 'edit' as const, label: '参考图编辑', icon: 'i-lucide-image-plus' },
+]
+const promptIdeas = computed(() => mode.value === 'edit'
+  ? [
+      { label: '更换背景', prompt: '保留参考图中的主体，将背景改为傍晚的海边，柔和的暖色光线。' },
+      { label: '手绘质感', prompt: '保持参考图的构图与主体特征，转换为温暖的手绘插画风格，带有细腻纸张纹理。' },
+    ]
+  : [
+      { label: '治愈插画', prompt: '云海中的小书店，窗边的橘猫正在打盹，午后阳光洒在书页上，温暖的手绘插画风格。' },
+      { label: '产品摄影', prompt: '一只白色陶瓷咖啡杯置于浅色石台上，侧面自然光，简洁背景，真实细腻的产品摄影。' },
+    ])
 const prompt = ref('')
 const negativePrompt = ref('')
 const media = ref<MediaInput[]>([])
@@ -161,30 +174,13 @@ onBeforeUnmount(polling.pause)
 </script>
 
 <template>
-  <main class="min-h-[calc(100svh-var(--app-header-offset))] bg-muted/35 py-3 md:py-4">
-    <div class="creation-content grid gap-4 xl:grid-cols-[400px_minmax(0,1fr)] 2xl:grid-cols-[420px_minmax(0,1fr)]">
-      <UCard :ui="{ body: 'p-0 sm:p-0' }">
-        <div class="border-b border-default px-5 py-4">
-          <p class="text-[11px] font-semibold tracking-wider text-dimmed">
-            图片生成
-          </p>
-          <h1 class="mt-1 text-lg font-semibold text-highlighted">
-            让想象，有一张自己的画面
-          </h1>
-          <p class="mt-1 text-xs leading-relaxed text-muted">
-            描述心中的场景，或用参考图片继续创作。
-          </p>
-        </div>
-        <div class="space-y-5 p-5">
-          <div class="grid grid-cols-2 gap-2" aria-label="图片生成模式">
-            <UButton :variant="mode === 'text' ? 'soft' : 'ghost'" :color="mode === 'text' ? 'primary' : 'neutral'" icon="i-lucide-sparkles" class="justify-center" @click="mode = 'text'">
-              文生图
-            </UButton>
-            <UButton :variant="mode === 'edit' ? 'soft' : 'ghost'" :color="mode === 'edit' ? 'primary' : 'neutral'" icon="i-lucide-image-plus" class="justify-center" @click="mode = 'edit'">
-              参考图编辑
-            </UButton>
-          </div>
-          <UFormField label="图片模型">
+  <StudioWorkspace>
+    <template #composer>
+      <UCard class="studio-composer" :ui="{ body: 'flex min-h-0 flex-1 flex-col p-0 sm:p-0' }">
+        <StudioPanelHeader title="图片生成" description="描绘想象，把灵感变成画面。" icon="i-lucide-image-plus" />
+        <div class="studio-composer__body">
+          <StudioModePicker v-model="mode" :items="imageModes" label="图片生成模式" />
+          <UFormField label="生成模型">
             <USelect v-model="selectedId" :items="modelItems" placeholder="选择图片模型" class="w-full" />
           </UFormField>
           <UAlert v-if="user && (!models.length || catalogError)" color="warning" variant="subtle" description="暂无可用图片模型，请联系管理员配置百炼图片连接和按张价格。">
@@ -196,8 +192,9 @@ onBeforeUnmount(polling.pause)
           </UAlert>
           <MediaSlot v-if="mode === 'edit'" label="参考图片" hint="上传 1–3 张图片，描述你希望保留或修改的内容" icon="i-lucide-image-plus" type="reference_image" accept="image/png,image/jpeg,image/webp" :allow-url="false" :max="3" :max-bytes="10 * 1024 * 1024" :values="media" @change="media = $event" />
           <UFormField :label="mode === 'edit' ? '编辑描述' : '画面描述'" :hint="`${prompt.length} / 4000`">
-            <UTextarea v-model="prompt" :rows="8" autoresize :maxrows="14" :maxlength="4000" class="w-full" :placeholder="mode === 'edit' ? '保留参考图中的人物，将背景改为傍晚的海边，暖色光线，胶片质感…' : '一间漂浮在云海中的小书店，窗边的橘猫正在打盹，柔和的午后阳光，温暖的手绘插画风格…'" />
+            <UTextarea v-model="prompt" :rows="4" autoresize :maxrows="10" :maxlength="4000" class="w-full" :placeholder="mode === 'edit' ? '保留参考图中的人物，将背景改为傍晚的海边，暖色光线，胶片质感…' : '一间漂浮在云海中的小书店，窗边的橘猫正在打盹，柔和的午后阳光，温暖的手绘插画风格…'" />
           </UFormField>
+          <StudioPromptIdeas v-model="prompt" :items="promptIdeas" :maxlength="4000" />
           <div class="grid grid-cols-2 gap-3">
             <UFormField label="画幅">
               <USelect v-model="size" :items="[...IMAGE_SIZES]" class="w-full" />
@@ -206,32 +203,23 @@ onBeforeUnmount(polling.pause)
               <USelect v-model="count" :items="[1, 2, 3, 4, 5, 6].map(value => ({ label: `${value} 张`, value }))" class="w-full" />
             </UFormField>
           </div>
-          <UButton color="neutral" variant="subtle" icon="i-lucide-settings-2" block @click="settingsOpen = true">
-            参数与项目设置
+          <UButton color="neutral" variant="outline" icon="i-lucide-settings-2" block @click="settingsOpen = true">
+            更多设置 · 偏好与项目
           </UButton>
-          <UAlert v-if="errorMessage" color="error" variant="subtle" :description="errorMessage" />
-          <div class="border-t border-default pt-4">
-            <p v-if="quote" class="mb-3 text-xs text-primary">
-              预估 {{ quote.estimatedCredits }} 额度 · 价格版本 {{ quote.priceVersion }}
-            </p>
-            <UButton block size="lg" icon="i-lucide-sparkles" :loading="submitting" :disabled="active || (!!user && (!selected?.available || !prompt.trim()))" @click="generate">
-              {{ quote ? `确认生成 · ${quote.estimatedCredits} 额度` : '获取生成报价' }}
-            </UButton>
-            <p class="mt-2 text-center text-[11px] text-dimmed">
-              生成后自动保存到作品库，可离开页面等待完成。
-            </p>
-          </div>
         </div>
+        <StudioGenerateAction :submitting="submitting" :active="active" :disabled="!!user && (!selected?.available || !prompt.trim() || (mode === 'edit' && !media.length))" :quote="quote" :error-message="errorMessage" @generate="generate" />
       </UCard>
-      <UCard :ui="{ body: 'p-5 sm:p-6' }">
-        <div class="mb-5 flex flex-wrap items-center justify-between gap-3">
-          <h2 class="flex items-center gap-2 text-sm font-semibold text-highlighted">
-            <UIcon name="i-lucide-images" class="size-4" />画面预览
-          </h2>
-          <UButton to="/projects?kind=image" variant="ghost" color="neutral" size="xs" trailing-icon="i-lucide-arrow-up-right">
-            图片作品库
-          </UButton>
-        </div>
+    </template>
+    <UCard class="studio-result" :ui="{ body: 'p-0 sm:p-0' }">
+      <div class="studio-result__header">
+        <h2 class="flex items-center gap-2 text-sm font-semibold">
+          <UIcon name="i-lucide-images" class="size-4 text-primary" />图片预览
+        </h2>
+        <UButton to="/projects?kind=image" variant="ghost" color="neutral" size="xs" trailing-icon="i-lucide-arrow-up-right">
+          作品库
+        </UButton>
+      </div>
+      <div class="p-5">
         <div v-if="run" class="mb-5 space-y-2 rounded-xl border border-default bg-muted/40 p-4">
           <div class="flex items-center justify-between gap-3 text-sm">
             <span class="flex items-center gap-2"><UIcon :name="active || saving ? 'i-lucide-loader-circle' : run.status === 'SUCCEEDED' ? 'i-lucide-circle-check' : 'i-lucide-circle-alert'" :class="{ 'animate-spin': active || saving }" />{{ saving ? '正在保存图片' : runStatusLabel[run.status] }}</span>
@@ -256,42 +244,34 @@ onBeforeUnmount(polling.pause)
             </figcaption>
           </figure>
         </div>
-        <div v-else class="flex min-h-[420px] flex-col items-center justify-center rounded-xl border border-dashed border-default bg-muted/20 px-8 text-center lg:min-h-[580px]">
-          <div class="mb-5 flex size-16 items-center justify-center rounded-2xl bg-primary/8 text-primary">
-            <UIcon :name="active ? 'i-lucide-loader-circle' : 'i-lucide-image'" class="size-7" :class="{ 'animate-spin': active }" />
+        <StudioEmptyState v-else icon="i-lucide-image" :busy="active || saving" :title="active ? '你的画面正在生成' : saving ? '画面正在保存' : '让脑海中的画面，出现在这里'" :description="active || saving ? '完成后会在这里展示，也可以稍后到作品库查看。' : '描述主体、风格与光线，或上传一张参考图。你的下一张作品，从这里开始。'" />
+      </div>
+    </UCard>
+    <template #dialogs>
+      <UModal v-model:open="settingsOpen" title="图片参数与项目" description="设置生成偏好，并选择作品所属项目。">
+        <template #body>
+          <div class="space-y-5">
+            <UFormField label="所属项目">
+              <USelect v-model="selectedProject" :items="projectItems" class="w-full" /><UButton v-if="projectCursor" size="xs" variant="ghost" @click="moreProjects().catch(e => errorMessage = apiError(e))">
+                加载更多项目
+              </UButton>
+            </UFormField>
+            <UFormField label="不希望出现的内容">
+              <UTextarea v-model="negativePrompt" :maxlength="500" :rows="3" class="w-full" placeholder="模糊、文字变形、杂乱背景…" />
+            </UFormField>
+            <UFormField label="随机种子" hint="留空随机">
+              <UInput v-model.number="seed" type="number" :min="0" :max="2147483647" class="w-full" />
+            </UFormField>
+            <USwitch v-model="promptExtend" label="智能优化提示词" />
+            <USwitch v-model="watermark" label="添加 Qwen-Image 水印" />
           </div>
-          <h3 class="text-base font-medium text-highlighted">
-            {{ active ? '你的画面正在生成' : saving ? '画面正在保存' : '下一张作品，从一个想法开始' }}
-          </h3>
-          <p class="mt-2 max-w-sm text-sm leading-relaxed text-muted">
-            {{ active || saving ? '完成后会在这里展示，也可以前往作品库查看。' : '写下主体、风格与光线，或者上传参考图，让细节更贴近你的想象。' }}
-          </p>
-        </div>
-      </UCard>
-    </div>
-    <UModal v-model:open="settingsOpen" title="图片参数与项目" description="设置生成偏好，并选择作品所属项目。">
-      <template #body>
-        <div class="space-y-5">
-          <UFormField label="所属项目">
-            <USelect v-model="selectedProject" :items="projectItems" class="w-full" /><UButton v-if="projectCursor" size="xs" variant="ghost" @click="moreProjects().catch(e => errorMessage = apiError(e))">
-              加载更多项目
-            </UButton>
-          </UFormField>
-          <UFormField label="不希望出现的内容">
-            <UTextarea v-model="negativePrompt" :maxlength="500" :rows="3" class="w-full" placeholder="模糊、文字变形、杂乱背景…" />
-          </UFormField>
-          <UFormField label="随机种子" hint="留空随机">
-            <UInput v-model.number="seed" type="number" :min="0" :max="2147483647" class="w-full" />
-          </UFormField>
-          <USwitch v-model="promptExtend" label="智能优化提示词" />
-          <USwitch v-model="watermark" label="添加 Qwen-Image 水印" />
-        </div>
-      </template>
-    </UModal>
-    <UModal :open="!!preview" title="图片预览" :ui="{ content: 'sm:max-w-5xl' }" @update:open="value => { if (!value) preview = undefined }">
-      <template #body>
-        <img v-if="preview" :src="preview" alt="生成图片预览" class="max-h-[80vh] w-full object-contain">
-      </template>
-    </UModal>
-  </main>
+        </template>
+      </UModal>
+      <UModal :open="!!preview" title="图片预览" :ui="{ content: 'sm:max-w-5xl' }" @update:open="value => { if (!value) preview = undefined }">
+        <template #body>
+          <img v-if="preview" :src="preview" alt="生成图片预览" class="max-h-[80vh] w-full object-contain">
+        </template>
+      </UModal>
+    </template>
+  </StudioWorkspace>
 </template>
