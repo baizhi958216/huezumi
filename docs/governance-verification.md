@@ -6,8 +6,8 @@
 
 - `pnpm check:full`：文档约束、42 项单元测试、lint、TypeScript 和 Nuxt production build。
 - `pnpm test:postgres`：独立随机测试数据库，22 项测试；结束删除测试库，不调用真实供应商。
-- `PYTHONDONTWRITEBYTECODE=1 vendor/ComfyUI/.venv/bin/python -m unittest discover -s comfyui/custom_nodes/forkvdo_prompt -p 'test_*.py'`：34 项 Python 节点测试。
-- `docker build -t forkvdo:governance-check .`：应用镜像构建；构建后的镜像可对独立测试数据库执行 `pnpm db:migrate`。
+- `PYTHONDONTWRITEBYTECODE=1 vendor/ComfyUI/.venv/bin/python -m unittest discover -s comfyui/custom_nodes/huezumi_prompt -p 'test_*.py'`：34 项 Python 节点测试。
+- `docker build -t huezumi:governance-check .`：应用镜像构建；构建后的镜像可对独立测试数据库执行 `pnpm db:migrate`。
 - production Compose 使用脱敏配置解析，核对 Web 不消费队列、worker 使用 `NUXT_WORKER_CONCURRENCY`、ComfyUI 不接收平台加密密钥。
 
 测试覆盖凭据加密与版本隔离、owner 隔离、重复受理、报价过期、余额与预算拒绝、并发上限、未知提交、worker 恢复、结算幂等、并发保存及 AI 不覆盖手动编辑。分页包含同一毫秒内不同数据库微秒的边界，摘要不含正文。工作流覆盖提交前登记、未知提交不重发、重复输出、归档失败与历史失效后重试；流式归档覆盖大小上限、超时取消和临时文件清理。
