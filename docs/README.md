@@ -1,12 +1,29 @@
 # 文档索引
 
-- [`../DESIGN.md`](../DESIGN.md)：系统架构、边界、流程和已知约束。
-- [`development.md`](development.md)：本地开发、验证与排障。
-- [`image-generation.md`](image-generation.md)：独立图片创作台、百炼接入及验证。
-- [`api.md`](api.md)：当前 HTTP API 概览。
-- [`minimax-h3-local-validation.md`](minimax-h3-local-validation.md)：H3 本地模型来源、节点覆盖和采样启动实测。
-- [`../spec/README.md`](../spec/README.md)：规格的创建和生命周期。
-- [`decisions/README.md`](decisions/README.md)：架构决策记录（ADR）。
-- [`../harness/README.md`](../harness/README.md)：统一、无凭据的工程验证入口。
+当前指南按 2026-09-22 源码整理；测试结论集中在 [项目检查记录](project-audit.md)。
 
-文档应描述已经存在且可验证的事实。计划中的行为放入 `spec/`，只有落地后才同步到这里。
+## 阅读路径
+
+| 需求                           | 文档                                                                                            |
+| ------------------------------ | ----------------------------------------------------------------------------------------------- |
+| 了解产品、目录和起步限制       | [项目 README](../README.md)                                                                     |
+| 修改代码与协作                 | [AGENTS](../AGENTS.md)、[CLAUDE](../CLAUDE.md)                                                  |
+| 理解系统和数据边界             | [DESIGN](../DESIGN.md)                                                                          |
+| 本地启动与排障                 | [开发指南](development.md)                                                                      |
+| 环境变量、后台连接与用途       | [配置说明](configuration.md)                                                                    |
+| 生产部署、升级、备份与恢复     | [运维指南](operations.md)                                                                       |
+| HTTP 与 WebSocket 接口         | [API](api.md)                                                                                   |
+| 普通用户图片生成               | [图片生成](image-generation.md)                                                                 |
+| 管理员 ComfyUI 与预设          | [工作流指南](workflows.md)、[Python 节点说明](../comfyui/custom_nodes/huezumi_prompt/README.md) |
+| 测试命令和环境要求             | [验证指南](testing.md)                                                                          |
+| 已知缺口与本轮结果             | [项目检查记录](project-audit.md)                                                                |
+| 命名和视觉资源                 | [工程命名](engineering-name.md)、[品牌资源](brand-art.md)                                       |
+| 规格与验收要求                 | [spec](../spec/README.md)                                                                       |
+| 架构决策与取代关系             | [ADR](decisions/README.md)                                                                      |
+| 旧环境实测、旧验收、生成提示词 | [历史资料](archive/README.md)                                                                   |
+
+## 维护边界
+
+README 保持入口性质，DESIGN 描述当前架构，docs 提供操作步骤，spec 记录合同与验收，ADR 保留决定及背景。历史记录与当前操作指南分开；外部模型、平台价格和硬件结果必须注明验证范围，不能将旧机器记录升级成普遍保证。
+
+文档链接应指向已存在的文件。缺失历史规格明确标记，不用新文件冒充旧记录；缺失可执行入口则在起步路径中直接说明限制。
