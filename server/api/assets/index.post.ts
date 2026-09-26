@@ -1,7 +1,9 @@
+import { writeFile } from 'node:fs/promises'
 import process from 'node:process'
 import { eq, sql } from 'drizzle-orm'
 import { useDatabase } from '../../database/client'
 import { assetReservations, assets } from '../../database/schema'
+import { assetSaveDiagnostic, assetSaveError } from '../../utils/asset-save-error'
 import { requireUser } from '../../utils/auth'
 import { mediaSignatureMatches } from '../../utils/media-signature'
 import { buildOssObjectKey, createOssUploader } from '../../utils/oss'
@@ -34,13 +36,18 @@ export default defineEventHandler(async (event) => {
       throw createError({ statusCode: 413, statusMessage: '个人存储空间不足' })
     await tx.insert(assetReservations).values({ id: reservationId, ownerId: user.id, size: file.data.length, expiresAt: new Date(Date.now() + 30 * 60 * 1000) })
   })
-  const uploader = createOssUploader()
+  let uploader: ReturnType<typeof createOssUploader>
+  let stage: 'storage' | 'database' = 'storage'
+  let operation = 'create-uploader'
   let objectKey: string | undefined
   let localStorageKey: string | undefined
   try {
+    uploader = createOssUploader()
     if (uploader) {
+      operation = 'build-object-key'
       const config = useRuntimeConfig(event)
       objectKey = buildOssObjectKey(`${String(config.ossPrefix || 'huezumi/uploads').replace(/^\/+|\/+$/g, '')}/${user.id}`, id, name)
+      operation = 'upload-object'
       await uploader.upload(objectKey, file.data, contentType)
     }
     else {
@@ -49,6 +56,7 @@ export default defineEventHandler(async (event) => {
       localStorageKey = `uploads:${user.id}:${id}`
       await useStorage('data').setItemRaw(localStorageKey, file.data)
     }
+    stage = 'database'
     await db.transaction(async (tx) => {
       await tx.insert(assets).values({ id, ownerId: user.id, name, contentType, size: file.data.length, objectKey, localStorageKey })
       await tx.delete(assetReservations).where(eq(assetReservations.id, reservationId))
@@ -62,8 +70,10 @@ export default defineEventHandler(async (event) => {
       await useStorage('data').removeItem(localStorageKey).catch(() => {})
     if ((error as { statusCode?: number }).statusCode)
       throw error
-    console.error('Failed to persist private material', error instanceof Error ? error.name : 'unknown')
-    throw createError({ statusCode: 502, statusMessage: '素材保存失败，请稍后重试' })
+    const failure = assetSaveError(error, stage)
+    await writeFile('/tmp/huezumi-upload-failure.json', JSON.stringify({ stage, operation, ...assetSaveDiagnostic(error), frames: error instanceof Error ? error.stack?.split('\n').filter(line => /^\s+at /.test(line)).slice(0, 5) : [] }), { mode: 0o600 })
+    console.error('Failed to persist private material', { stage, operation, code: failure.code, ...assetSaveDiagnostic(error), requestId: event.context.requestId })
+    throw createError({ statusCode: 502, statusMessage: failure.message, data: { code: failure.code } })
   }
   return { id, name, type: contentType, size: file.data.length, createdAt: new Date().toISOString(), url: `/api/files/${id}` }
 })

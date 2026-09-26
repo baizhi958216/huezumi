@@ -136,3 +136,7 @@ prompt 请求包含 prompt、可选 clientId/front/promptId/workflow/projectId�
 ## 保留的媒体地址
 
 `GET /api/files/:id`、`GET /api/generations/:id/video` 保持受保护的历史媒体访问；`GET /api/comfyui/view` 仍需管理员。不存在旧 `POST /api/files` 或独立免费文本生成入口，不应按早期 ADR 调用。
+
+### 素材保存错误
+
+`POST /api/assets` 保存失败时区分对象存储超时、权限拒绝、Bucket 不存在、网络不可达和数据库登记失败，分别返回 `ASSET_STORAGE_TIMEOUT`、`ASSET_STORAGE_DENIED`、`ASSET_STORAGE_BUCKET_MISSING`、`ASSET_STORAGE_UNREACHABLE`、`ASSET_DATABASE_FAILED`；其他存储写入失败返回 `ASSET_STORAGE_FAILED`。错误不包含上游签名地址、凭据或 SQL 参数。创建存储客户端失败时同样释放本次空间预留。
