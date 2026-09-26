@@ -5,23 +5,6 @@
   background: color-mix(in srgb, var(--ui-bg-muted) 30%, var(--ui-bg));
 }
 
-.studio-workspace__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 1.25rem;
-  padding: 0.5rem 0.25rem 1.5rem;
-}
-
-.studio-workspace__title {
-  font-size: 1.5rem;
-  line-height: 1.3;
-  font-weight: 650;
-  color: var(--ui-text-highlighted);
-}
-
-.studio-navigation,
 .studio-mode-picker {
   display: flex;
   gap: 0.25rem;
@@ -31,7 +14,6 @@
   background: var(--ui-bg-muted);
 }
 
-.studio-navigation__item,
 .studio-mode-picker__item {
   display: flex;
   align-items: center;
@@ -55,13 +37,11 @@
   font-size: 0.8125rem;
 }
 
-.studio-navigation__item:hover,
 .studio-mode-picker__item:hover {
   color: var(--ui-text-highlighted);
   background: color-mix(in srgb, var(--ui-bg-elevated) 60%, transparent);
 }
 
-.studio-navigation__item.is-active,
 .studio-mode-picker__item.is-active {
   background: var(--ui-bg-elevated);
   color: var(--ui-primary);
@@ -242,10 +222,10 @@
     grid-template-columns: 25rem minmax(0, 1fr);
   }
   .studio-composer {
-    height: max(43rem, calc(100dvh - var(--app-header-offset) - 9rem));
+    height: max(43rem, calc(100dvh - var(--app-header-offset) - 3.25rem));
   }
   .studio-result {
-    min-height: max(43rem, calc(100dvh - var(--app-header-offset) - 9rem));
+    min-height: max(43rem, calc(100dvh - var(--app-header-offset) - 3.25rem));
   }
   .studio-result .studio-empty {
     min-height: 37rem;
@@ -261,18 +241,6 @@
 @media (max-width: 639px) {
   .studio-workspace {
     padding-top: 0.75rem;
-  }
-  .studio-workspace__header {
-    gap: 1rem;
-  }
-  .studio-navigation {
-    width: 100%;
-    flex-wrap: wrap;
-  }
-  .studio-navigation__item {
-    flex: 1;
-    padding-inline: 0.5rem;
-    font-size: 0.8125rem;
   }
   .studio-empty {
     min-height: 24rem;
