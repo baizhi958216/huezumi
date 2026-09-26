@@ -89,27 +89,28 @@
 
 ## 管理接口
 
-| 方法     | 路径                                  | 用途                                                                                    |
-| -------- | ------------------------------------- | --------------------------------------------------------------------------------------- |
-| GET      | `/api/admin/overview`                 | 管理概览                                                                                |
-| GET      | `/api/admin/users`                    | 用户列表                                                                                |
-| PATCH    | `/api/admin/users/:id`                | 用户管理                                                                                |
-| POST     | `/api/admin/users/:id/credits`        | `{ amount, reason }` 调整额度，余额不能低于预留                                         |
-| GET/POST | `/api/admin/pricing`                  | 图片/视频价格规则查询与发布                                                             |
-| GET/POST | `/api/admin/text-prices`              | 固定文本价格版本                                                                        |
-| GET      | `/api/admin/generations`              | 视频生成管理                                                                            |
-| POST     | `/api/admin/generations/:id/action`   | `refresh` 同步、`release` 释放或 `charge` 核对扣费；后两者需 reason，charge 另需 amount |
-| GET      | `/api/admin/runs`                     | 待核对文本/图片任务，最多 100 条                                                        |
-| POST     | `/api/admin/runs/:id/settle`          | `{ action: "release" 或 "charge", reason }`，按报价上限核对，不伪造产物                 |
-| GET      | `/api/admin/audit`                    | 管理审计                                                                                |
-| GET/POST | `/api/admin/invitations`              | 邀请码查询与创建                                                                        |
-| DELETE   | `/api/admin/invitations/:id`          | 删除邀请码                                                                              |
-| GET/POST | `/api/admin/connections`              | 查询摘要 / 创建 text、image、video 连接                                                 |
-| PUT      | `/api/admin/connections/:id`          | 保存新版本；省略 secrets 保持已有凭据                                                   |
-| GET      | `/api/admin/connections/:id/versions` | 分页版本摘要，不返回凭据                                                                |
-| POST     | `/api/admin/connections/:id/revoke`   | `{ revisionId }` 显式撤销版本                                                           |
-| GET/PUT  | `/api/admin/settings`                 | 运营设置与默认用途分配                                                                  |
-| GET      | `/api/admin/deployment`               | 只读部署状态                                                                            |
+| 方法          | 路径                                  | 用途                                                                                                                                                                                                 |
+| ------------- | ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET           | `/api/admin/overview`                 | 管理概览                                                                                                                                                                                             |
+| GET           | `/api/admin/users`                    | 用户列表                                                                                                                                                                                             |
+| PATCH         | `/api/admin/users/:id`                | 用户管理                                                                                                                                                                                             |
+| POST          | `/api/admin/users/:id/credits`        | `{ amount, reason }` 调整额度，余额不能低于预留                                                                                                                                                      |
+| GET/POST      | `/api/admin/pricing`                  | 图片/视频价格规则查询与发布                                                                                                                                                                          |
+| GET/POST      | `/api/admin/text-prices`              | 固定文本价格版本                                                                                                                                                                                     |
+| GET           | `/api/admin/generations`              | 视频生成管理                                                                                                                                                                                         |
+| POST          | `/api/admin/generations/:id/action`   | `refresh` 同步、`release` 释放或 `charge` 核对扣费；后两者需 reason，charge 另需 amount                                                                                                              |
+| GET           | `/api/admin/tasks`                    | 统一任务列表；`scope=review/all`、`kind=all/text/image/video/workflow`、`q`（最多 200 字）、`page`（从 1 开始），每页 30 条，返回 `{ items, hasMore }`；视频只读取 generations，不重复展示 runs 镜像 |
+| GET           | `/api/admin/runs`                     | 待核对文本/图片任务，最多 100 条                                                                                                                                                                     |
+| POST          | `/api/admin/runs/:id/settle`          | `{ action: "release" 或 "charge", reason }`，按报价上限核对，不伪造产物                                                                                                                              |
+| GET           | `/api/admin/audit`                    | 管理审计                                                                                                                                                                                             |
+| GET/POST      | `/api/admin/invitations`              | 邀请码查询与创建                                                                                                                                                                                     |
+| DELETE        | `/api/admin/invitations/:id`          | 删除邀请码                                                                                                                                                                                           |
+| GET/POST      | `/api/admin/connections`              | 查询摘要 / 创建 text、image、video 连接                                                                                                                                                              |
+| PUT           | `/api/admin/connections/:id`          | 保存新版本；省略 secrets 保持已有凭据                                                                                                                                                                |
+| GET           | `/api/admin/connections/:id/versions` | 分页版本摘要，不返回凭据                                                                                                                                                                             |
+| POST          | `/api/admin/connections/:id/revoke`   | `{ revisionId }` 显式撤销版本                                                                                                                                                                        |
+| GET/PUT/PATCH | `/api/admin/settings`                 | 运营设置与默认用途分配                                                                                                                                                                               |
+| GET           | `/api/admin/deployment`               | 只读部署状态                                                                                                                                                                                         |
 
 图片连接支持 dashscope 与 OpenAI-compatible 两类，独立图片报价仅支持前者的白名单模型。用途字段为 defaultTextConnectionId、defaultImageConnectionId、defaultVideoConnectionId、workflowAgentConnectionId、workflowVideoConnectionId，详见 [配置指南](configuration.md)。
 
@@ -140,3 +141,11 @@ prompt 请求包含 prompt、可选 clientId/front/promptId/workflow/projectId�
 ### 素材保存错误
 
 `POST /api/assets` 保存失败时区分对象存储超时、权限拒绝、Bucket 不存在、网络不可达和数据库登记失败，分别返回 `ASSET_STORAGE_TIMEOUT`、`ASSET_STORAGE_DENIED`、`ASSET_STORAGE_BUCKET_MISSING`、`ASSET_STORAGE_UNREACHABLE`、`ASSET_DATABASE_FAILED`；其他存储写入失败返回 `ASSET_STORAGE_FAILED`。错误不包含上游签名地址、凭据或 SQL 参数。创建存储客户端失败时同样释放本次空间预留。
+
+### 控制面板局部设置更新
+
+`PATCH /api/admin/settings` 接收与 PUT 相同的字段，但全部可省略。只更新传入字段；用途连接字段传 `null` 表示移除分配，运营数值字段不接受 `null`。服务端串行合并并验证改动的用途，写审计记录；PUT 保留完整替换语义。接口不返回凭据。
+
+`GET /api/admin/users` 支持 `q`（姓名或邮箱，最多 200 字）与 `page`（从 1 开始）。分页请求每页取 30 条加一条后续存在性标记，调用方展示前 30 条；省略 page 保持最多 200 条的原响应数组。搜索在数据库中执行，覆盖所有账户。
+
+总览新增 `creativeTasks`、`activeCreativeTasks`、`reviewTasks`，包含文案、图片、视频；旧 `generations/active/failed` 仍只统计视频。存储统计排除已删除素材。

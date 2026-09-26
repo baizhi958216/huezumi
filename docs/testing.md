@@ -18,7 +18,9 @@ package.json 直接串联命令：check 为 test → lint → typecheck，check:
 pnpm test:postgres
 ```
 
-命令读取可选 `.env`，要求 NUXT_DATABASE_URL 中的账户具备创建数据库权限。脚本只用它连接 PostgreSQL 服务，创建随机 `huezumi_test_*` 空库，在该库执行 db:init，再运行数据库初始化与图片 worker 测试，最后删除临时库。不会在传入 URL 指定的业务库上建表、清表或迁移数据。
+命令读取可选 `.env`，要求 NUXT_DATABASE_URL 中的账户具备创建数据库权限。脚本只用它连接 PostgreSQL 服务，创建随机 `huezumi_test_*` 空库，在该库执行 db:init，再运行数据库初始化、图片 worker 与控制面板集成测试，最后删除临时库。不会在传入 URL 指定的业务库上建表、清表或迁移数据。
+
+控制面板检查覆盖统一任务去重、类型/关键词筛选、分页、管理员鉴权和并发设置局部保存。
 
 检查包括当前 schema 建表、重复初始化保留用户/钱包/账本/邀请码与队列任务，以及图片受理、并发/预算限制、结算、未知提交和归档重试。图片供应商与对象存储均被 mock，不调用收费接口。
 

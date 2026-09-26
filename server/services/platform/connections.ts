@@ -5,6 +5,7 @@ import { and, desc, eq, inArray, sql } from 'drizzle-orm'
 import { useDatabase } from '../../database/client'
 import { auditLogs, connectionVersions, generations, platformConnections, platformSettings, pricingRules, runs, textPrices } from '../../database/schema'
 import { getCapability } from '../providers/catalog'
+import { connectionValidationMessage, mergeSettingsPatch, settingsPatchSchema } from './config-schemas'
 import { decryptSecrets, encryptSecrets } from './crypto'
 import { connectionSchema, secretSchema, settingsSchema } from './schemas'
 
@@ -13,21 +14,36 @@ export async function readSettings(): Promise<PlatformSettings> {
   return settingsSchema.parse(row?.value || {})
 }
 export async function writeSettings(actorId: string, input: unknown) {
-  const value = settingsSchema.parse(input)
-  for (const [id, kind] of [[value.defaultVideoConnectionId, 'video'], [value.defaultTextConnectionId, 'text'], [value.workflowAgentConnectionId, 'text'], [value.defaultImageConnectionId, 'image'], [value.workflowVideoConnectionId, 'video']] as const) {
-    if (!id)
-      continue
-    const { connection } = await currentConnection(id)
-    if (id === value.workflowVideoConnectionId && connection.provider !== 'dashscope')
-      throw createError({ statusCode: 422, statusMessage: '当前工作流视频节点需要百炼连接' })
-    if (connection.kind !== kind)
-      throw createError({ statusCode: 422, statusMessage: '默认连接不可用' })
-  }
-  await useDatabase().transaction(async (tx) => {
+  return saveSettings(actorId, input, false)
+}
+export async function patchSettings(actorId: string, input: unknown) {
+  return saveSettings(actorId, input, true)
+}
+async function saveSettings(actorId: string, input: unknown, partial: boolean) {
+  const parsed = partial ? settingsPatchSchema.parse(input) : settingsSchema.parse(input)
+  return await useDatabase().transaction(async (tx) => {
+    // Serialize both full replacements and field updates, including first-time setup.
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext('huezumi:platform-settings'))`)
+    const [row] = await tx.select().from(platformSettings).where(eq(platformSettings.id, 'platform'))
+    const current = settingsSchema.parse(row?.value || {})
+    const value = partial ? mergeSettingsPatch(current, parsed) : settingsSchema.parse(parsed)
+    for (const [field, kind] of [['defaultVideoConnectionId', 'video'], ['defaultTextConnectionId', 'text'], ['workflowAgentConnectionId', 'text'], ['defaultImageConnectionId', 'image'], ['workflowVideoConnectionId', 'video']] as const) {
+      // Unrelated operations must remain possible when an old assignment was disabled.
+      if (partial && !Object.hasOwn(parsed, field))
+        continue
+      const id = value[field]
+      if (!id)
+        continue
+      const { connection } = await currentConnection(id)
+      if (field === 'workflowVideoConnectionId' && connection.provider !== 'dashscope')
+        throw createError({ statusCode: 422, statusMessage: '当前工作流视频节点需要百炼连接' })
+      if (connection.kind !== kind)
+        throw createError({ statusCode: 422, statusMessage: '默认连接不可用' })
+    }
     await tx.insert(platformSettings).values({ value }).onConflictDoUpdate({ target: platformSettings.id, set: { value, updatedAt: new Date() } })
-    await tx.insert(auditLogs).values({ actorUserId: actorId, action: 'settings.update', targetType: 'settings', targetId: 'platform', detail: { fields: Object.keys(value) } })
+    await tx.insert(auditLogs).values({ actorUserId: actorId, action: 'settings.update', targetType: 'settings', targetId: 'platform', detail: { fields: Object.keys(parsed) } })
+    return value
   })
-  return value
 }
 
 function masterKey() {
@@ -58,7 +74,10 @@ export async function listConnections(): Promise<ConnectionSummary[]> {
   return rows.map(({ c, v }) => ({ id: c.id, name: c.name, kind: c.kind, provider: c.provider, enabled: c.enabled, revisionId: v.id, version: v.version, settings: v.settings, hasCredentials: v.hasCredentials, revoked: Boolean(v.revokedAt) }))
 }
 export async function saveConnection(actorId: string, input: unknown, id?: string) {
-  const data = connectionSchema.parse(input)
+  const parsed = connectionSchema.safeParse(input)
+  if (!parsed.success)
+    throw createError({ statusCode: 422, statusMessage: connectionValidationMessage(parsed.error) })
+  const data = parsed.data
   const capability = data.kind === 'video' ? getCapability(data.provider) : undefined
   if (data.kind === 'video' && (!capability || data.settings.models.some(model => !capability.models.some(item => item.id === model))))
     throw createError({ statusCode: 422, statusMessage: '模型不在供应商能力目录内' })
