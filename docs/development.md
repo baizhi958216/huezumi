@@ -53,7 +53,7 @@ pnpm dev
 
 访问 `http://localhost:3000`。开发示例启用 `NUXT_WORKER_ENABLED=true`，同一进程消费 PostgreSQL 队列。若设为 false，需另一个启用 worker 的进程才能推进任务。
 
-默认注册模式 invite、赠送额度 0。管理员在 `/admin/invitations` 创建邀请码，在 `/admin/settings` 配置连接、文本价格、默认用途、并发及日预算；图片/视频价格在管理界面发布。没有价格或额度时不能提交付费任务。
+默认注册模式 invite、赠送额度 0。管理员在 `/admin/invitations` 创建邀请码，在 `/admin/services` 配置连接与用途，在 `/admin/pricing` 发布文本/图片/视频价格，在 `/admin/settings` 设置并发及日预算。没有价格或额度时不能提交付费任务。
 
 ## 可选 ComfyUI
 
