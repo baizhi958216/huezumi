@@ -9,7 +9,7 @@ import { resolveProviderMediaUrls } from '../assets'
 import { createQuote } from '../billing'
 import { assertRequestSupported } from '../providers'
 import { getCapability } from '../providers/catalog'
-import { currentConnection } from './connections'
+import { currentConnection, readSettings } from './connections'
 import { resolveImageInputs } from './image-input'
 import { runRequestSchema } from './schemas'
 
@@ -45,7 +45,13 @@ export async function quoteRun(ownerId: string, input: unknown) {
     delete request.input.connectionId
   }
   await validateRunContext(ownerId, request)
+  const settings = await readSettings()
+  const assigned = { text: settings.defaultTextConnectionId, image: settings.defaultImageConnectionId, video: settings.defaultVideoConnectionId }
+  if (!assigned[request.kind] || request.connectionId !== assigned[request.kind])
+    throw createError({ statusCode: 422, statusMessage: '生成服务未分配或配置已变更，请刷新页面或联系管理员' })
   const { connection, version } = await currentConnection(request.connectionId)
+  if (request.model !== version.settings.defaultModel)
+    throw createError({ statusCode: 422, statusMessage: '生成配置已变更，请刷新页面后重新报价' })
   if (connection.kind !== request.kind || !version.settings.models.includes(request.model))
     throw createError({ statusCode: 422, statusMessage: '连接或模型无效' })
   let id: string

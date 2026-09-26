@@ -3,7 +3,6 @@ import type { TextCreationLength } from '#shared/types/text-creation'
 
 defineProps<{
   projectItems: Array<{ label: string, value: string }>
-  providerItems: Array<{ label: string, value: string }>
   lengthItems: Array<{ label: string, value: string }>
   projectCursor?: string | null
   disabledProject?: boolean
@@ -15,7 +14,6 @@ const emit = defineEmits<{
 
 const open = defineModel<boolean>('open', { default: false })
 const projectId = defineModel<string>('projectId', { default: '' })
-const connectionId = defineModel<string | undefined>('connectionId')
 const length = defineModel<TextCreationLength>('length', { required: true })
 const tone = defineModel<string>('tone', { required: true })
 const audience = defineModel<string>('audience', { required: true })
@@ -36,34 +34,20 @@ function selectTonePreset(preset: string) {
 <template>
   <UModal
     v-model:open="open"
-    title="文案设置"
-    description="调整篇幅、风格、受众与所属项目。"
+    description="配置篇幅长短、基调受众与归属项目"
     :ui="{ content: 'sm:max-w-lg max-w-[94vw] overflow-hidden' }"
   >
-    <template #header>
-      <div class="flex items-center justify-between w-full">
-        <div class="flex items-center gap-2.5">
-          <div class="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
-            <UIcon name="i-lucide-sliders" class="size-4.5" />
-          </div>
-          <div>
-            <h2 class="text-base font-semibold text-highlighted leading-tight">
-              文本创作参数设置
-            </h2>
-            <p class="text-xs text-dimmed mt-0.5">
-              配置篇幅长短、基调受众、生成模型与归属项目
-            </p>
-          </div>
-        </div>
-        <UButton
-          color="neutral"
-          variant="ghost"
-          size="sm"
-          icon="i-lucide-x"
-          aria-label="关闭"
-          @click="open = false"
-        />
-      </div>
+    <template #title>
+      <span class="flex items-center gap-2.5">
+        <span class="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+          <UIcon name="i-lucide-sliders" class="size-4.5" />
+        </span>
+        文本创作参数设置
+      </span>
+    </template>
+
+    <template #close>
+      <UButton color="neutral" variant="ghost" size="sm" icon="i-lucide-x" aria-label="关闭" />
     </template>
 
     <template #body>
@@ -76,19 +60,6 @@ function selectTonePreset(preset: string) {
             class="w-full"
             size="sm"
             icon="i-lucide-align-left"
-          />
-        </UFormField>
-
-        <!-- 文本模型 -->
-        <UFormField label="文本大模型" size="sm" description="用于故事策划、剧本分场与文案撰写">
-          <USelect
-            v-model="connectionId"
-            :items="providerItems"
-            class="w-full"
-            size="sm"
-            placeholder="选择私有连接或模型"
-            :disabled="!providerItems.length"
-            icon="i-lucide-cpu"
           />
         </UFormField>
 

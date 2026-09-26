@@ -14,7 +14,6 @@ const { data: catalog, refresh: refreshModels, error: catalogError } = await use
 const models = computed(() => (catalog.value || []).filter(item => item.kind === 'image'))
 const selectedId = ref('')
 const selected = computed(() => models.value.find(item => item.id === selectedId.value))
-const modelItems = computed(() => models.value.map(item => ({ label: `${item.label}${item.reason ? ` · ${item.reason}` : ''}`, value: item.id, disabled: !item.available })))
 watch(models, (items) => {
   if (!items.some(item => item.id === selectedId.value))
     selectedId.value = items.find(item => item.available)?.id || items[0]?.id || ''
@@ -96,7 +95,7 @@ async function generate() {
   }
   errorMessage.value = ''
   if (!selected.value?.available || !prompt.value.trim()) {
-    errorMessage.value = '请选择可用模型并填写画面描述'
+    errorMessage.value = '请确认生成服务可用并填写画面描述'
     return
   }
   if (mode.value === 'edit' && !media.value.length) {
@@ -139,7 +138,6 @@ async function restoreRun() {
     projectId.value = result.projectId || ''
     if (result.imageRequest) {
       const request = result.imageRequest
-      selectedId.value = `${request.connectionId}:${request.model}`
       mode.value = request.input.mode
       prompt.value = request.input.prompt
       negativePrompt.value = request.input.negativePrompt || ''
@@ -180,10 +178,7 @@ onBeforeUnmount(polling.pause)
         <StudioPanelHeader title="图片生成" description="描绘想象，把灵感变成画面。" icon="i-lucide-image-plus" />
         <div class="studio-composer__body">
           <StudioModePicker v-model="mode" :items="imageModes" label="图片生成模式" />
-          <UFormField label="生成模型">
-            <USelect v-model="selectedId" :items="modelItems" placeholder="选择图片模型" class="w-full" />
-          </UFormField>
-          <UAlert v-if="user && (!models.length || catalogError)" color="warning" variant="subtle" description="暂无可用图片模型，请联系管理员配置百炼图片连接和按张价格。">
+          <UAlert v-if="user && (!selected?.available || catalogError)" color="warning" variant="subtle" description="图片生成暂不可用，请联系管理员分配生成服务并配置按张价格。">
             <template #actions>
               <UButton size="xs" variant="soft" @click="refreshModels()">
                 重新加载
@@ -263,7 +258,7 @@ onBeforeUnmount(polling.pause)
               <UInput v-model.number="seed" type="number" :min="0" :max="2147483647" class="w-full" />
             </UFormField>
             <USwitch v-model="promptExtend" label="智能优化提示词" />
-            <USwitch v-model="watermark" label="添加 Qwen-Image 水印" />
+            <USwitch v-model="watermark" label="添加 AI 水印" />
           </div>
         </template>
       </UModal>

@@ -110,11 +110,12 @@ export async function saveConnection(actorId: string, input: unknown, id?: strin
 }
 export async function listModels(): Promise<ModelOption[]> {
   const settings = await readSettings()
-  const connections = (await listConnections()).sort((a, b) => Number(b.id === settings.defaultImageConnectionId || b.id === settings.defaultTextConnectionId || b.id === settings.defaultVideoConnectionId) - Number(a.id === settings.defaultImageConnectionId || a.id === settings.defaultTextConnectionId || a.id === settings.defaultVideoConnectionId))
+  const assigned = { text: settings.defaultTextConnectionId, image: settings.defaultImageConnectionId, video: settings.defaultVideoConnectionId }
+  const connections = (await listConnections()).filter(c => c.id === assigned[c.kind])
   const prices = await useDatabase().select().from(textPrices)
   const videoPrices = await useDatabase().select().from(pricingRules).where(and(eq(pricingRules.active, true), sql`${pricingRules.effectiveFrom} <= now()`, sql`(${pricingRules.effectiveTo} is null or ${pricingRules.effectiveTo} > now())`))
   const priced = (c: ConnectionSummary, model: string) => c.kind === 'image' ? videoPrices.some(p => p.provider === c.provider && p.model === model && isImagePrice(p.formula)) : c.kind === 'video' ? videoPrices.some(p => p.provider === c.provider && (p.model === '*' || p.model === model)) : prices.some(p => p.connectionId === c.id && p.model === model)
-  return connections.filter(c => c.kind !== 'image' || c.provider === 'dashscope').flatMap(c => ([...c.settings.models].sort((a, b) => Number(b === c.settings.defaultModel) - Number(a === c.settings.defaultModel))).map(model => ({
+  return connections.filter(c => c.kind !== 'image' || c.provider === 'dashscope').flatMap(c => c.settings.models.filter(model => model === c.settings.defaultModel).map(model => ({
     id: `${c.id}:${model}`,
     kind: c.kind,
     connectionId: c.id,

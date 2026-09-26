@@ -25,28 +25,28 @@
 
 以下接口除公共 `/api/providers` 外均需登录。
 
-| 方法      | 路径                                     | 合同                                                      |
-| --------- | ---------------------------------------- | --------------------------------------------------------- |
-| GET       | `/api/providers`                         | 公共视频适配器能力目录，无供应商凭据                      |
-| GET       | `/api/catalog/models`                    | 用户可用模型、能力与状态，无私有地址/凭据                 |
-| GET/POST  | `/api/projects`                          | 本人项目列表 / `{ name }` 创建                            |
-| GET/PATCH | `/api/projects/:id`                      | 本人项目摘要 / 重命名                                     |
-| GET       | `/api/documents`                         | 分页摘要，不携带完整正文                                  |
-| GET       | `/api/documents/:id`                     | 当前完整版本                                              |
-| GET/POST  | `/api/documents/:id/versions`            | 分页版本摘要 / `{ baseVersionId, content }` 保存          |
-| GET       | `/api/documents/:id/versions/:versionId` | 指定不可变版本                                            |
-| POST      | `/api/billing/quotes`                    | 规范化输入并返回报价                                      |
-| GET/POST  | `/api/runs`                              | 任务列表 / 受理任务，提交成功返回 202                     |
-| GET       | `/api/runs/:id`                          | 任务详情、结果和 allowedActions；兼容旧视频 generation ID |
-| POST      | `/api/runs/:id/sync`                     | 排队同步已有视频/工作流状态；不再次生成                   |
-| POST      | `/api/runs/:id/archive`                  | 排队重试图片、视频或工作流归档；不重复计费                |
-| GET       | `/api/works`                             | 本人文本、图片、视频作品摘要及 total                      |
-| PATCH     | `/api/works/:id`                         | `{ projectId }` 将本人作品归入本人项目                    |
-| GET/POST  | `/api/assets`                            | 分页素材元数据 / multipart `file` 上传                    |
-| GET       | `/api/assets/:id/content`                | 鉴权媒体读取或私有签名跳转                                |
-| GET       | `/api/model-assets`                      | 模型资产元数据；非模型上传/训练接口                       |
-| GET       | `/api/billing/ledger`                    | 分页额度流水                                              |
-| GET       | `/api/account/overview`                  | 钱包、存储、作品统计及最近摘要                            |
+| 方法      | 路径                                     | 合同                                                          |
+| --------- | ---------------------------------------- | ------------------------------------------------------------- |
+| GET       | `/api/providers`                         | 公共视频适配器能力目录，无供应商凭据                          |
+| GET       | `/api/catalog/models`                    | 管理员为各用途分配的连接默认模型、能力与状态，无私有地址/凭据 |
+| GET/POST  | `/api/projects`                          | 本人项目列表 / `{ name }` 创建                                |
+| GET/PATCH | `/api/projects/:id`                      | 本人项目摘要 / 重命名                                         |
+| GET       | `/api/documents`                         | 分页摘要，不携带完整正文                                      |
+| GET       | `/api/documents/:id`                     | 当前完整版本                                                  |
+| GET/POST  | `/api/documents/:id/versions`            | 分页版本摘要 / `{ baseVersionId, content }` 保存              |
+| GET       | `/api/documents/:id/versions/:versionId` | 指定不可变版本                                                |
+| POST      | `/api/billing/quotes`                    | 规范化输入并返回报价                                          |
+| GET/POST  | `/api/runs`                              | 任务列表 / 受理任务，提交成功返回 202                         |
+| GET       | `/api/runs/:id`                          | 任务详情、结果和 allowedActions；兼容旧视频 generation ID     |
+| POST      | `/api/runs/:id/sync`                     | 排队同步已有视频/工作流状态；不再次生成                       |
+| POST      | `/api/runs/:id/archive`                  | 排队重试图片、视频或工作流归档；不重复计费                    |
+| GET       | `/api/works`                             | 本人文本、图片、视频作品摘要及 total                          |
+| PATCH     | `/api/works/:id`                         | `{ projectId }` 将本人作品归入本人项目                        |
+| GET/POST  | `/api/assets`                            | 分页素材元数据 / multipart `file` 上传                        |
+| GET       | `/api/assets/:id/content`                | 鉴权媒体读取或私有签名跳转                                    |
+| GET       | `/api/model-assets`                      | 模型资产元数据；非模型上传/训练接口                           |
+| GET       | `/api/billing/ledger`                    | 分页额度流水                                                  |
+| GET       | `/api/account/overview`                  | 钱包、存储、作品统计及最近摘要                                |
 
 上传视频上限 100 MiB，其他支持的图片/音频上限 20 MiB，同时校验内容签名及个人存储配额。独立图片台参考图另限 PNG/JPEG/WebP、每张 10 MiB；素材上传成功不代表符合所有模型输入要求。
 

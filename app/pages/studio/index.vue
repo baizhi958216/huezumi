@@ -13,6 +13,13 @@ const quote = ref<PlatformQuote>()
 const quoteKey = ref('')
 const run = ref<RunSummary>()
 const projectId = ref('')
+// Keep the select's non-empty UI value out of quote and run requests.
+const selectedProject = computed({
+  get: () => projectId.value || '__auto__',
+  set: (value: string) => {
+    projectId.value = value === '__auto__' ? '' : value
+  },
+})
 const { items: projects, cursor: projectCursor, loadMore: moreProjects, refresh: refreshProjects } = await useProjectOptions()
 const documentCursor = ref<string | null>(null)
 const kind = ref<TextCreationKind>('story')
@@ -47,7 +54,6 @@ function discardChanges() {
 }
 const providers = ref<ModelOption[]>([])
 const documents = ref<TextDocumentSummary[]>([])
-const providerItems = computed(() => providers.value.map(item => ({ label: `${item.label}${item.reason ? ` · ${item.reason}` : ''}`, value: item.id, disabled: !item.available })))
 const kindOptions: Array<{
   value: TextCreationKind
   label: string
@@ -245,7 +251,7 @@ const versions = ref<Array<{
 const versionCursor = ref<string | null>(null)
 
 const projectItems = computed(() => [
-  { label: '自动创建项目', value: '' },
+  { label: '自动创建项目', value: '__auto__' },
   ...projects.value.map(p => ({ label: p.name, value: p.id })),
 ])
 
@@ -313,9 +319,6 @@ onMounted(async () => {
         </StudioPanelHeader>
         <div class="studio-composer__body">
           <StudioModePicker :model-value="kind" :items="kindOptions" label="文案类型" @update:model-value="selectKind" />
-          <UFormField label="生成模型">
-            <USelect v-model="connectionId" :items="providerItems" placeholder="选择文本模型" icon="i-lucide-cpu" class="w-full" />
-          </UFormField>
           <UFormField label="创作想法与设定" :hint="`${brief.length} / 12K`" size="sm">
             <UTextarea
               v-model="brief"
@@ -335,7 +338,7 @@ onMounted(async () => {
           <UButton color="neutral" variant="outline" icon="i-lucide-settings-2" block @click="textSettingsModalOpen = true">
             更多设置 · 风格与项目
           </UButton>
-          <UAlert v-if="!providerItems.length && user" color="warning" variant="subtle" icon="i-lucide-plug-zap" description="请联系管理员配置文本模型连接及篇幅价格。" />
+          <UAlert v-if="!selectedProvider?.available && user" color="warning" variant="subtle" icon="i-lucide-plug-zap" description="文案生成暂不可用，请联系管理员分配生成服务并配置篇幅价格。" />
           <UAlert v-if="savedMessage" color="success" variant="subtle" icon="i-lucide-circle-check" :description="savedMessage" />
         </div>
         <StudioGenerateAction :submitting="generating" :active="active" :disabled="!!user && (brief.trim().length < 5 || !selectedProvider?.available)" :quote="quote" :error-message="errorMessage" @generate="generate" />
@@ -526,13 +529,11 @@ onMounted(async () => {
       <!-- 文本创作参数设置弹窗 -->
       <TextSettingsModal
         v-model:open="textSettingsModalOpen"
-        v-model:project-id="projectId"
-        v-model:connection-id="connectionId"
+        v-model:project-id="selectedProject"
         v-model:length="length"
         v-model:tone="tone"
         v-model:audience="audience"
         :project-items="projectItems"
-        :provider-items="providerItems"
         :length-items="lengthItems"
         :project-cursor="projectCursor"
         :disabled-project="!!current"

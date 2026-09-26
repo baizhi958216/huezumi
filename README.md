@@ -36,7 +36,7 @@ pnpm dev
 
 当前按全新开发项目管理数据库，`schema.ts` 是结构来源。`db:init` 使用 Drizzle Kit push 建表并初始化 PostgreSQL 队列，不需要 `drizzle/` 迁移历史；已有开发库改结构使用 `pnpm db:push`，不自动强制确认破坏性变更。
 
-默认页面地址为 `http://localhost:3000`。模型连接、价格、注册方式和平台预算在管理后台维护。完整步骤见 [开发指南](docs/development.md)，检查结果见 [项目检查记录](docs/project-audit.md)。
+默认页面地址为 `http://localhost:3000`。文案、图片与视频的服务平台和生成模型由管理员在控制面板分配，创作台不展示选择入口。模型连接、价格、注册方式和平台预算在管理后台维护。完整步骤见 [开发指南](docs/development.md)，检查结果见 [项目检查记录](docs/project-audit.md)。
 
 ## 验证
 

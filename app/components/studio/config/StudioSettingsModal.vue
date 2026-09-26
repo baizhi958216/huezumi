@@ -1,14 +1,10 @@
 <script setup lang="ts">
-import type { AspectRatio, ModelSpec, ProviderCapability, Resolution } from '#shared/types/generation'
+import type { AspectRatio, ProviderCapability, Resolution } from '#shared/types/generation'
 import StudioModelPicker from './StudioModelPicker.vue'
 import StudioSpecGrid from './StudioSpecGrid.vue'
 
 const props = defineProps<{
-  capability?: ProviderCapability
-  selectedModel?: ModelSpec
   effectiveCapability?: ProviderCapability
-  providerItems: Array<{ label: string, value: string, disabled: boolean }>
-  modelItems: Array<{ label: string, value: string }>
   resolutionOptions: Resolution[]
   ratioOptions: AspectRatio[]
   durationSteps?: number[]
@@ -24,11 +20,9 @@ const emit = defineEmits<{
 }>()
 
 const open = defineModel<boolean>('open', { default: false })
-const activeTab = defineModel<'specs' | 'model' | 'advanced'>('tab', { default: 'specs' })
+const activeTab = defineModel<'specs' | 'project' | 'advanced'>('tab', { default: 'specs' })
 
 const projectId = defineModel<string>('projectId', { default: '' })
-const providerId = defineModel<string | undefined>('providerId')
-const model = defineModel<string>('model', { required: true })
 const resolution = defineModel<Resolution>('resolution', { required: true })
 const ratio = defineModel<AspectRatio>('ratio', { required: true })
 const duration = defineModel<number>('duration', { required: true })
@@ -41,7 +35,7 @@ const seed = defineModel<number | undefined>('seed')
 
 const tabs = [
   { id: 'specs' as const, label: '规格参数', icon: 'i-lucide-monitor' },
-  { id: 'model' as const, label: '模型与项目', icon: 'i-lucide-cpu' },
+  { id: 'project' as const, label: '归属项目', icon: 'i-lucide-folder' },
   { id: 'advanced' as const, label: '高级控制', icon: 'i-lucide-sliders-horizontal' },
 ]
 
@@ -64,32 +58,20 @@ function resetDefaults() {
 <template>
   <UModal
     v-model:open="open"
+    description="配置输出规格、项目与高级生成控制"
     :ui="{ content: 'sm:max-w-xl max-w-[94vw] overflow-hidden' }"
   >
-    <template #header>
-      <div class="flex items-center justify-between w-full">
-        <div class="flex items-center gap-2.5">
-          <div class="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
-            <UIcon name="i-lucide-sliders" class="size-4.5" />
-          </div>
-          <div>
-            <h2 class="text-base font-semibold text-highlighted leading-tight">
-              生成参数设置
-            </h2>
-            <p class="text-xs text-dimmed mt-0.5">
-              配置输出规格、模型与高级生成控制
-            </p>
-          </div>
-        </div>
-        <UButton
-          color="neutral"
-          variant="ghost"
-          size="sm"
-          icon="i-lucide-x"
-          aria-label="关闭"
-          @click="open = false"
-        />
-      </div>
+    <template #title>
+      <span class="flex items-center gap-2.5">
+        <span class="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+          <UIcon name="i-lucide-sliders" class="size-4.5" />
+        </span>
+        生成参数设置
+      </span>
+    </template>
+
+    <template #close>
+      <UButton color="neutral" variant="ghost" size="sm" icon="i-lucide-x" aria-label="关闭" />
     </template>
 
     <template #body>
@@ -127,17 +109,10 @@ function resetDefaults() {
           />
         </div>
 
-        <!-- Tab 2: 模型与项目 -->
-        <div v-show="activeTab === 'model'" class="space-y-4 pt-1">
+        <!-- Tab 2: 归属项目 -->
+        <div v-show="activeTab === 'project'" class="space-y-4 pt-1">
           <StudioModelPicker
             v-model:project-id="projectId"
-            v-model:provider-id="providerId"
-            v-model:model="model"
-            :capability="capability"
-            :selected-model="selectedModel"
-            :effective-capability="effectiveCapability"
-            :provider-items="providerItems"
-            :model-items="modelItems"
             :project-options="projectOptions"
             :project-cursor="projectCursor"
             @more-projects="emit('moreProjects')"
@@ -200,7 +175,7 @@ function resetDefaults() {
       <div class="flex items-center justify-between w-full">
         <div class="flex items-center gap-1.5 text-xs text-dimmed truncate max-w-[260px] sm:max-w-none">
           <UIcon name="i-lucide-check-circle-2" class="size-3.5 text-success shrink-0" />
-          <span class="truncate">{{ selectedModelName }} · {{ resolution }} · {{ ratio }} · {{ smartDuration ? '智能时长' : `${duration}s` }}</span>
+          <span class="truncate">{{ resolution }} · {{ ratio }} · {{ smartDuration ? '智能时长' : `${duration}s` }}</span>
         </div>
         <div class="flex items-center gap-2">
           <UButton

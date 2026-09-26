@@ -55,7 +55,7 @@ watch(() => props.task?.id, () => {
     <StudioEmptyState v-if="!task" icon="i-lucide-video" title="让每一个想法，都有下一帧" description="描述场景与镜头，或用参考素材开始。生成的视频会在这里播放，并保存到作品库。" />
     <div v-else class="p-5">
       <div class="mb-4 flex flex-wrap gap-2">
-        <UBadge v-for="badge in [task.model, task.resolution, ratioLabel, task.duration === -1 ? '智能时长' : `${task.duration} 秒`]" :key="badge" color="neutral" variant="subtle">
+        <UBadge v-for="badge in [task.resolution, ratioLabel, task.duration === -1 ? '智能时长' : `${task.duration} 秒`]" :key="badge" color="neutral" variant="subtle">
           {{ badge }}
         </UBadge>
       </div>

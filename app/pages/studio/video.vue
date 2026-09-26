@@ -59,16 +59,6 @@ const quote = ref<PlatformQuote & {
   idempotencyKey: string
   sourceLabel: string
 }>()
-const providerItems = computed(() => (providerCatalog.value || []).map(item => ({
-  label: item.enabled ? item.name : `${item.name} · ${modelCatalog.value?.find(m => m.connectionId === item.id)?.reason || '暂不可用'}`,
-  value: item.id,
-  disabled: !item.enabled,
-})))
-const modelItems = computed(() => (capability.value?.models || []).map((item) => {
-  const option = modelCatalog.value?.find(m => m.connectionId === providerId.value && m.model === item.id)
-  return { label: `${item.name}${option?.reason ? ` · ${option.reason}` : item.badge ? ` · ${item.badge}` : ''}`, value: item.id, disabled: !option?.available }
-}))
-const selectedModel = computed(() => capability.value?.models.find(item => item.id === model.value))
 const effectiveCapability = computed(() => capability.value
   ? resolveModelCapability(capability.value, model.value, resolution.value)
   : undefined)
@@ -89,7 +79,7 @@ const durationSliderValue = computed<number | number[]>({
       duration.value = next
   },
 })
-const selectedModelName = computed(() => selectedModel.value?.name || model.value)
+const selectedModelName = '当前生成配置'
 /** 切换供应商后先选择该供应商的默认模型。 */
 watch(capability, (cap) => {
   if (!cap)
@@ -98,7 +88,7 @@ watch(capability, (cap) => {
     model.value = cap.models[0]?.id || ''
 }, { immediate: true })
 /** 切换模型、清晰度后，把现有选择收敛到模型级能力范围。 */
-watch(effectiveCapability, (cap) => {
+function normalizeSpecs(cap: ProviderCapability | undefined) {
   if (!cap)
     return
   if (!cap.modes.includes(mode.value))
@@ -120,7 +110,8 @@ watch(effectiveCapability, (cap) => {
     promptExtend.value = false
   const mediaIssue = getMediaValidationIssue(cap, media.value)
   errorMessage.value = mediaIssue ? formatMediaValidationIssue(mediaIssue) : ''
-}, { immediate: true })
+}
+watch(effectiveCapability, normalizeSpecs, { immediate: true })
 watch(mode, () => {
   media.value = []
   errorMessage.value = ''
@@ -129,7 +120,7 @@ function formatMediaValidationIssue(issue: ReturnType<typeof getMediaValidationI
   if (!issue)
     return ''
   if (issue.kind === 'unsupported')
-    return `${selectedModelName.value} 不支持${MEDIA_META[issue.type].label}`
+    return `${selectedModelName} 不支持${MEDIA_META[issue.type].label}`
   if (issue.kind === 'count')
     return `「${MEDIA_META[issue.type].label}」最多允许 ${issue.max} 份`
   if (issue.kind === 'duration_required')
@@ -193,7 +184,7 @@ async function generate() {
   }
   errorMessage.value = ''
   if (!capability.value || !modelAvailable.value) {
-    errorMessage.value = '请选择可用的视频模型'
+    errorMessage.value = '视频生成暂不可用，请联系管理员分配生成服务并配置价格'
     return
   }
   if (!prompt.value.trim() && !media.value.length) {
@@ -276,10 +267,6 @@ async function loadFromTask(fromId: string) {
   try {
     const prior = (await platform.run(fromId)).generation
     if (prior) {
-      if (prior.provider)
-        providerId.value = modelCatalog.value?.find(m => m.provider === prior.provider)?.connectionId
-      if (prior.model)
-        model.value = prior.model
       if (prior.mode)
         mode.value = prior.mode
       if (prior.prompt)
@@ -313,6 +300,8 @@ async function loadFromTask(fromId: string) {
         seed.value = prior.seed
         advancedOpen.value = true
       }
+      await nextTick()
+      normalizeSpecs(effectiveCapability.value)
       reusedFromId.value = prior.id
     }
   }
@@ -321,13 +310,6 @@ async function loadFromTask(fromId: string) {
   }
 }
 onMounted(() => {
-  if (typeof route.query.provider === 'string') {
-    const selected = modelCatalog.value?.find(m => m.kind === 'video' && m.provider === route.query.provider && (!route.query.model || m.model === route.query.model))
-    if (selected) {
-      providerId.value = selected.connectionId
-      model.value = selected.model
-    }
-  }
   const fromId = route.query.from
   if (typeof fromId === 'string' && fromId) {
     loadFromTask(fromId)
@@ -366,8 +348,6 @@ onMounted(async () => {
         v-model:project-id="projectId"
         v-model:source-version-id="sourceVersionId"
         v-model:source-excerpt="sourceExcerpt"
-        v-model:provider-id="providerId"
-        v-model:model="model"
         v-model:mode="mode"
         v-model:prompt="prompt"
         v-model:negative-prompt="negativePrompt"
@@ -381,11 +361,7 @@ onMounted(async () => {
         v-model:seed="seed"
         v-model:advanced-open="advancedOpen"
         v-model:reused-from-id="reusedFromId"
-        :capability="capability"
-        :selected-model="selectedModel"
         :effective-capability="effectiveCapability"
-        :provider-items="providerItems"
-        :model-items="modelItems"
         :mode-options="modeOptions"
         :resolution-options="resolutionOptions"
         :ratio-options="ratioOptions"

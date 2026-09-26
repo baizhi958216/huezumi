@@ -1,15 +1,11 @@
 <script setup lang="ts">
-import type { AspectRatio, GenerationMode, MediaInput, MediaType, ModelSpec, ProviderCapability, Resolution } from '#shared/types/generation'
+import type { AspectRatio, GenerationMode, MediaInput, MediaType, ProviderCapability, Resolution } from '#shared/types/generation'
 import StudioMediaZone from './config/StudioMediaZone.vue'
 import StudioPromptArea from './config/StudioPromptArea.vue'
 import StudioSettingsModal from './config/StudioSettingsModal.vue'
 
 defineProps<{
-  capability?: ProviderCapability
-  selectedModel?: ModelSpec
   effectiveCapability?: ProviderCapability
-  providerItems: Array<{ label: string, value: string, disabled: boolean }>
-  modelItems: Array<{ label: string, value: string }>
   modeOptions: Array<{ value: GenerationMode, label: string, hint: string, icon: string }>
   resolutionOptions: Resolution[]
   ratioOptions: AspectRatio[]
@@ -40,8 +36,6 @@ const emit = defineEmits<{
 const projectId = defineModel<string>('projectId', { default: '' })
 const sourceVersionId = defineModel<string | undefined>('sourceVersionId')
 const sourceExcerpt = defineModel<string | undefined>('sourceExcerpt')
-const providerId = defineModel<string | undefined>('providerId')
-const model = defineModel<string>('model', { required: true })
 const mode = defineModel<GenerationMode>('mode', { required: true })
 const prompt = defineModel<string>('prompt', { required: true })
 const negativePrompt = defineModel<string>('negativePrompt', { required: true })
@@ -57,9 +51,9 @@ const advancedOpen = defineModel<boolean>('advancedOpen', { required: true })
 const reusedFromId = defineModel<string | undefined>('reusedFromId')
 
 const settingsModalOpen = ref(false)
-const settingsModalTab = ref<'specs' | 'model' | 'advanced'>('specs')
+const settingsModalTab = ref<'specs' | 'project' | 'advanced'>('specs')
 
-function openSettings(tab: 'specs' | 'model' | 'advanced' = 'specs') {
+function openSettings(tab: 'specs' | 'project' | 'advanced' = 'specs') {
   settingsModalTab.value = tab
   settingsModalOpen.value = true
 }
@@ -89,15 +83,7 @@ const promptIdeas = [
     <StudioPanelHeader title="视频生成" description="从静止的灵感，到流动的故事。" icon="i-lucide-video" />
     <div class="studio-composer__body">
       <StudioModePicker v-if="modeOptions.length" v-model="mode" :items="modeOptions" label="视频生成模式" />
-      <div class="grid grid-cols-2 gap-3">
-        <UFormField label="服务平台">
-          <USelect v-model="providerId" :items="providerItems" placeholder="选择平台" class="w-full" />
-        </UFormField>
-        <UFormField label="生成模型">
-          <USelect v-model="model" :items="modelItems" placeholder="选择视频模型" class="w-full" />
-        </UFormField>
-      </div>
-      <UAlert v-if="user && !modelAvailable" color="warning" variant="subtle" description="暂无可用视频模型，请选择其他模型，或联系管理员配置连接与价格。" />
+      <UAlert v-if="user && !modelAvailable" color="warning" variant="subtle" description="视频生成暂不可用，请联系管理员分配生成服务并配置价格。" />
       <!-- 提示词输入与片段关联 -->
       <StudioPromptArea
         v-model:prompt="prompt"
@@ -133,13 +119,11 @@ const promptIdeas = [
     </div>
     <StudioGenerateAction :submitting="submitting" :active="active" :disabled="!!user && !modelAvailable" :quote="quote" :error-message="errorMessage" @generate="emit('generate')" />
 
-    <!-- 4. 参数设置弹窗（规格、模型与高级选项收纳） -->
+    <!-- 4. 参数设置弹窗（规格、项目与高级选项收纳） -->
     <StudioSettingsModal
       v-model:open="settingsModalOpen"
       v-model:tab="settingsModalTab"
       v-model:project-id="projectId"
-      v-model:provider-id="providerId"
-      v-model:model="model"
       v-model:resolution="resolution"
       v-model:ratio="ratio"
       v-model:duration="duration"
@@ -149,11 +133,7 @@ const promptIdeas = [
       v-model:prompt-extend="promptExtend"
       v-model:watermark="watermark"
       v-model:seed="seed"
-      :capability="capability"
-      :selected-model="selectedModel"
       :effective-capability="effectiveCapability"
-      :provider-items="providerItems"
-      :model-items="modelItems"
       :resolution-options="resolutionOptions"
       :ratio-options="ratioOptions"
       :duration-steps="durationSteps"
