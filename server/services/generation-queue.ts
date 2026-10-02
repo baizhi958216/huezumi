@@ -1,5 +1,5 @@
 import type { GenerationJob } from '../database/task-queue'
-import { and, asc, eq, isNull, lte, sql } from 'drizzle-orm'
+import { and, asc, eq, inArray, isNull, lte, sql } from 'drizzle-orm'
 import { Pool } from 'pg'
 import { databaseUrl, useDatabase } from '../database/client'
 import { outboxEvents } from '../database/schema'
@@ -29,11 +29,11 @@ export async function enqueueGeneration(job: GenerationJob, options: {
 }
 export async function publishOutbox() {
   const db = useDatabase()
-  const pending = await db.select().from(outboxEvents).where(and(isNull(outboxEvents.publishedAt), lte(outboxEvents.availableAt, sql`now()`))).orderBy(asc(outboxEvents.createdAt)).limit(50)
+  const pending = await db.select().from(outboxEvents).where(and(inArray(outboxEvents.topic, ['generation.submit', 'run.text', 'run.image']), isNull(outboxEvents.publishedAt), lte(outboxEvents.availableAt, sql`now()`))).orderBy(asc(outboxEvents.createdAt)).limit(50)
   for (const event of pending) {
-    if (!['generation.submit', 'run.text', 'run.image', 'run.workflow'].includes(event.topic))
+    if (!['generation.submit', 'run.text', 'run.image'].includes(event.topic))
       continue
-    await enqueueGeneration({ kind: event.topic === 'run.image' ? 'image' : event.topic === 'run.text' ? 'text' : event.topic === 'run.workflow' ? 'workflow' : 'submit', generationId: event.aggregateId }, { jobId: event.id })
+    await enqueueGeneration({ kind: event.topic === 'run.image' ? 'image' : event.topic === 'run.text' ? 'text' : 'submit', generationId: event.aggregateId }, { jobId: event.id })
     await db.update(outboxEvents).set({ publishedAt: new Date() }).where(and(eq(outboxEvents.id, event.id), isNull(outboxEvents.publishedAt)))
   }
 }

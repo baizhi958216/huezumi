@@ -16,20 +16,16 @@ if (env.NUXT_CONNECTION_ENCRYPTION_KEY && Buffer.from(env.NUXT_CONNECTION_ENCRYP
   failed = true
 }
 if (process.argv.includes('--production')) {
-  for (const key of ['NUXT_OSS_ACCESS_KEY_ID', 'NUXT_OSS_ACCESS_KEY_SECRET', 'NUXT_OSS_BUCKET', 'NUXT_COMFYUI_REMOTE_BASE_URL']) {
+  for (const key of ['NUXT_OSS_ACCESS_KEY_ID', 'NUXT_OSS_ACCESS_KEY_SECRET', 'NUXT_OSS_BUCKET']) {
     if (!env[key]) {
       console.log(`${key}: missing`)
       failed = true
     }
-  }
-  if (env.NUXT_COMFYUI_MODE !== 'remote') {
-    console.log('ComfyUI mode: production requires remote')
-    failed = true
   }
 }
 for (const key of ['NUXT_QUEUE_MODE', 'NUXT_REDIS_URL', 'REDIS_HOST_PORT', 'WORKER_CONCURRENCY', 'NUXT_TEXT_LLM_CONNECTIONS_JSON', 'NUXT_REGISTRATION_MODE', 'NUXT_SIGNUP_CREDITS']) {
   if (env[key])
     console.log(`${key}: legacy configuration; import/remove as documented`)
 }
-console.log('Business configuration source: PostgreSQL; workflow API configuration source: PostgreSQL (per-run private snapshot)')
+console.log('Business configuration source: PostgreSQL')
 process.exitCode = failed ? 1 : 0

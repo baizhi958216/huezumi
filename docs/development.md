@@ -2,7 +2,7 @@
 
 ## 环境
 
-使用 Node.js 22.12+、`pnpm@10.15.1`、Docker Compose。可选 ComfyUI 需要 Git、Python、PyTorch 和对应模型。Nuxt 在宿主机运行，PostgreSQL 17 与 SeaweedFS 4.46 使用 [开发 Compose](../docker-compose.dev.yml)。
+使用 Node.js 22.12+、`pnpm@10.15.1`、Docker Compose。Nuxt 在宿主机运行，PostgreSQL 17 与 SeaweedFS 4.46 使用 [开发 Compose](../docker-compose.dev.yml)。
 
 当前按全新开发库处理，不维护历史 SQL 迁移或独立 harness 目录。数据库结构以 `server/database/schema.ts` 为准；验证入口直接定义在 package.json。
 
@@ -55,12 +55,6 @@ pnpm dev
 
 默认注册模式 invite、赠送额度 0。管理员在 `/admin/invitations` 创建邀请码，在 `/admin/services` 配置连接与用途，在 `/admin/pricing` 发布文本/图片/视频价格，在 `/admin/settings` 设置并发及日预算。没有价格或额度时不能提交付费任务。
 
-## 可选 ComfyUI
-
-`NUXT_COMFYUI_MODE=local` 时启动会后台探活，已安装且未运行则尝试启动；首次进入管理员 `/studio/workflow` 安装后再启动。默认目录 `vendor/ComfyUI`。解释器先选该目录内 .venv/venv，再检查 `NUXT_COMFYUI_PYTHON`，最后查 PATH；`NUXT_COMFYUI_DIR` 可调整目录。
-
-安装不会下载模型权重。remote 模式只检查连接，不管理远端进程。节点更新需要重启一次；后台 API Key 或用途分配变化使用下一次任务快照，无需重启。预设和执行端边界见 [工作流指南](workflows.md)。
-
 ## 日常验证
 
 ```bash
@@ -71,16 +65,14 @@ pnpm build
 git diff --check
 ```
 
-`pnpm check` 串联测试/lint/类型检查，`pnpm check:full` 再构建。Python 与可选数据库测试见 [验证指南](testing.md)。`pnpm generate` 是静态生成命令，不能替代依赖认证、数据库和 worker 的完整平台部署。
+`pnpm check` 串联测试/lint/类型检查，`pnpm check:full` 再构建。可选数据库测试见 [验证指南](testing.md)。`pnpm generate` 是静态生成命令，不能替代依赖认证、数据库和 worker 的完整平台部署。
 
 ## 常见问题
 
-| 现象                         | 检查方向                                                           |
-| ---------------------------- | ------------------------------------------------------------------ |
-| 配置检查通过但登录/任务失败  | 它不检测连通性；核对 PostgreSQL 地址、schema 与账户状态            |
-| 任务停留 queued              | worker 开关、pg-boss 初始化、outbox 和后台日志                     |
-| 模型不可选 / 报价 422        | 连接启用状态、模型白名单、用途及匹配价格                           |
-| 图片成功但不能预览           | 查看归档阶段、作品可用性和 OSS 连接；按 allowedActions 重试保存    |
-| 云供应商读不到参考图         | 本机 9100 HTTP URL 不能供公网供应商读取，需可访问的 HTTPS 私有存储 |
-| ComfyUI 缺失节点             | 执行端版本、自定义节点挂载、依赖和重启状态                         |
-| Python 测试缺少 torch/PIL 等 | 使用已安装依赖的 ComfyUI 虚拟环境，不能只换成裸系统 Python         |
+| 现象                        | 检查方向                                                           |
+| --------------------------- | ------------------------------------------------------------------ |
+| 配置检查通过但登录/任务失败 | 它不检测连通性；核对 PostgreSQL 地址、schema 与账户状态            |
+| 任务停留 queued             | worker 开关、pg-boss 初始化、outbox 和后台日志                     |
+| 模型不可选 / 报价 422       | 连接启用状态、模型白名单、用途及匹配价格                           |
+| 图片成功但不能预览          | 查看归档阶段、作品可用性和 OSS 连接；按 allowedActions 重试保存    |
+| 云供应商读不到参考图        | 本机 9100 HTTP URL 不能供公网供应商读取，需可访问的 HTTPS 私有存储 |

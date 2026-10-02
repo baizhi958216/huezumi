@@ -29,14 +29,11 @@ export function getAppNavigation(role: AppNavigationRole): AppNavigationItem[] {
   ]
 }
 
-export function getStudioNavigation(role: AppNavigationRole): AppNavigationItem[] {
+export function getStudioNavigation(_role: AppNavigationRole): AppNavigationItem[] {
   return [
     { label: '文案生成', to: '/studio', icon: 'i-lucide-file-pen-line' },
     { label: '图片生成', to: '/studio/image', icon: 'i-lucide-image-plus' },
     { label: '视频生成', to: '/studio/video', icon: 'i-lucide-video' },
-    ...(role === 'admin'
-      ? [{ label: '工作流 · 高级', to: '/studio/workflow', icon: 'i-lucide-workflow' }]
-      : []),
   ]
 }
 

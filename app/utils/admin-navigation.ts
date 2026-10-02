@@ -1,6 +1,6 @@
 export const adminNavigation = [
   { label: '总览', to: '/admin', icon: 'i-lucide-layout-dashboard', description: '从待办事项进入管理工作' },
-  { label: '生成服务', to: '/admin/services', icon: 'i-lucide-network', description: '维护模型连接，为创作台和工作流分配服务' },
+  { label: '生成服务', to: '/admin/services', icon: 'i-lucide-network', description: '维护模型连接，为创作台分配服务' },
   { label: '价格管理', to: '/admin/pricing', icon: 'i-lucide-coins', description: '管理文本、图片和视频的新报价' },
   { label: '任务处理', to: '/admin/tasks', icon: 'i-lucide-list-checks', description: '核对不明确的提交结果，处理预留额度' },
   { label: '用户与额度', to: '/admin/users', icon: 'i-lucide-users', description: '查找用户，调整额度和账户状态' },

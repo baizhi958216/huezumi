@@ -14,9 +14,7 @@ export const connectionSettingsSchema = z.object({
   auth: z.enum(['bearer', 'none']).optional(),
   apiProtocol: z.enum(['auto', 'chat_completions', 'responses']).optional(),
   timeoutSeconds: z.number().int().min(5).max(300).optional(),
-  supportsVision: z.boolean().optional(),
-  webSearch: z.boolean().optional(),
-}).strict().refine(v => v.models.includes(v.defaultModel), { message: '默认模型必须属于模型列表，请重新选择默认模型', path: ['defaultModel'] }).refine(v => !v.webSearch || v.apiProtocol !== 'chat_completions', '联网搜索需要使用 Responses 或自动协议')
+}).strict().refine(v => v.models.includes(v.defaultModel), { message: '默认模型必须属于模型列表，请重新选择默认模型', path: ['defaultModel'] })
 export const connectionSchema = z.object({
   name: z.string().trim().min(1).max(80),
   kind: z.enum(['video', 'text', 'image']),
@@ -32,9 +30,7 @@ export const settingsSchema = z.object({
   platformDailyCreditBudget: z.number().int().min(0).max(2000000000).default(100000),
   defaultVideoConnectionId: z.uuid().optional(),
   defaultTextConnectionId: z.uuid().optional(),
-  workflowAgentConnectionId: z.uuid().optional(),
   defaultImageConnectionId: z.uuid().optional(),
-  workflowVideoConnectionId: z.uuid().optional(),
 }).strict()
 
 // Null explicitly removes an assignment; omitted fields remain unchanged.
@@ -45,9 +41,7 @@ export const settingsPatchSchema = z.object({
   platformDailyCreditBudget: settingsSchema.shape.platformDailyCreditBudget.removeDefault().optional(),
   defaultVideoConnectionId: z.uuid().nullable().optional(),
   defaultTextConnectionId: z.uuid().nullable().optional(),
-  workflowAgentConnectionId: z.uuid().nullable().optional(),
   defaultImageConnectionId: z.uuid().nullable().optional(),
-  workflowVideoConnectionId: z.uuid().nullable().optional(),
 }).strict()
 
 export function mergeSettingsPatch(current: PlatformSettingsInput, input: unknown) {
@@ -73,8 +67,6 @@ export function connectionValidationMessage(error: z.ZodError): string {
     'settings.auth': '鉴权方式',
     'settings.apiProtocol': '协议格式',
     'settings.timeoutSeconds': '请求超时',
-    'settings.supportsVision': '图片理解设置',
-    'settings.webSearch': '联网搜索设置',
     'secrets': '连接凭据',
   }
   const issue = error.issues[0]

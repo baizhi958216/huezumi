@@ -72,7 +72,7 @@ const shortcuts = [
       </NuxtLink>
     </div>
     <p class="text-xs text-muted">
-      创作任务统计包含文案、图片与视频，不包含管理员工作流。当前素材占用 {{ ((overview?.assetBytes || 0) / 1024 / 1024).toFixed(1) }} MB。
+      创作任务统计包含文案、图片与视频。当前素材占用 {{ ((overview?.assetBytes || 0) / 1024 / 1024).toFixed(1) }} MB。
     </p>
   </div>
 </template>

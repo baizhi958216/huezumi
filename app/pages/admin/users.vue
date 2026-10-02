@@ -191,7 +191,7 @@ async function toggleUser(target: AdminUser) {
       <template #body>
         <form id="account-form" class="space-y-4" @submit.prevent="saveAccount">
           <fieldset :disabled="!!userBusy" class="space-y-4">
-            <UFormField label="账户角色" description="管理员可管理全站用户、额度、服务凭据和工作流。">
+            <UFormField label="账户角色" description="管理员可管理全站用户、额度、服务凭据。">
               <USelect v-model="accountDraft.role" :disabled="accountTarget?.id === user?.id" :items="[{ label: '普通用户', value: 'user' }, { label: '管理员', value: 'admin' }]" class="w-full" />
             </UFormField><UFormField label="存储上限（MiB）" description="1024 MiB = 1 GiB。调整上限不会删除已有素材。">
               <UInput v-model.number="accountDraft.storageLimitMiB" type="number" step="any" :min="0" required class="w-full" />

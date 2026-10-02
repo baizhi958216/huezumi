@@ -9,7 +9,7 @@ import { enqueueGeneration, withGenerationLock } from './generation-queue'
 import { archiveRemoteOutput, OutputArchiveError } from './output-archive'
 import { runImageJob } from './platform/image-worker'
 import { failRunJob, runTextJob } from './platform/text-worker'
-import { syncVideoWork, syncWorkflowRun } from './platform/works'
+import { syncVideoWork } from './platform/works'
 import { getVideoProvider } from './providers'
 import { configuredVideoProvider } from './providers/configured'
 
@@ -20,17 +20,18 @@ export async function runGenerationJob(job: GenerationJob) {
       return await runImageJob(job.generationId)
     if (job.kind === 'text')
       return await runTextJob(job.generationId)
-    if (job.kind === 'workflow')
-      return await syncWorkflowRun(job.generationId)
     if (job.kind === 'submit')
       return await submitGeneration(job.generationId)
-    return await pollGeneration(job.generationId)
+    if (job.kind === 'poll')
+      return await pollGeneration(job.generationId)
   })
 }
 export async function handleFailedGeneration(job: GenerationJob) {
   await withGenerationLock(job.generationId, async () => {
-    if (job.kind === 'image' || job.kind === 'text' || job.kind === 'workflow')
+    if (job.kind === 'image' || job.kind === 'text')
       return await failRunJob(job.generationId)
+    if (job.kind !== 'submit' && job.kind !== 'poll')
+      return
     await useDatabase().update(generations).set({
       status: 'UNKNOWN',
       dispatchStatus: 'reconciling',

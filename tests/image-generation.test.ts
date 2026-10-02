@@ -75,9 +75,8 @@ describe('image request and pricing boundaries', () => {
     expect(() => imageCredits({ fixedCredits: 2, outputSecondCredits: 20 }, 1)).toThrow()
     expect(() => imageCredits({ fixedCredits: Infinity }, 1)).toThrow()
   })
-  it('exposes independent image creation to users and reserves advanced workflows for admins', () => {
+  it('exposes the same creation modes to users and admins', () => {
     expect(getStudioNavigation('user').map(item => item.to)).toContain('/studio/image')
-    expect(getStudioNavigation('user').map(item => item.to)).not.toContain('/studio/workflow')
-    expect(getStudioNavigation('admin').find(item => item.to === '/studio/workflow')?.label).toBe('工作流 · 高级')
+    expect(getStudioNavigation('admin')).toEqual(getStudioNavigation('user'))
   })
 })

@@ -10,7 +10,7 @@ watch([filter, search, kind], () => {
 })
 const query = computed(() => ({ scope: filter.value, q: search.value, kind: kind.value, page: page.value }))
 const { data, error: loadError, status: loadStatus, refresh } = await useFetch<{ items: AdminTask[], hasMore: boolean }>('/api/admin/tasks', { query })
-const kindLabels: Record<string, string> = { text: '文案', image: '图片', video: '视频', workflow: '工作流' }
+const kindLabels: Record<string, string> = { text: '文案', image: '图片', video: '视频' }
 const busy = ref(false)
 const open = ref(false)
 const target = ref<AdminTask>()
@@ -105,7 +105,7 @@ async function settle() {
           <p class="text-xs text-muted">
             {{ statusLabels[task.status] || task.status }} · {{ settlementLabels[task.settlement] || task.settlement }} · 预留 {{ task.credits }} · 已扣 {{ task.chargedCredits ?? '—' }} 额度 · {{ stageLabels[task.stage] || task.stage }}
           </p>
-          <div v-if="task.settlement === 'review' && task.kind !== 'workflow'" class="flex flex-wrap gap-2">
+          <div v-if="task.settlement === 'review'" class="flex flex-wrap gap-2">
             <UButton v-if="task.source === 'video' && task.providerTaskId" size="sm" variant="soft" :disabled="busy" @click="sync(task)">
               同步状态
             </UButton><UButton size="sm" variant="outline" color="neutral" :disabled="busy" @click="select(task, 'release')">

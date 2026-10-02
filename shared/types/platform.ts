@@ -2,7 +2,7 @@ import type { GenerationRecord, GenerationRequest, GenerationStatus, ProviderCap
 import type { ImageGenerationRequest } from './image-generation'
 import type { TextCreationRequest, TextDocumentVersionRecord } from './text-creation'
 
-export type RunKind = 'video' | 'text' | 'image' | 'workflow'
+export type RunKind = 'video' | 'text' | 'image'
 export interface Page<T> {
   items: T[]
   nextCursor: string | null
@@ -17,8 +17,6 @@ export interface ConnectionSettings {
   auth?: 'bearer' | 'none'
   apiProtocol?: 'auto' | 'chat_completions' | 'responses'
   timeoutSeconds?: number
-  supportsVision?: boolean
-  webSearch?: boolean
 }
 export interface ConnectionSecrets {
   apiKey?: string
@@ -44,9 +42,7 @@ export interface PlatformSettings {
   platformDailyCreditBudget: number
   defaultVideoConnectionId?: string
   defaultTextConnectionId?: string
-  workflowAgentConnectionId?: string
   defaultImageConnectionId?: string
-  workflowVideoConnectionId?: string
 }
 export interface ModelOption {
   id: string
@@ -96,7 +92,6 @@ export interface RunSummary {
   updatedAt: string
 }
 export interface WorkSummary {
-  promptId?: string
   id: string
   kind: 'text' | 'image' | 'video'
   title: string

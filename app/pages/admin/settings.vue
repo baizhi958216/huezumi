@@ -28,7 +28,7 @@ async function save() {
   catch (e) { saveError.value = apiError(e) }
   finally { busy.value = false }
 }
-const deploymentLabels: Record<string, string> = { databaseConfigured: '数据库配置', encryptionConfigured: '凭据加密配置', storageConfigured: '对象存储配置', workerEnabled: '当前进程 Worker 开关', workerConcurrency: 'Worker 并发数', comfyuiMode: 'ComfyUI 模式' }
+const deploymentLabels: Record<string, string> = { databaseConfigured: '数据库配置', encryptionConfigured: '凭据加密配置', storageConfigured: '对象存储配置', workerEnabled: '当前进程 Worker 开关', workerConcurrency: 'Worker 并发数' }
 </script>
 
 <template>

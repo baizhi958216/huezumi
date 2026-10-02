@@ -32,7 +32,7 @@ try {
     const secrets = capability.id === 'kling' ? { accessKey: accessKey!, secretKey: secretKey! } : { apiKey: key! }
     candidates.push({ importKey: `env:video:${capability.id}`, name: capability.name, kind: 'video', provider: capability.id, settings: { defaultModel: values[`${prefix}MODEL`] || capability.models[0]!.id, models: capability.models.map(m => m.id), ...(values[`${prefix}BASE_URL`] ? { baseUrl: values[`${prefix}BASE_URL`] } : {}), ...(values[`${prefix}WORKSPACE_ID`] ? { workspaceId: values[`${prefix}WORKSPACE_ID`] } : {}), ...(values[`${prefix}REGION`] ? { region: values[`${prefix}REGION`] } : {}), ...(values[`${prefix}GROUP_ID`] ? { groupId: values[`${prefix}GROUP_ID`] } : {}) }, secrets })
   }
-  const raw = values.NUXT_TEXT_LLM_CONNECTIONS_JSON || values.NUXT_COMFYUI_LLM_CONNECTIONS_JSON
+  const raw = values.NUXT_TEXT_LLM_CONNECTIONS_JSON
   if (raw) {
     const connections: unknown = JSON.parse(raw)
     if (!connections || typeof connections !== 'object' || Array.isArray(connections))
@@ -83,7 +83,7 @@ try {
     next += `\nNUXT_CONNECTION_ENCRYPTION_KEY=${masterKey}\n`
   if (process.argv.includes('--compact-env')) {
     const retained: Record<string, string> = {}
-    const keep = (k: string) => k === 'NUXT_CONNECTION_ENCRYPTION_KEY' || k === 'NUXT_DATABASE_URL' || k === 'NUXT_PUBLIC_APP_URL' || k.startsWith('POSTGRES_') || k.startsWith('LOCAL_OSS_') || k.startsWith('NUXT_OSS_') || k.startsWith('NUXT_COMFYUI_') || k.startsWith('HUEZUMI_') || k.startsWith('DASHSCOPE_') || ['NUXT_DASHSCOPE_API_KEY', 'NUXT_DASHSCOPE_WORKSPACE_ID', 'NUXT_DASHSCOPE_REGION'].includes(k) || k.startsWith('NUXT_WORKER_')
+    const keep = (k: string) => k === 'NUXT_CONNECTION_ENCRYPTION_KEY' || k === 'NUXT_DATABASE_URL' || k === 'NUXT_PUBLIC_APP_URL' || k.startsWith('POSTGRES_') || k.startsWith('LOCAL_OSS_') || k.startsWith('NUXT_OSS_') || k.startsWith('NUXT_WORKER_')
     for (const [key, value] of Object.entries(parseEnv(next))) {
       if (keep(key) && value !== '')
         retained[key] = value
@@ -93,9 +93,9 @@ try {
       ['平台加密与访问地址', k => k === 'NUXT_CONNECTION_ENCRYPTION_KEY' || k === 'NUXT_PUBLIC_APP_URL'],
       ['私有对象存储', k => k.startsWith('NUXT_OSS_') || k.startsWith('LOCAL_OSS_')],
       ['后台任务进程', k => k.startsWith('NUXT_WORKER_')],
-      ['独立 ComfyUI 执行端', () => true],
+      ['其他配置', () => true],
     ]
-    next = '# 业务连接和运营参数由管理后台维护；这里只保留部署及工作流配置。\n'
+    next = '# 业务连接和运营参数由管理后台维护；这里只保留部署配置。\n'
     for (const [label, matches] of groups) {
       const entries = Object.entries(retained).filter(([key]) => matches(key))
       if (!entries.length)

@@ -156,11 +156,11 @@ function formatDate(value?: string) {
 
           <!-- Bottom Actions -->
           <div class="space-y-2 pt-4 border-t border-default">
-            <UButton v-if="work.kind === 'image' && work.runId && !work.promptId" block color="primary" icon="i-lucide-image-plus" :to="`/studio/image?run=${work.runId}`">
+            <UButton v-if="work.kind === 'image' && work.runId" block color="primary" icon="i-lucide-image-plus" :to="`/studio/image?run=${work.runId}`">
               返回图片创作台
             </UButton>
             <UButton
-              v-if="work.kind === 'video' && work.runId && !work.promptId"
+              v-if="work.kind === 'video' && work.runId"
               block
               color="primary"
               icon="i-lucide-sparkles"
@@ -188,17 +188,6 @@ function formatDate(value?: string) {
               :to="`/studio/video?document=${work.documentId}&sourceVersion=${work.versionId}`"
             >
               使用此版本生成视频
-            </UButton>
-
-            <UButton
-              v-if="work.promptId"
-              block
-              color="neutral"
-              variant="soft"
-              icon="i-lucide-workflow"
-              :to="`/studio/workflow?sourcePromptId=${work.promptId}`"
-            >
-              打开原始 ComfyUI 工作流
             </UButton>
 
             <div v-if="work.url" class="flex gap-2 pt-1">

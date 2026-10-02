@@ -5,7 +5,7 @@ import { generateTextContent } from '../text-creation'
 import { runRequestSchema } from './schemas'
 
 export async function failRunJob(id: string) {
-  await useDatabase().update(runs).set({ status: 'UNKNOWN', stage: 'review', settlementStatus: sql`case when kind='workflow' then 'exempt' else 'review' end`, error: '执行结果不明，请管理员核对；不会自动重新生成。', updatedAt: new Date() }).where(and(eq(runs.id, id), inArray(runs.status, ['PENDING', 'RUNNING', 'UNKNOWN'])))
+  await useDatabase().update(runs).set({ status: 'UNKNOWN', stage: 'review', settlementStatus: 'review', error: '执行结果不明，请管理员核对；不会自动重新生成。', updatedAt: new Date() }).where(and(eq(runs.id, id), inArray(runs.status, ['PENDING', 'RUNNING', 'UNKNOWN'])))
 }
 export async function runTextJob(id: string) {
   const db = useDatabase()

@@ -11,7 +11,7 @@ import { connectionSchema, secretSchema, settingsSchema } from './schemas'
 
 export async function readSettings(): Promise<PlatformSettings> {
   const [row] = await useDatabase().select().from(platformSettings).where(eq(platformSettings.id, 'platform'))
-  return settingsSchema.parse(row?.value || {})
+  return settingsSchema.strip().parse(row?.value || {})
 }
 export async function writeSettings(actorId: string, input: unknown) {
   return saveSettings(actorId, input, false)
@@ -25,9 +25,9 @@ async function saveSettings(actorId: string, input: unknown, partial: boolean) {
     // Serialize both full replacements and field updates, including first-time setup.
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext('huezumi:platform-settings'))`)
     const [row] = await tx.select().from(platformSettings).where(eq(platformSettings.id, 'platform'))
-    const current = settingsSchema.parse(row?.value || {})
+    const current = settingsSchema.strip().parse(row?.value || {})
     const value = partial ? mergeSettingsPatch(current, parsed) : settingsSchema.parse(parsed)
-    for (const [field, kind] of [['defaultVideoConnectionId', 'video'], ['defaultTextConnectionId', 'text'], ['workflowAgentConnectionId', 'text'], ['defaultImageConnectionId', 'image'], ['workflowVideoConnectionId', 'video']] as const) {
+    for (const [field, kind] of [['defaultVideoConnectionId', 'video'], ['defaultTextConnectionId', 'text'], ['defaultImageConnectionId', 'image']] as const) {
       // Unrelated operations must remain possible when an old assignment was disabled.
       if (partial && !Object.hasOwn(parsed, field))
         continue
@@ -35,8 +35,6 @@ async function saveSettings(actorId: string, input: unknown, partial: boolean) {
       if (!id)
         continue
       const { connection } = await currentConnection(id)
-      if (field === 'workflowVideoConnectionId' && connection.provider !== 'dashscope')
-        throw createError({ statusCode: 422, statusMessage: '当前工作流视频节点需要百炼连接' })
       if (connection.kind !== kind)
         throw createError({ statusCode: 422, statusMessage: '默认连接不可用' })
     }
@@ -81,9 +79,9 @@ export async function saveConnection(actorId: string, input: unknown, id?: strin
   const capability = data.kind === 'video' ? getCapability(data.provider) : undefined
   if (data.kind === 'video' && (!capability || data.settings.models.some(model => !capability.models.some(item => item.id === model))))
     throw createError({ statusCode: 422, statusMessage: '模型不在供应商能力目录内' })
-  if ((data.kind === 'text' || (data.kind === 'image' && data.provider !== 'dashscope')) && (data.provider !== 'openai-compatible' || !data.settings.baseUrl))
-    throw createError({ statusCode: 422, statusMessage: '文本和图片连接需使用兼容协议并填写地址' })
-  if (data.kind === 'image' && data.provider === 'dashscope' && (data.settings.auth === 'none' || data.settings.models.some(model => !isSupportedImageModel(model))))
+  if (data.kind === 'text' && (data.provider !== 'openai-compatible' || !data.settings.baseUrl))
+    throw createError({ statusCode: 422, statusMessage: '文本连接需使用兼容协议并填写地址' })
+  if (data.kind === 'image' && (data.provider !== 'dashscope' || data.settings.auth === 'none' || data.settings.models.some(model => !isSupportedImageModel(model))))
     throw createError({ statusCode: 422, statusMessage: '百炼图片连接需要 API Key 及已支持的 Qwen-Image 2.0 模型' })
   const connectionId = id || crypto.randomUUID()
   await useDatabase().transaction(async (tx) => {

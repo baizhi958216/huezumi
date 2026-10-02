@@ -19,7 +19,6 @@ COPY --from=builder /app/server ./server
 COPY --from=builder /app/shared ./shared
 COPY --from=builder /app/scripts ./scripts
 COPY --from=builder /app/drizzle.config.ts ./drizzle.config.ts
-COPY --from=builder /app/workflows ./workflows
 RUN mkdir -p /app/.data && chown -R node:node /app
 USER node
 EXPOSE 3000

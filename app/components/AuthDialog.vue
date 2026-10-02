@@ -58,7 +58,7 @@ async function submit() {
     v-model:open="open"
     :scrollable="true"
     :title="mode === 'login' ? '登录 绘小宙' : '创建帐号'"
-    description="登录后，生成任务、素材和工作流会保存在你的私有空间。"
+    description="登录后，生成任务、素材和作品会保存在你的私有空间。"
     :ui="{
       content: 'sm:max-w-[460px] w-full p-0 overflow-hidden border border-default/70 dark:border-white/10 rounded-2xl bg-elevated/95 backdrop-blur-2xl shadow-cinema divide-y-0',
     }"
@@ -108,7 +108,7 @@ async function submit() {
                 {{ mode === 'login' ? '欢迎回到你的小宇宙' : '开启你的创作小宇宙' }}
               </h2>
               <p class="mt-1 text-xs leading-relaxed text-muted">
-                {{ mode === 'login' ? '登录后，你的生成任务、素材和工作流将同步至私有空间。' : '创建独立私有空间，畅享多模型视频生成与资产云端存储。' }}
+                {{ mode === 'login' ? '登录后，你的生成任务、素材和作品将同步至私有空间。' : '创建独立私有空间，畅享多模型视频生成与资产云端存储。' }}
               </p>
             </div>
           </Transition>
@@ -356,7 +356,7 @@ async function submit() {
             <span class="text-default/50">·</span>
             <span class="inline-flex items-center gap-1">
               <UIcon name="i-lucide-film" class="size-3 text-signal-500" />
-              工作流自由复用
+              创作成果随时回看
             </span>
           </div>
         </div>

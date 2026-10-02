@@ -73,7 +73,6 @@ const emit = defineEmits<{
 
           <div class="flex items-center gap-1.5">
             <UButton
-              v-if="run.kind !== 'workflow'"
               size="xs"
               variant="ghost"
               color="primary"

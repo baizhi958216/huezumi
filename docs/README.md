@@ -4,23 +4,22 @@
 
 ## 阅读路径
 
-| 需求                           | 文档                                                                                            |
-| ------------------------------ | ----------------------------------------------------------------------------------------------- |
-| 了解产品、目录和起步限制       | [项目 README](../README.md)                                                                     |
-| 修改代码与协作                 | [AGENTS](../AGENTS.md)、[CLAUDE](../CLAUDE.md)                                                  |
-| 理解系统和数据边界             | [DESIGN](../DESIGN.md)                                                                          |
-| 本地启动与排障                 | [开发指南](development.md)                                                                      |
-| 环境变量、后台连接与用途       | [配置说明](configuration.md)                                                                    |
-| 生产部署、升级、备份与恢复     | [运维指南](operations.md)                                                                       |
-| HTTP 与 WebSocket 接口         | [API](api.md)                                                                                   |
-| 普通用户图片生成               | [图片生成](image-generation.md)                                                                 |
-| 管理员 ComfyUI 与预设          | [工作流指南](workflows.md)、[Python 节点说明](../comfyui/custom_nodes/huezumi_prompt/README.md) |
-| 测试命令和环境要求             | [验证指南](testing.md)                                                                          |
-| 已知缺口与本轮结果             | [项目检查记录](project-audit.md)                                                                |
-| 命名和视觉资源                 | [工程命名](engineering-name.md)、[品牌资源](brand-art.md)                                       |
-| 规格与验收要求                 | [spec](../spec/README.md)                                                                       |
-| 架构决策与取代关系             | [ADR](decisions/README.md)                                                                      |
-| 旧环境实测、旧验收、生成提示词 | [历史资料](archive/README.md)                                                                   |
+| 需求                           | 文档                                                      |
+| ------------------------------ | --------------------------------------------------------- |
+| 了解产品、目录和起步限制       | [项目 README](../README.md)                               |
+| 修改代码与协作                 | [AGENTS](../AGENTS.md)、[CLAUDE](../CLAUDE.md)            |
+| 理解系统和数据边界             | [DESIGN](../DESIGN.md)                                    |
+| 本地启动与排障                 | [开发指南](development.md)                                |
+| 环境变量、后台连接与用途       | [配置说明](configuration.md)                              |
+| 生产部署、升级、备份与恢复     | [运维指南](operations.md)                                 |
+| HTTP 接口                      | [API](api.md)                                             |
+| 普通用户图片生成               | [图片生成](image-generation.md)                           |
+| 测试命令和环境要求             | [验证指南](testing.md)                                    |
+| 已知缺口与本轮结果             | [项目检查记录](project-audit.md)                          |
+| 命名和视觉资源                 | [工程命名](engineering-name.md)、[品牌资源](brand-art.md) |
+| 规格与验收要求                 | [spec](../spec/README.md)                                 |
+| 架构决策与取代关系             | [ADR](decisions/README.md)                                |
+| 旧环境实测、旧验收、生成提示词 | [历史资料](archive/README.md)                             |
 
 ## 维护边界
 

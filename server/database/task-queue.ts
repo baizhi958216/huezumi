@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto'
 import { PgBoss } from 'pg-boss'
 
 export interface GenerationJob {
-  kind: 'submit' | 'poll' | 'text' | 'image' | 'workflow'
+  kind: 'submit' | 'poll' | 'text' | 'image'
   generationId: string
 }
 export const QUEUE_NAME = 'huezumi-generations'

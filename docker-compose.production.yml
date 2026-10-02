@@ -28,8 +28,6 @@ services:
       NUXT_OSS_SECURE: ${NUXT_OSS_SECURE:-true}
       NUXT_OSS_PUBLIC_BASE_URL: ${NUXT_OSS_PUBLIC_BASE_URL:-}
       NUXT_DATABASE_URL: postgresql://${POSTGRES_USER:-huezumi}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-huezumi}
-      NUXT_COMFYUI_MODE: remote
-      NUXT_COMFYUI_REMOTE_BASE_URL: http://comfyui:8188
     command: [pnpm, 'db:init']
     depends_on:
       postgres:
@@ -56,23 +54,5 @@ services:
       db-init:
         condition: service_completed_successfully
 
-  comfyui:
-    build:
-      context: .
-      dockerfile: docker/comfyui/Dockerfile
-      args:
-        COMFYUI_REF: ${COMFYUI_REF:-v0.37.0}
-    gpus: all
-    volumes:
-      - ${COMFYUI_MODELS_DIR:?set COMFYUI_MODELS_DIR}:/opt/ComfyUI/models:ro
-      - comfy-input:/opt/ComfyUI/input
-      - comfy-output:/opt/ComfyUI/output
-      - comfy-temp:/opt/ComfyUI/temp
-    expose:
-      - '8188'
-
 volumes:
   postgres-data:
-  comfy-input:
-  comfy-output:
-  comfy-temp:

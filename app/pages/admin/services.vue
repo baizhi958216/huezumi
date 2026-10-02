@@ -27,8 +27,6 @@ const region = ref('cn-beijing')
 const groupId = ref('')
 const auth = ref<'bearer' | 'none'>('bearer')
 const protocol = ref<'auto' | 'chat_completions' | 'responses'>('auto')
-const supportsVision = ref(false)
-const webSearch = ref(false)
 const timeoutSeconds = ref(120)
 const enabled = ref(true)
 const apiKey = ref('')
@@ -44,8 +42,6 @@ function reset() {
   region.value = 'cn-beijing'
   auth.value = 'bearer'
   protocol.value = 'auto'
-  supportsVision.value = false
-  webSearch.value = false
   timeoutSeconds.value = 120
   connectionError.value = ''
   name.value = ''
@@ -85,8 +81,6 @@ function edit(c: ConnectionSummary) {
   groupId.value = c.settings.groupId || ''
   auth.value = c.settings.auth || 'bearer'
   protocol.value = c.settings.apiProtocol || 'auto'
-  supportsVision.value = Boolean(c.settings.supportsVision)
-  webSearch.value = Boolean(c.settings.webSearch)
   timeoutSeconds.value = c.settings.timeoutSeconds || 120
   connectionOpen.value = true
 }
@@ -102,14 +96,14 @@ async function save() {
   busy.value = true
   try {
     const secrets = { ...(apiKey.value ? { apiKey: apiKey.value } : {}), ...(accessKey.value ? { accessKey: accessKey.value } : {}), ...(secretKey.value ? { secretKey: secretKey.value } : {}) }
-    const body = { name: name.value, kind: kind.value, provider: kind.value === 'text' ? 'openai-compatible' : provider.value, enabled: enabled.value, settings: { baseUrl: baseUrl.value || undefined, defaultModel: defaultModel.value, models: modelOptions.value, workspaceId: workspaceId.value || undefined, region: region.value || undefined, groupId: groupId.value || undefined, auth: auth.value, apiProtocol: protocol.value, ...(kind.value !== 'video' ? { supportsVision: supportsVision.value, webSearch: webSearch.value, timeoutSeconds: timeoutSeconds.value } : {}) }, ...(Object.keys(secrets).length ? { secrets } : {}) }
+    const body = { name: name.value, kind: kind.value, provider: kind.value === 'text' ? 'openai-compatible' : provider.value, enabled: enabled.value, settings: { baseUrl: baseUrl.value || undefined, defaultModel: defaultModel.value, models: modelOptions.value, workspaceId: workspaceId.value || undefined, region: region.value || undefined, groupId: groupId.value || undefined, auth: auth.value, apiProtocol: protocol.value, ...(kind.value !== 'video' ? { timeoutSeconds: timeoutSeconds.value } : {}) }, ...(Object.keys(secrets).length ? { secrets } : {}) }
     if (editing.value)
       await $fetch(`/api/admin/connections/${editing.value}`, { method: 'PUT', body })
     else
       await $fetch('/api/admin/connections', { method: 'POST', body })
     connectionOpen.value = false
     reset()
-    message.value = '连接版本已保存；后续报价和新提交的工作流使用新配置。'
+    message.value = '连接版本已保存；后续报价使用新配置。'
     await refresh()
   }
   catch (e) {
@@ -311,7 +305,7 @@ const authOptions = [
                 <div class="flex gap-2">
                   <USelect
                     v-model="provider"
-                    :items="kind === 'image' ? [{ label: '阿里云百炼 · 千问图片', value: 'dashscope' }, { label: 'OpenAI 兼容（工作流）', value: 'openai-compatible' }] : providerOptions"
+                    :items="kind === 'image' ? [{ label: '阿里云百炼 · 千问图片', value: 'dashscope' }] : providerOptions"
                     :disabled="!!editing"
                     class="flex-1"
                     @change="useCatalog"
@@ -365,17 +359,6 @@ const authOptions = [
               <UFormField v-if="kind !== 'video'" label="请求超时（秒）">
                 <UInput v-model.number="timeoutSeconds" class="w-full" type="number" :min="5" :max="300" />
               </UFormField>
-
-              <div v-if="kind === 'text'" class="sm:col-span-2 grid gap-3 rounded-lg border border-default/70 bg-muted/30 p-3 sm:grid-cols-2">
-                <label class="flex cursor-pointer items-start gap-2 text-sm">
-                  <input v-model="supportsVision" type="checkbox" class="mt-0.5 size-4 rounded text-primary focus:ring-primary">
-                  <span><strong class="block text-highlighted">支持图片理解</strong><span class="text-xs text-muted">允许 Agent 读取工作流上传的参考图片</span></span>
-                </label>
-                <label class="flex cursor-pointer items-start gap-2 text-sm">
-                  <input v-model="webSearch" type="checkbox" class="mt-0.5 size-4 rounded text-primary focus:ring-primary">
-                  <span><strong class="block text-highlighted">允许联网搜索</strong><span class="text-xs text-muted">需要 Responses 协议及服务端 web_search 能力</span></span>
-                </label>
-              </div>
 
               <template v-if="kind === 'video' && provider === 'kling'">
                 <UFormField label="Access Key（留空保持）">

@@ -8,7 +8,6 @@ import WorkDetailModal from '~/components/projects/WorkDetailModal.vue'
 const platform = usePlatformApi()
 const query = ref('')
 const route = useRoute()
-const { user } = useAuth()
 const kind = ref(['image', 'video', 'text'].includes(String(route.query.kind)) ? String(route.query.kind) : '')
 const projectId = ref('')
 // Select reserves the empty string for clearing; keep the API filter unchanged.
@@ -187,7 +186,6 @@ const creationItems = computed(() => [
     { label: '文本与剧本创作', icon: 'i-lucide-sparkles', to: '/studio' },
     { label: '视频生成任务', icon: 'i-lucide-film', to: '/studio/video' },
     { label: '图片生成', icon: 'i-lucide-image-plus', to: '/studio/image' },
-    ...(user.value?.role === 'admin' ? [{ label: '工作流 · 高级', icon: 'i-lucide-workflow', to: '/studio/workflow' }] : []),
   ],
 ])
 

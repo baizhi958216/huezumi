@@ -48,28 +48,11 @@ export default defineNuxtConfig({
     ossMaxOutputBytes: 1073741824,
     ossTransferTimeoutMs: 300000,
     ossSignedUrlTtlSeconds: 86400,
-    // 启动时自动探活：本地已安装则按需启动，远程服务由外部管理
-    comfyuiMode: 'auto',
-    comfyuiDir: '',
-    comfyuiPython: '',
-    comfyuiHost: '127.0.0.1',
-    comfyuiPort: 8188,
-    comfyuiArgs: '',
-    comfyuiRemoteBaseUrl: '',
-    comfyuiCustomNodeSourceDir: '',
-    // JSON remains private and is passed only to a local ComfyUI child process.
-    comfyuiLlmConnectionsJson: '',
-    comfyuiStartTimeoutMs: 180000,
-    comfyuiProbeTimeoutMs: 1500,
     public: {
       appUrl: 'http://localhost:3000',
     },
   },
   nitro: {
-    experimental: {
-      // 工作流页面通过服务端的 WebSocket 代理接收 ComfyUI 的执行事件
-      websocket: true,
-    },
     storage: {
       data: {
         driver: 'fs',

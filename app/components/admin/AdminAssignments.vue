@@ -9,23 +9,19 @@ watch(() => props.connections, () => {
 })
 const purposes = [
   { field: 'defaultTextConnectionId', label: '文案创作', kind: 'text', description: '故事、剧本和文案' },
-  { field: 'defaultImageConnectionId', label: '图片创作 / 图片工作流', kind: 'image', description: '图片创作台需要百炼；兼容接口仅供工作流' },
+  { field: 'defaultImageConnectionId', label: '图片创作', kind: 'image', description: '图片创作台使用百炼连接' },
   { field: 'defaultVideoConnectionId', label: '视频创作', kind: 'video', description: '视频创作台' },
-  { field: 'workflowAgentConnectionId', label: '工作流 Agent', kind: 'text', description: '提示词生成与参考图理解' },
-  { field: 'workflowVideoConnectionId', label: '工作流视频', kind: 'video', description: '百炼视频节点' },
 ] as const
 const active = ref<(typeof purposes)[number]>()
 const selected = ref('none')
 const busy = ref(false)
 const saveError = ref('')
 const open = ref(false)
-const options = computed(() => [{ label: '不分配服务', value: 'none' }, ...props.connections.filter(c => c.kind === active.value?.kind && c.enabled && !c.revoked && (active.value?.field !== 'workflowVideoConnectionId' || c.provider === 'dashscope')).map(c => ({ label: `${c.name} · ${c.settings.defaultModel}`, value: c.id }))])
+const options = computed(() => [{ label: '不分配服务', value: 'none' }, ...props.connections.filter(c => c.kind === active.value?.kind && c.enabled && !c.revoked).map(c => ({ label: `${c.name} · ${c.settings.defaultModel}`, value: c.id }))])
 function connection(field: (typeof purposes)[number]['field']) {
   return props.connections.find(c => c.id === settings.value?.[field])
 }
 function availability(purpose: (typeof purposes)[number]) {
-  if (purpose.field.startsWith('workflow'))
-    return ''
   const c = connection(purpose.field)
   if (!c)
     return ''

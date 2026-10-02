@@ -26,18 +26,8 @@ pnpm test:postgres
 
 图片测试还在临时库内创建随机 schema，只复制结构。测试异常退出通常由 finally 清理；如果整个进程被强制终止，应按随机名称核对并清理残留测试库。
 
-## Python 自定义节点
-
-使用具有 torch、Pillow、requests、aiohttp 等依赖的 ComfyUI 虚拟环境：
-
-```bash
-PYTHONDONTWRITEBYTECODE=1 vendor/ComfyUI/.venv/bin/python -m unittest discover -s comfyui/custom_nodes/huezumi_prompt -p 'test_*.py'
-```
-
-路径不同则替换解释器。节点测试不执行真实模型采样或收费 API；裸系统 Python 缺依赖不代表节点算法失败。
-
 ## 文档与部署检查
 
 检查 Markdown 本地链接、命令入口、API 路由和示例变量。ESLint 启用了文档格式化规则；只对目标文件执行 --fix，避免扩大改动范围。
 
-完整镜像需另执行 `docker build`，并检查容器内 db:init 和 `/app/workflows`。真实 HTTPS、WebSocket、私有存储签名、浏览器交互、GPU、供应商账单与备份恢复均需目标环境验收。实际执行结果见 [项目检查记录](project-audit.md)。
+完整镜像需另执行 `docker build`，并检查容器内 db:init。真实 HTTPS、私有存储签名、浏览器交互、供应商账单与备份恢复均需目标环境验收。实际执行结果见 [项目检查记录](project-audit.md)。

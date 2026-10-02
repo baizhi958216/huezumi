@@ -1,4 +1,3 @@
-import type { ComfyWorkflowJSON } from '#shared/types/comfyui'
 import type { GenerationRequest, GenerationStatus } from '#shared/types/generation'
 import type { ImageGenerationRequest } from '#shared/types/image-generation'
 import type { ConnectionSettings, PlatformSettings, RunRequest } from '#shared/types/platform'
@@ -213,24 +212,6 @@ export const assetReservations = pgTable('asset_reservations', {
   expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, table => [index('asset_reservation_owner_idx').on(table.ownerId, table.expiresAt)])
-export const workflows = pgTable('workflows', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  schemaVersion: integer('schema_version').notNull().default(1),
-  ownerId: uuid('owner_id').notNull().references(() => users.id),
-  name: text('name').notNull(),
-  visibility: text('visibility').notNull().default('private'),
-  graph: jsonb('graph').$type<ComfyWorkflowJSON>().notNull(),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-}, table => [index('workflows_owner_idx').on(table.ownerId, table.updatedAt), index('workflows_visibility_idx').on(table.visibility, table.updatedAt)])
-export const comfyExecutions = pgTable('comfy_executions', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  ownerId: uuid('owner_id').notNull().references(() => users.id),
-  promptId: text('prompt_id').notNull(),
-  status: text('status').notNull().default('submitted'),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-}, table => [uniqueIndex('comfy_prompt_unique').on(table.promptId), index('comfy_owner_idx').on(table.ownerId, table.createdAt)])
 export const outboxEvents = pgTable('outbox_events', {
   id: uuid('id').primaryKey().defaultRandom(),
   topic: text('topic').notNull(),
@@ -292,12 +273,10 @@ export const textPrices = pgTable('text_prices', {
 export const runs = pgTable('runs', {
   id: uuid('id').primaryKey().defaultRandom(),
   ownerId: uuid('owner_id').notNull().references(() => users.id),
-  kind: text('kind').$type<'video' | 'text' | 'image' | 'workflow'>().notNull(),
+  kind: text('kind').$type<'video' | 'text' | 'image'>().notNull(),
   projectId: uuid('project_id').references(() => creativeProjects.id),
   generationId: uuid('generation_id').unique().references(() => generations.id, { onDelete: 'cascade' }),
-  promptId: text('prompt_id').unique(),
   request: jsonb('request').$type<RunRequest>(),
-  workflow: jsonb('workflow').$type<ComfyWorkflowJSON>(),
   sourceVersionId: uuid('source_version_id').references(() => creativeDocumentVersions.id),
   baseVersionId: uuid('base_version_id'),
   connectionVersionId: uuid('connection_version_id').references(() => connectionVersions.id),

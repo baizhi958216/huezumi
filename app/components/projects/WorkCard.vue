@@ -140,7 +140,7 @@ function onMouseLeave() {
 
     <div class="flex items-center gap-1.5">
       <UButton
-        v-if="work.kind === 'video' && work.runId && !work.promptId"
+        v-if="work.kind === 'video' && work.runId"
         size="xs"
         variant="ghost"
         color="neutral"
@@ -338,7 +338,7 @@ function onMouseLeave() {
           <!-- Video Work Actions -->
           <template v-else-if="work.kind === 'video'">
             <UButton
-              v-if="work.runId && !work.promptId"
+              v-if="work.runId"
               size="xs"
               variant="soft"
               color="primary"
@@ -346,16 +346,6 @@ function onMouseLeave() {
               :to="`/studio/video?from=${work.runId}`"
             >
               衍生
-            </UButton>
-            <UButton
-              v-if="work.promptId"
-              size="xs"
-              variant="soft"
-              color="neutral"
-              icon="i-lucide-workflow"
-              :to="`/studio/workflow?sourcePromptId=${work.promptId}`"
-            >
-              工作流
             </UButton>
           </template>
 
