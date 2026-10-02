@@ -5,5 +5,5 @@ import { requireAdmin } from '../../utils/auth'
 
 export default defineEventHandler(async (event) => {
   await requireAdmin(event)
-  return await useDatabase().select({ id: runs.id, ownerEmail: users.email, kind: runs.kind, reservedCredits: runs.reservedCredits, error: runs.error }).from(runs).innerJoin(users, eq(runs.ownerId, users.id)).where(and(inArray(runs.kind, ['text', 'image']), eq(runs.settlementStatus, 'review'))).orderBy(desc(runs.createdAt)).limit(100)
+  return await useDatabase().select({ id: runs.id, ownerEmail: users.email, kind: runs.kind, reservedCredits: runs.reservedCredits, error: runs.error }).from(runs).innerJoin(users, eq(runs.ownerId, users.id)).where(and(inArray(runs.kind, ['text', 'image', 'workflow']), eq(runs.settlementStatus, 'review'))).orderBy(desc(runs.createdAt)).limit(100)
 })

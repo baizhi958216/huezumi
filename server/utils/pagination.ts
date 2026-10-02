@@ -6,7 +6,7 @@ import { z } from 'zod'
 
 const cursorSchema = z.object({ time: z.iso.datetime(), id: z.uuid() })
 export function pageQuery(input: Record<string, unknown>) {
-  const query = z.object({ limit: z.coerce.number().int().min(1).max(100).default(30), cursor: z.string().max(400).optional(), q: z.string().max(200).optional(), projectId: z.uuid().optional(), kind: z.enum(['text', 'video', 'image']).optional(), status: z.enum(['PENDING', 'RUNNING', 'SUCCEEDED', 'FAILED', 'UNKNOWN']).optional() }).parse(input)
+  const query = z.object({ limit: z.coerce.number().int().min(1).max(100).default(30), cursor: z.string().max(400).optional(), q: z.string().max(200).optional(), projectId: z.uuid().optional(), kind: z.enum(['text', 'video', 'image', 'workflow']).optional(), status: z.enum(['PENDING', 'RUNNING', 'SUCCEEDED', 'FAILED', 'UNKNOWN']).optional() }).parse(input)
   let cursor: z.infer<typeof cursorSchema> | undefined
   if (query.cursor) {
     try {

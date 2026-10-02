@@ -2,6 +2,7 @@ import type { GenerationRequest, GenerationStatus } from '#shared/types/generati
 import type { ImageGenerationRequest } from '#shared/types/image-generation'
 import type { ConnectionSettings, PlatformSettings, RunRequest } from '#shared/types/platform'
 import type { TextCreationContent, TextCreationKind, TextCreationRequest } from '#shared/types/text-creation'
+import type { WorkflowExecution, WorkflowGraph, WorkflowInput, WorkflowLayout } from '#shared/types/workflow'
 import type { PriceFormula } from '#shared/utils/pricing'
 import { bigint, boolean, index, integer, jsonb, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core'
 
@@ -89,7 +90,7 @@ export const quotes = pgTable('quotes', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: uuid('user_id').notNull().references(() => users.id),
   requestHash: text('request_hash').notNull(),
-  request: jsonb('request').$type<GenerationRequest | TextCreationRequest | ImageGenerationRequest>().notNull(),
+  request: jsonb('request').$type<GenerationRequest | TextCreationRequest | ImageGenerationRequest | WorkflowInput>().notNull(),
   ruleId: uuid('rule_id').references(() => pricingRules.id),
   priceVersion: integer('price_version').notNull(),
   estimatedCredits: integer('estimated_credits').notNull(),
@@ -240,7 +241,7 @@ export const platformConnections = pgTable('platform_connections', {
   id: uuid('id').primaryKey().defaultRandom(),
   importKey: text('import_key').unique(),
   name: text('name').notNull(),
-  kind: text('kind').$type<'video' | 'text' | 'image'>().notNull(),
+  kind: text('kind').$type<'video' | 'text' | 'image' | 'workflow'>().notNull(),
   provider: text('provider').notNull(),
   enabled: boolean('enabled').notNull().default(true),
   currentVersionId: uuid('current_version_id'),
@@ -273,7 +274,7 @@ export const textPrices = pgTable('text_prices', {
 export const runs = pgTable('runs', {
   id: uuid('id').primaryKey().defaultRandom(),
   ownerId: uuid('owner_id').notNull().references(() => users.id),
-  kind: text('kind').$type<'video' | 'text' | 'image'>().notNull(),
+  kind: text('kind').$type<'video' | 'text' | 'image' | 'workflow'>().notNull(),
   projectId: uuid('project_id').references(() => creativeProjects.id),
   generationId: uuid('generation_id').unique().references(() => generations.id, { onDelete: 'cascade' }),
   request: jsonb('request').$type<RunRequest>(),
@@ -288,6 +289,9 @@ export const runs = pgTable('runs', {
   settlementStatus: text('settlement_status').notNull().default('reserved'),
   reservedCredits: integer('reserved_credits').notNull().default(0),
   chargedCredits: integer('charged_credits'),
+  // Preserve prompt identifiers from existing development databases.
+  promptId: text('prompt_id'),
+  workflow: jsonb('workflow').$type<WorkflowExecution>(),
   resultVersionId: uuid('result_version_id').references(() => creativeDocumentVersions.id),
   needsReview: boolean('needs_review').notNull().default(false),
   error: text('error'),
@@ -316,3 +320,20 @@ export const works = pgTable('works', {
   availability: text('availability').$type<'available' | 'pending' | 'unavailable'>().notNull().default('pending'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, t => [index('work_owner_created_idx').on(t.ownerId, t.createdAt)])
+
+/** Workflows are editable data; accepted runs retain their immutable graph snapshot. */
+export const workflows = pgTable('workflows', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  // Existing development databases may already contain private legacy graphs.
+  schemaVersion: integer('schema_version').notNull().default(1),
+  visibility: text('visibility').notNull().default('private'),
+  ownerId: uuid('owner_id').notNull().references(() => users.id),
+  name: text('name').notNull(),
+  graph: jsonb('graph').$type<WorkflowGraph>().notNull(),
+  layout: jsonb('layout').$type<WorkflowLayout>().notNull().default({ positions: {} }),
+  assets: jsonb('assets').$type<Record<string, string>>().notNull().default({}),
+  isTemplate: boolean('is_template').notNull().default(false),
+  revision: integer('revision').notNull().default(1),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, t => [index('workflow_owner_idx').on(t.ownerId, t.updatedAt)])

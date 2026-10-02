@@ -77,7 +77,7 @@ const emit = defineEmits<{
               variant="ghost"
               color="primary"
               icon="i-lucide-external-link"
-              :to="`${run.kind === 'text' ? '/studio' : run.kind === 'image' ? '/studio/image' : '/studio/video'}?run=${run.id}`"
+              :to="`${run.kind === 'workflow' ? '/studio/workflow' : run.kind === 'text' ? '/studio' : run.kind === 'image' ? '/studio/image' : '/studio/video'}?run=${run.id}`"
             >
               打开
             </UButton>

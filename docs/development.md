@@ -55,6 +55,10 @@ pnpm dev
 
 默认注册模式 invite、赠送额度 0。管理员在 `/admin/invitations` 创建邀请码，在 `/admin/services` 配置连接与用途，在 `/admin/pricing` 发布文本/图片/视频价格，在 `/admin/settings` 设置并发及日预算。没有价格或额度时不能提交付费任务。
 
+## ComfyUI 工作流
+
+执行 `pnpm comfy:install` 安装本地运行时，再用 `pnpm db:push` 同步新增工作流表和任务字段。`pnpm dev` 默认拉起 ComfyUI；管理员在 `/studio/workflow` 配置数据库连接、节点策略和启停。模型、Python/GPU 环境、生产拆分与兼容限制见 [工作流指南](comfyui.md)。
+
 ## 日常验证
 
 ```bash

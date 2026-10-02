@@ -213,3 +213,24 @@ export async function archiveLocalOutput(generationId: string, path: string, con
   const format = videoFormat(contentType)
   return uploadOutputFile(uploader, generationId, path, format, config)
 }
+
+/** Only the ComfyUI client may supply this response, from the database-pinned connection. */
+export async function archiveComfyResponse(workId: string, ownerId: string, filename: string, response: Response) {
+  const formats: Record<string, string> = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif', mp4: 'video/mp4', webm: 'video/webm', mov: 'video/quicktime' }
+  const extension = filename.split('.').pop()?.toLowerCase() || ''
+  const contentType = formats[extension]
+  if (!contentType)
+    throw new OutputArchiveError('OUTPUT_TRANSFER_FAILED')
+  const config = getOutputArchiveConfig()
+  config.outputPrefix = `${config.outputPrefix}/${ownerId}`
+  const uploader = requireUploader()
+  const directory = await mkdtemp(join(tmpdir(), 'huezumi-comfy-'))
+  const path = join(directory, 'output')
+  try {
+    await writeResponseBody(response, path, config.maxBytes)
+    return await uploadOutputFile(uploader, workId, path, { contentType, extension }, config)
+  }
+  finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+}

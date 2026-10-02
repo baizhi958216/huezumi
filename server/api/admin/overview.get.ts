@@ -16,7 +16,7 @@ export default defineEventHandler(async (event) => {
       total: count(),
       active: sql<number>`count(*) filter (where ${runs.status} in ('PENDING', 'RUNNING'))::int`,
       review: sql<number>`count(*) filter (where ${runs.settlementStatus} = 'review')::int`,
-    }).from(runs).where(sql`${runs.kind} in ('text', 'image')`),
+    }).from(runs).where(sql`${runs.kind} in ('text', 'image', 'workflow')`),
     db.select({ value: count() }).from(generations).where(eq(generations.settlementStatus, 'review')),
   ])
   return {

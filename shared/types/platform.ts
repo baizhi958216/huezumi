@@ -1,13 +1,15 @@
 import type { GenerationRecord, GenerationRequest, GenerationStatus, ProviderCapability } from './generation'
 import type { ImageGenerationRequest } from './image-generation'
 import type { TextCreationRequest, TextDocumentVersionRecord } from './text-creation'
+import type { WorkflowExecution, WorkflowInput, WorkflowPolicy } from './workflow'
 
-export type RunKind = 'video' | 'text' | 'image'
+export type RunKind = 'video' | 'text' | 'image' | 'workflow'
 export interface Page<T> {
   items: T[]
   nextCursor: string | null
 }
 export interface ConnectionSettings {
+  workflowPolicy?: WorkflowPolicy
   baseUrl?: string
   defaultModel: string
   models: string[]
@@ -26,7 +28,7 @@ export interface ConnectionSecrets {
 export interface ConnectionSummary {
   id: string
   name: string
-  kind: 'video' | 'text' | 'image'
+  kind: 'video' | 'text' | 'image' | 'workflow'
   provider: string
   enabled: boolean
   revisionId: string
@@ -43,10 +45,11 @@ export interface PlatformSettings {
   defaultVideoConnectionId?: string
   defaultTextConnectionId?: string
   defaultImageConnectionId?: string
+  defaultWorkflowConnectionId?: string
 }
 export interface ModelOption {
   id: string
-  kind: 'video' | 'text' | 'image'
+  kind: 'video' | 'text' | 'image' | 'workflow'
   connectionId: string
   provider: string
   label: string
@@ -56,10 +59,10 @@ export interface ModelOption {
   capability?: ProviderCapability
 }
 export interface RunRequest {
-  kind: 'video' | 'text' | 'image'
+  kind: 'video' | 'text' | 'image' | 'workflow'
   connectionId: string
   model: string
-  input: GenerationRequest | TextCreationRequest | ImageGenerationRequest
+  input: GenerationRequest | TextCreationRequest | ImageGenerationRequest | WorkflowInput
   projectId?: string
   sourceVersionId?: string
   sourceExcerpt?: string
@@ -83,6 +86,7 @@ export interface RunSummary {
     kind: string
     url?: string
   }>
+  workflow?: WorkflowExecution
   generation?: GenerationRecord
   imageRequest?: { connectionId: string, model: string, input: ImageGenerationRequest }
   documentVersion?: TextDocumentVersionRecord

@@ -1,7 +1,7 @@
 export interface AdminTask {
   id: string
   source: 'run' | 'video'
-  kind: 'text' | 'image' | 'video'
+  kind: 'text' | 'image' | 'video' | 'workflow'
   owner: string
   status: string
   settlement: string

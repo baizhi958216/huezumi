@@ -27,7 +27,7 @@ async function saveSettings(actorId: string, input: unknown, partial: boolean) {
     const [row] = await tx.select().from(platformSettings).where(eq(platformSettings.id, 'platform'))
     const current = settingsSchema.strip().parse(row?.value || {})
     const value = partial ? mergeSettingsPatch(current, parsed) : settingsSchema.parse(parsed)
-    for (const [field, kind] of [['defaultVideoConnectionId', 'video'], ['defaultTextConnectionId', 'text'], ['defaultImageConnectionId', 'image']] as const) {
+    for (const [field, kind] of [['defaultVideoConnectionId', 'video'], ['defaultTextConnectionId', 'text'], ['defaultImageConnectionId', 'image'], ['defaultWorkflowConnectionId', 'workflow']] as const) {
       // Unrelated operations must remain possible when an old assignment was disabled.
       if (partial && !Object.hasOwn(parsed, field))
         continue
@@ -83,6 +83,8 @@ export async function saveConnection(actorId: string, input: unknown, id?: strin
     throw createError({ statusCode: 422, statusMessage: '文本连接需使用兼容协议并填写地址' })
   if (data.kind === 'image' && (data.provider !== 'dashscope' || data.settings.auth === 'none' || data.settings.models.some(model => !isSupportedImageModel(model))))
     throw createError({ statusCode: 422, statusMessage: '百炼图片连接需要 API Key 及已支持的 Qwen-Image 2.0 模型' })
+  if (data.kind === 'workflow' && (data.provider !== 'comfyui' || !data.settings.baseUrl || !data.settings.workflowPolicy))
+    throw createError({ statusCode: 422, statusMessage: '工作流连接需要 ComfyUI 地址和节点执行策略' })
   const connectionId = id || crypto.randomUUID()
   await useDatabase().transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${connectionId}, 0))`)
@@ -108,7 +110,7 @@ export async function saveConnection(actorId: string, input: unknown, id?: strin
 }
 export async function listModels(): Promise<ModelOption[]> {
   const settings = await readSettings()
-  const assigned = { text: settings.defaultTextConnectionId, image: settings.defaultImageConnectionId, video: settings.defaultVideoConnectionId }
+  const assigned = { text: settings.defaultTextConnectionId, image: settings.defaultImageConnectionId, video: settings.defaultVideoConnectionId, workflow: undefined }
   const connections = (await listConnections()).filter(c => c.id === assigned[c.kind])
   const prices = await useDatabase().select().from(textPrices)
   const videoPrices = await useDatabase().select().from(pricingRules).where(and(eq(pricingRules.active, true), sql`${pricingRules.effectiveFrom} <= now()`, sql`(${pricingRules.effectiveTo} is null or ${pricingRules.effectiveTo} > now())`))
@@ -132,6 +134,7 @@ export async function revokeConnectionVersion(actorId: string, connectionId: str
       throw createError({ statusCode: 404, statusMessage: '连接版本不存在' })
     await tx.update(generations).set({ status: 'UNKNOWN', dispatchStatus: 'reconciling', settlementStatus: 'review', error: '连接版本已撤销，请管理员核对。', updatedAt: new Date() }).where(and(eq(generations.connectionVersionId, revisionId), sql`${generations.status} in ('PENDING', 'RUNNING', 'UNKNOWN')`))
     await tx.update(runs).set({ status: 'UNKNOWN', stage: 'review', settlementStatus: 'review', error: '连接版本已撤销，请管理员核对。', updatedAt: new Date() }).where(and(eq(runs.connectionVersionId, revisionId), inArray(runs.kind, ['text', 'image']), sql`${runs.status} in ('PENDING', 'RUNNING', 'UNKNOWN')`))
+    await tx.update(runs).set({ status: 'UNKNOWN', stage: 'review', error: '连接版本已撤销，请管理员核对。', updatedAt: new Date() }).where(and(eq(runs.connectionVersionId, revisionId), eq(runs.kind, 'workflow'), sql`${runs.status} in ('PENDING', 'RUNNING', 'UNKNOWN')`))
     await tx.insert(auditLogs).values({ actorUserId: actorId, action: 'connection.revoke', targetType: 'connection', targetId: connectionId, detail: { revisionId } })
   })
   return { ok: true }

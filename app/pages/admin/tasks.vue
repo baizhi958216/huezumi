@@ -10,7 +10,7 @@ watch([filter, search, kind], () => {
 })
 const query = computed(() => ({ scope: filter.value, q: search.value, kind: kind.value, page: page.value }))
 const { data, error: loadError, status: loadStatus, refresh } = await useFetch<{ items: AdminTask[], hasMore: boolean }>('/api/admin/tasks', { query })
-const kindLabels: Record<string, string> = { text: '文案', image: '图片', video: '视频' }
+const kindLabels: Record<string, string> = { text: '文案', image: '图片', video: '视频', workflow: '工作流' }
 const busy = ref(false)
 const open = ref(false)
 const target = ref<AdminTask>()
@@ -23,7 +23,7 @@ const actionError = ref('')
 const filtered = computed(() => data.value?.items || [])
 const statusLabels: Record<string, string> = { PENDING: '排队中', RUNNING: '生成中', SUCCEEDED: '生成成功', FAILED: '生成失败', UNKNOWN: '结果待核对' }
 const stageLabels: Record<string, string> = { queued: '等待执行', submitting: '正在提交', executing: '执行中', review: '待核对', complete: '处理完成', archived: '已归档', archiving: '归档中', failed: '归档失败', not_started: '尚未归档' }
-const settlementLabels: Record<string, string> = { reserved: '已预留', review: '待核对', settled: '已结算', released: '已释放', exempt: '免计费' }
+const settlementLabels: Record<string, string> = { reserved: '已预留', review: '待核对', settled: '已结算', released: '已释放', exempt: '免计费', not_required: '暂不计费' }
 function select(task: AdminTask, next: 'release' | 'charge') {
   target.value = task
   action.value = next
@@ -103,7 +103,9 @@ async function settle() {
         </p>
         <div class="flex flex-wrap items-center justify-between gap-3">
           <p class="text-xs text-muted">
-            {{ statusLabels[task.status] || task.status }} · {{ settlementLabels[task.settlement] || task.settlement }} · 预留 {{ task.credits }} · 已扣 {{ task.chargedCredits ?? '—' }} 额度 · {{ stageLabels[task.stage] || task.stage }}
+            {{ statusLabels[task.status] || task.status }} · {{ settlementLabels[task.settlement] || task.settlement }}<template v-if="task.kind !== 'workflow'">
+              · 预留 {{ task.credits }} · 已扣 {{ task.chargedCredits ?? '—' }} 额度
+            </template> · {{ stageLabels[task.stage] || task.stage }}
           </p>
           <div v-if="task.settlement === 'review'" class="flex flex-wrap gap-2">
             <UButton v-if="task.source === 'video' && task.providerTaskId" size="sm" variant="soft" :disabled="busy" @click="sync(task)">

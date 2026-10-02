@@ -28,8 +28,8 @@ export async function syncVideoWork(id: string) {
 }
 export async function listWorks(ownerId: string, query: Record<string, unknown>) {
   const p = pageQuery(query)
-  const conditions = and(eq(works.ownerId, ownerId), p.kind ? eq(works.kind, p.kind) : undefined, p.projectId ? eq(works.projectId, p.projectId) : undefined, p.q ? ilike(works.title, `%${p.q.replace(/[%_\\]/g, '\\$&')}%`) : undefined)
-  const rows = await useDatabase().select({ work: works, runId: runs.id }).from(works).leftJoin(runs, and(eq(works.runId, runs.id), inArray(runs.kind, ['text', 'image', 'video']))).where(and(conditions, cursorCondition(works.createdAt, works.id, p.cursor))).orderBy(desc(pageTime(works.createdAt)), desc(works.id)).limit(p.limit + 1)
+  const conditions = and(eq(works.ownerId, ownerId), p.kind && p.kind !== 'workflow' ? eq(works.kind, p.kind) : undefined, p.projectId ? eq(works.projectId, p.projectId) : undefined, p.q ? ilike(works.title, `%${p.q.replace(/[%_\\]/g, '\\$&')}%`) : undefined)
+  const rows = await useDatabase().select({ work: works, runId: runs.id }).from(works).leftJoin(runs, and(eq(works.runId, runs.id), inArray(runs.kind, ['text', 'image', 'video', 'workflow']))).where(and(conditions, cursorCondition(works.createdAt, works.id, p.cursor))).orderBy(desc(pageTime(works.createdAt)), desc(works.id)).limit(p.limit + 1)
   const page = pageResult(rows.map(row => ({ ...row.work, runId: row.runId })), p.limit)
   const [count] = await useDatabase().select({ total: sql<number>`count(*)::int` }).from(works).where(conditions)
   const items: WorkSummary[] = page.items.map(w => ({ id: w.id, kind: w.kind, title: w.title, summary: w.summary, projectId: w.projectId || undefined, runId: w.runId || undefined, documentId: w.documentId || undefined, versionId: w.versionId || undefined, url: w.assetId ? `/api/assets/${w.assetId}/content` : w.generationId ? `/api/generations/${w.generationId}/video` : undefined, availability: w.availability, createdAt: w.createdAt.toISOString() }))

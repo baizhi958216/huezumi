@@ -1,7 +1,9 @@
+import { workflowPolicySchema } from '#shared/utils/workflow'
 import { z } from 'zod'
 
 export const secretSchema = z.object({ apiKey: z.string().min(1).optional(), accessKey: z.string().min(1).optional(), secretKey: z.string().min(1).optional() }).strict()
 export const connectionSettingsSchema = z.object({
+  workflowPolicy: workflowPolicySchema.optional(),
   baseUrl: z.url().refine((value) => {
     const url = URL.parse(value)
     return !!url && ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password && !url.search && !url.hash
@@ -17,7 +19,7 @@ export const connectionSettingsSchema = z.object({
 }).strict().refine(v => v.models.includes(v.defaultModel), { message: '默认模型必须属于模型列表，请重新选择默认模型', path: ['defaultModel'] })
 export const connectionSchema = z.object({
   name: z.string().trim().min(1).max(80),
-  kind: z.enum(['video', 'text', 'image']),
+  kind: z.enum(['video', 'text', 'image', 'workflow']),
   provider: z.string().min(1).max(50),
   enabled: z.boolean().default(true),
   settings: connectionSettingsSchema,
@@ -31,6 +33,7 @@ export const settingsSchema = z.object({
   defaultVideoConnectionId: z.uuid().optional(),
   defaultTextConnectionId: z.uuid().optional(),
   defaultImageConnectionId: z.uuid().optional(),
+  defaultWorkflowConnectionId: z.uuid().optional(),
 }).strict()
 
 // Null explicitly removes an assignment; omitted fields remain unchanged.
@@ -42,6 +45,7 @@ export const settingsPatchSchema = z.object({
   defaultVideoConnectionId: z.uuid().nullable().optional(),
   defaultTextConnectionId: z.uuid().nullable().optional(),
   defaultImageConnectionId: z.uuid().nullable().optional(),
+  defaultWorkflowConnectionId: z.uuid().nullable().optional(),
 }).strict()
 
 export function mergeSettingsPatch(current: PlatformSettingsInput, input: unknown) {

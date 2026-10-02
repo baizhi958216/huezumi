@@ -31,3 +31,5 @@ pnpm test:postgres
 检查 Markdown 本地链接、命令入口、API 路由和示例变量。ESLint 启用了文档格式化规则；只对目标文件执行 --fix，避免扩大改动范围。
 
 完整镜像需另执行 `docker build`，并检查容器内 db:init。真实 HTTPS、私有存储签名、浏览器交互、供应商账单与备份恢复均需目标环境验收。实际执行结果见 [项目检查记录](project-audit.md)。
+
+工作流测试位于 `tests/workflow.test.ts` 和 `tests/workflow-worker.integration.test.ts`。后者由 `pnpm test:postgres` 使用随机临时数据库执行，覆盖工作流幂等/免计费/未知结果/归档恢复，不调用真实模型。ComfyUI 实机协议检查及模型验收边界见 [工作流指南](comfyui.md)。

@@ -9,5 +9,5 @@ export default antfu({
     quotes: 'single',
     semi: false,
   },
-  ignores: ['.nuxt', '.output', '.data', 'public/uploads'],
+  ignores: ['vendor/**', '.nuxt', '.output', '.data', 'public/uploads'],
 })

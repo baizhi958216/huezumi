@@ -82,6 +82,14 @@ flowchart LR
 
 控制面板使用独立侧栏导航：总览、生成服务、价格管理、任务处理、用户与额度、邀请码、运营设置、操作记录。总览提供异常待办与配置入口；服务连接、用途分配与运营策略各有独立保存边界。任务页按生成、结算、归档维度展示状态，统一检索分页，视频使用 generations 权威记录而不重复展示 runs 镜像；人工结算展示金额、要求核对依据并防止重复点击。用户管理支持全量搜索、分页、角色和存储上限调整。历史价格默认折叠，凭据编辑只有一个入口。
 
+## ComfyUI 工作流
+
+新增 `/studio/workflow`，采用独立的 Vue Flow 三栏编辑器。ComfyUI API 图是执行合同，画布位置独立存储；节点来自 `/object_info`，模板与用户工作流为数据库数据。通用协议与图校验在 `shared/utils/workflow.ts`，连接、进程、存储与 worker 适配在 `server/services/comfyui/`，可选 Python 节点独立放在 `integrations/comfyui/`。新增标准节点或模板通过部署与页面配置完成，不为每个工作流新增平台分支。
+
+`runs.kind=workflow` 使用独立免计费受理接口，复用连接版本、幂等受理、outbox 与队列锁；不创建报价、不操作钱包或账本。`runs.workflow` 保存上游 prompt id 与输出引用；文本输出创建新文档版本，媒体保存到私有作品索引。`workflows` 保存 owner、图、布局、私有素材绑定、模板标记与乐观版本号。
+
+ComfyUI 已加载的全部节点自动进入目录和执行链路，节点配置仅用于参数覆盖与凭据映射，不再作为白名单；受保护参数和密钥由服务端注入，上传字段绑定 owner 素材；浏览器不直连 ComfyUI。结果不明进入 review；已知 prompt id 支持明确同步；归档失败只重试归档。托管 ComfyUI 默认随本机 Nuxt 启动并由管理员启停，生产 Web 与 worker 仍分离，ComfyUI 单独部署。操作与兼容范围见 [工作流指南](docs/comfyui.md)。
+
 ## 已知限制与演进
 
 - 开发期使用 schema push，不维护历史迁移。初始化、检查和镜像交付约定见 [仓库完整性规格](spec/2026-09-22-repository-integrity.md)。

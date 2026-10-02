@@ -67,6 +67,10 @@ function createConnection() {
   connectionOpen.value = true
 }
 function edit(c: ConnectionSummary) {
+  if (c.kind === 'workflow') {
+    void navigateTo('/studio/workflow')
+    return
+  }
   reset()
   editing.value = c.id
   name.value = c.name

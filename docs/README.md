@@ -14,6 +14,7 @@
 | 生产部署、升级、备份与恢复     | [运维指南](operations.md)                                 |
 | HTTP 接口                      | [API](api.md)                                             |
 | 普通用户图片生成               | [图片生成](image-generation.md)                           |
+| ComfyUI 安装与工作流           | [工作流指南](comfyui.md)                                  |
 | 测试命令和环境要求             | [验证指南](testing.md)                                    |
 | 已知缺口与本轮结果             | [项目检查记录](project-audit.md)                          |
 | 命名和视觉资源                 | [工程命名](engineering-name.md)、[品牌资源](brand-art.md) |

@@ -34,6 +34,7 @@ export function getStudioNavigation(_role: AppNavigationRole): AppNavigationItem
     { label: '文案生成', to: '/studio', icon: 'i-lucide-file-pen-line' },
     { label: '图片生成', to: '/studio/image', icon: 'i-lucide-image-plus' },
     { label: '视频生成', to: '/studio/video', icon: 'i-lucide-video' },
+    { label: '工作流', to: '/studio/workflow', icon: 'i-lucide-workflow' },
   ]
 }
 

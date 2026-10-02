@@ -30,6 +30,12 @@ export default defineNuxtConfig({
     },
   },
   runtimeConfig: {
+    comfyManaged: true,
+    comfyAutoStart: true,
+    comfyDirectory: 'vendor/ComfyUI',
+    comfyPython: '',
+    comfyPort: 8188,
+    comfyCpu: false,
     connectionEncryptionKey: '',
     // 宿主机开发连接 docker-compose.dev.yml；连接信息由私有 .env 提供。
     databaseUrl: '',

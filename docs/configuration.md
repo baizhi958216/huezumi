@@ -55,3 +55,7 @@ pnpm config:check --production
 `--production` 还检查 OSS 必要项。宿主 `.env.production.example` 没写完整的容器运行期变量；Compose 会注入数据库 URL，因此不能把宿主直接执行检查的结果等同于容器配置。
 
 旧配置导入会备份并可能重写 `.env`，只在迁移场景按 [运维指南](operations.md) 执行。工程标识见 [命名约定](engineering-name.md)。
+
+## ComfyUI
+
+本机进程管理使用 `NUXT_COMFY_*`，服务地址、节点白名单、固定参数、素材输入、凭据映射存于数据库连接版本。完整参数与示例集中在 [工作流配置](comfyui.md)，避免用环境变量替代平台连接。生产 Compose 默认关闭本机托管。

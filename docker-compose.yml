@@ -5,6 +5,9 @@ services:
     build: .
     ports:
       - '3000:3000'
+    environment:
+      NUXT_COMFY_MANAGED: 'false'
+      NUXT_COMFY_AUTO_START: 'false'
     env_file:
       - .env
     volumes:

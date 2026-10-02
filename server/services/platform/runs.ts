@@ -13,6 +13,8 @@ import { submitRunSchema } from './schemas'
 
 export async function submitRun(ownerId: string, input: unknown) {
   const body = submitRunSchema.parse(input)
+  if (body.request.kind === 'workflow')
+    throw createError({ statusCode: 422, statusMessage: '请使用工作流运行接口' })
   const hash = requestHash(body.request)
   const settings = await readSettings()
   const id = await useDatabase().transaction(async (tx) => {
@@ -31,12 +33,12 @@ export async function submitRun(ownerId: string, input: unknown) {
     await validateRunContext(ownerId, body.request)
     const active = await tx.execute<{
       count: number
-    }>(sql`select ((select count(*) from generations where owner_id=${ownerId} and status in ('PENDING','RUNNING')) + (select count(*) from runs where owner_id=${ownerId} and kind in ('text','image') and status in ('PENDING','RUNNING')))::int as count`)
+    }>(sql`select ((select count(*) from generations where owner_id=${ownerId} and status in ('PENDING','RUNNING')) + (select count(*) from runs where owner_id=${ownerId} and kind in ('text','image','workflow') and status in ('PENDING','RUNNING')))::int as count`)
     if ((active.rows[0]?.count || 0) >= settings.userMaxActiveGenerations)
       throw createError({ statusCode: 429, statusMessage: '进行中的任务已达上限' })
     const daily = await tx.execute<{
       used: string
-    }>(sql`select ((select coalesce(sum(case when settlement_status='released' then 0 else coalesce(charged_credits,reserved_credits) end),0) from generations where created_at>=date_trunc('day',now())) + (select coalesce(sum(case when settlement_status='released' then 0 else coalesce(charged_credits,reserved_credits) end),0) from runs where kind in ('text','image') and created_at>=date_trunc('day',now())))::text as used`)
+    }>(sql`select ((select coalesce(sum(case when settlement_status='released' then 0 else coalesce(charged_credits,reserved_credits) end),0) from generations where created_at>=date_trunc('day',now())) + (select coalesce(sum(case when settlement_status='released' then 0 else coalesce(charged_credits,reserved_credits) end),0) from runs where kind in ('text','image','workflow') and created_at>=date_trunc('day',now())))::text as used`)
     if (Number(daily.rows[0]?.used || 0) + quote.estimatedCredits > settings.platformDailyCreditBudget)
       throw createError({ statusCode: 503, statusMessage: '平台今日额度预算已用完' })
     const wallet = await tx.execute(sql`update wallets set reserved_credits=reserved_credits+${quote.estimatedCredits}, updated_at=now() where user_id=${ownerId} and balance_credits-reserved_credits>=${quote.estimatedCredits} returning user_id`)
@@ -78,7 +80,9 @@ export async function serializeRun(row: typeof runs.$inferSelect, includeDocumen
     allowedActions.push('sync')
   if (generation?.status === 'SUCCEEDED' && !generation.videoArchived && settlement !== 'review')
     allowedActions.push('archive')
-  if (row.kind === 'image' && row.stage === 'archiving' && settlement !== 'review')
+  if (row.kind === 'workflow' && row.workflow?.promptId && ['RUNNING', 'UNKNOWN'].includes(status) && settlement === 'not_required')
+    allowedActions.push('sync')
+  if ((row.kind === 'image' || row.kind === 'workflow') && row.stage === 'archiving' && settlement !== 'review')
     allowedActions.push('archive')
   let documentVersion: RunSummary['documentVersion']
   if (includeDocument && row.resultVersionId) {
@@ -86,10 +90,10 @@ export async function serializeRun(row: typeof runs.$inferSelect, includeDocumen
     if (v)
       documentVersion = { id: v.id, documentId: v.documentId, projectId: row.projectId!, version: v.version, source: v.source, content: v.content, model: v.model || undefined, provider: v.provider || undefined, createdAt: v.createdAt.toISOString() }
   }
-  return { id: row.id, kind: row.kind, projectId: row.projectId || undefined, status, stage: generation?.dispatchStatus || row.stage, billing: { estimatedCredits: generation?.reservedCredits ?? row.reservedCredits, chargedCredits: (generation?.chargedCredits ?? row.chargedCredits) ?? undefined, settlementStatus: settlement, priceVersion: priceVersion ?? undefined }, allowedActions, outputs: outputs.map(o => ({ id: o.id, kind: o.kind, url: o.assetId ? `/api/assets/${o.assetId}/content` : undefined })), imageRequest: includeDocument && row.kind === 'image' && row.request ? { connectionId: row.request.connectionId, model: row.request.model, input: row.request.input as import('#shared/types/image-generation').ImageGenerationRequest } : undefined, generation: includeDocument && generation ? toPublicGenerationRecord(rowToGeneration(generation)) : undefined, documentVersion, needsReview: row.needsReview, error: generation?.error || row.error || undefined, createdAt: row.createdAt.toISOString(), updatedAt: (generation?.updatedAt || row.updatedAt).toISOString() }
+  return { id: row.id, workflow: row.workflow || undefined, kind: row.kind, projectId: row.projectId || undefined, status, stage: generation?.dispatchStatus || row.stage, billing: { estimatedCredits: generation?.reservedCredits ?? row.reservedCredits, chargedCredits: (generation?.chargedCredits ?? row.chargedCredits) ?? undefined, settlementStatus: settlement, priceVersion: priceVersion ?? undefined }, allowedActions, outputs: outputs.map(o => ({ id: o.id, kind: o.kind, url: o.assetId ? `/api/assets/${o.assetId}/content` : undefined })), imageRequest: includeDocument && row.kind === 'image' && row.request ? { connectionId: row.request.connectionId, model: row.request.model, input: row.request.input as import('#shared/types/image-generation').ImageGenerationRequest } : undefined, generation: includeDocument && generation ? toPublicGenerationRecord(rowToGeneration(generation)) : undefined, documentVersion, needsReview: row.needsReview, error: generation?.error || row.error || undefined, createdAt: row.createdAt.toISOString(), updatedAt: (generation?.updatedAt || row.updatedAt).toISOString() }
 }
 export async function getRun(ownerId: string, id: string) {
-  const [row] = await useDatabase().select().from(runs).where(and(or(eq(runs.id, id), eq(runs.generationId, id)), eq(runs.ownerId, ownerId), inArray(runs.kind, ['text', 'image', 'video'])))
+  const [row] = await useDatabase().select().from(runs).where(and(or(eq(runs.id, id), eq(runs.generationId, id)), eq(runs.ownerId, ownerId), inArray(runs.kind, ['text', 'image', 'video', 'workflow'])))
   if (!row)
     throw createError({ statusCode: 404, statusMessage: '任务不存在' })
   return await serializeRun(row)
@@ -97,7 +101,7 @@ export async function getRun(ownerId: string, id: string) {
 export async function listRuns(ownerId: string, query: Record<string, unknown>) {
   const p = pageQuery(query)
   const state = sql`coalesce(${generations.status}, ${runs.status})`
-  const rows = await useDatabase().select({ row: runs, generation: generations, priceVersion: quotes.priceVersion }).from(runs).leftJoin(generations, eq(runs.generationId, generations.id)).leftJoin(quotes, eq(runs.quoteId, quotes.id)).where(and(eq(runs.ownerId, ownerId), inArray(runs.kind, ['text', 'image', 'video']), cursorCondition(runs.createdAt, runs.id, p.cursor), p.kind ? eq(runs.kind, p.kind) : undefined, p.projectId ? eq(runs.projectId, p.projectId) : undefined, p.status ? sql`${state}=${p.status}` : undefined, query.active === 'true' ? sql`(${state} in ('PENDING','RUNNING','UNKNOWN') or (${runs.kind}='image' and ${runs.stage}='archiving'))` : undefined)).orderBy(desc(pageTime(runs.createdAt)), desc(runs.id)).limit(p.limit + 1)
+  const rows = await useDatabase().select({ row: runs, generation: generations, priceVersion: quotes.priceVersion }).from(runs).leftJoin(generations, eq(runs.generationId, generations.id)).leftJoin(quotes, eq(runs.quoteId, quotes.id)).where(and(eq(runs.ownerId, ownerId), inArray(runs.kind, ['text', 'image', 'video', 'workflow']), cursorCondition(runs.createdAt, runs.id, p.cursor), p.kind ? eq(runs.kind, p.kind) : undefined, p.projectId ? eq(runs.projectId, p.projectId) : undefined, p.status ? sql`${state}=${p.status}` : undefined, query.active === 'true' ? sql`(${state} in ('PENDING','RUNNING','UNKNOWN') or (${runs.kind} in ('image','workflow') and ${runs.stage}='archiving'))` : undefined)).orderBy(desc(pageTime(runs.createdAt)), desc(runs.id)).limit(p.limit + 1)
   const page = pageResult(rows.map(r => r.row), p.limit)
   const outputs = page.items.length ? await useDatabase().select({ id: works.id, kind: works.kind, assetId: works.assetId, runId: works.runId }).from(works).where(inArray(works.runId, page.items.map(row => row.id))) : []
   const items = await Promise.all(page.items.map((row, index) => serializeRun(row, false, { generation: rows[index]?.generation, priceVersion: rows[index]?.priceVersion, outputs: outputs.filter(output => output.runId === row.id) })))
@@ -108,6 +112,16 @@ export async function commandRun(ownerId: string, id: string, action: 'sync' | '
   if (!summary.allowedActions.includes(action))
     throw createError({ statusCode: 409, statusMessage: '任务当前不允许此操作' })
   const [row] = await useDatabase().select().from(runs).where(eq(runs.id, summary.id))
+  if (row!.kind === 'workflow') {
+    await readConnectionVersion(row!.connectionVersionId!)
+    await useDatabase().transaction(async (tx) => {
+      if (action === 'sync')
+        await tx.update(runs).set({ stage: 'submitted', status: 'RUNNING', error: null, updatedAt: new Date() }).where(and(eq(runs.id, summary.id), eq(runs.stage, 'review'), eq(runs.settlementStatus, 'not_required')))
+      await tx.insert(outboxEvents).values({ topic: 'run.workflow', aggregateId: summary.id, payload: {} })
+    })
+    publishOutbox().catch(() => console.error('Workflow synchronization deferred'))
+    return { queued: true }
+  }
   await enqueueGeneration({ kind: row!.kind === 'image' ? 'image' : 'poll', generationId: row!.generationId || id }, { jobId: `command:${id}:${Date.now()}` })
   return { queued: true }
 }

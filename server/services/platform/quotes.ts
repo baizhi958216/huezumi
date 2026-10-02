@@ -7,6 +7,7 @@ import { creativeDocuments, creativeDocumentVersions, creativeProjects, pricingR
 import { requestHash } from '../../utils/request-hash'
 import { resolveProviderMediaUrls } from '../assets'
 import { createQuote } from '../billing'
+import { assertWorkflowAssets } from '../comfyui/catalog'
 import { assertRequestSupported } from '../providers'
 import { getCapability } from '../providers/catalog'
 import { currentConnection, readSettings } from './connections'
@@ -14,6 +15,8 @@ import { resolveImageInputs } from './image-input'
 import { runRequestSchema } from './schemas'
 
 export async function validateRunContext(ownerId: string, request: RunRequest) {
+  if (request.kind === 'workflow')
+    await assertWorkflowAssets(ownerId, request.input as import('#shared/types/workflow').WorkflowInput)
   if (request.projectId) {
     const [project] = await useDatabase().select({ id: creativeProjects.id }).from(creativeProjects).where(and(eq(creativeProjects.id, request.projectId), eq(creativeProjects.ownerId, ownerId)))
     if (!project)
@@ -39,6 +42,8 @@ export async function validateRunContext(ownerId: string, request: RunRequest) {
 }
 export async function quoteRun(ownerId: string, input: unknown) {
   const request = runRequestSchema.parse(input)
+  if (request.kind === 'workflow')
+    throw createError({ statusCode: 422, statusMessage: '工作流无需报价，请直接运行' })
   if (request.kind === 'text') {
     request.projectId ||= request.input.projectId
     delete request.input.projectId
@@ -46,7 +51,7 @@ export async function quoteRun(ownerId: string, input: unknown) {
   }
   await validateRunContext(ownerId, request)
   const settings = await readSettings()
-  const assigned = { text: settings.defaultTextConnectionId, image: settings.defaultImageConnectionId, video: settings.defaultVideoConnectionId }
+  const assigned = { text: settings.defaultTextConnectionId, image: settings.defaultImageConnectionId, video: settings.defaultVideoConnectionId, workflow: settings.defaultWorkflowConnectionId }
   if (!assigned[request.kind] || request.connectionId !== assigned[request.kind])
     throw createError({ statusCode: 422, statusMessage: '生成服务未分配或配置已变更，请刷新页面或联系管理员' })
   const { connection, version } = await currentConnection(request.connectionId)

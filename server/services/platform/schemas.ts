@@ -1,3 +1,4 @@
+import { workflowInputSchema } from '#shared/utils/workflow'
 import { z } from 'zod'
 import { generationSchema } from '../../utils/generation-schema'
 import { imageGenerationSchema } from '../../utils/image-generation-schema'
@@ -16,6 +17,7 @@ export const textRequestSchema = z.object({
 }).strict()
 const context = { connectionId: z.uuid(), model: z.string().trim().min(1).max(120), projectId: z.uuid().optional(), sourceVersionId: z.uuid().optional(), sourceExcerpt: z.string().max(20000).optional(), baseVersionId: z.uuid().optional() }
 export const runRequestSchema = z.discriminatedUnion('kind', [
+  z.object({ ...context, kind: z.literal('workflow'), input: workflowInputSchema }),
   z.object({ ...context, kind: z.literal('video'), input: generationSchema }),
   z.object({ ...context, kind: z.literal('image'), input: imageGenerationSchema }),
   z.object({ ...context, kind: z.literal('text'), input: textRequestSchema }),

@@ -7,7 +7,7 @@ import { requireAdmin } from '../../utils/auth'
 const querySchema = z.object({
   page: z.coerce.number().int().min(1).max(100000).default(1),
   scope: z.enum(['review', 'all']).default('review'),
-  kind: z.enum(['all', 'text', 'image', 'video']).default('all'),
+  kind: z.enum(['all', 'text', 'image', 'video', 'workflow']).default('all'),
   q: z.string().trim().max(200).default(''),
 })
 export default defineEventHandler(async (event) => {
@@ -19,8 +19,8 @@ export default defineEventHandler(async (event) => {
       select r.id, 'run' as source, r.kind, u.email as owner, r.status,
         r.settlement_status as settlement, r.reserved_credits as credits,
         r.charged_credits as "chargedCredits", coalesce(r.error, r.request->'input'->>'prompt', r.request->'input'->>'brief', '') as detail,
-        r.created_at as "createdAt", null::text as "providerTaskId", r.stage
-      from runs r join users u on u.id = r.owner_id where r.kind in ('text', 'image')
+        r.created_at as "createdAt", r.workflow->>'promptId' as "providerTaskId", r.stage
+      from runs r join users u on u.id = r.owner_id where r.kind in ('text', 'image', 'workflow')
       union all
       select g.id, 'video', 'video', u.email, g.status, g.settlement_status::text,
         g.reserved_credits, g.charged_credits, coalesce(g.error, g.request->>'prompt', ''),

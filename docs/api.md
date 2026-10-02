@@ -129,3 +129,13 @@
 `GET /api/admin/users` 支持 `q`（姓名或邮箱，最多 200 字）与 `page`（从 1 开始）。分页请求每页取 30 条加一条后续存在性标记，调用方展示前 30 条；省略 page 保持最多 200 条的原响应数组。搜索在数据库中执行，覆盖所有账户。
 
 总览新增 `creativeTasks`、`activeCreativeTasks`、`reviewTasks`，包含文案、图片、视频；旧 `generations/active/failed` 仍只统计视频。存储统计排除已删除素材。
+
+## ComfyUI 工作流
+
+- `POST /api/workflows/preview`：登录后解析官方画布 JSON，返回标准图、布局、端口和兼容性问题；不保存或执行工作流。
+- `GET /api/workflows/catalog`：登录后读取全部已加载节点的脱敏描述、连接标识、节点数量和参数规则；不返回共享上传文件名及密钥。
+- `GET/POST /api/workflows`、`PUT/DELETE /api/workflows/:id`：读取自己的工作流及平台模板，保存/删除自己的图；更新携带 revision。只有管理员可发布模板。
+- `GET /api/workflows/runtime`：登录后读取本机服务状态；`POST` 的 start/stop 仅管理员可用，有未完成任务时拒绝停止。
+- `GET/PUT /api/admin/comfyui`：管理员读取完整已安装节点摘要（含上传和凭据字段名、扫描错误）并配置版本化连接与可选节点参数；不返回字段默认值或共享文件列表。PUT 的 connection 使用现有连接 schema，kind=workflow、provider=comfyui。
+- `POST /api/workflows/runs`：使用 `{ input: { prompt, graph, assets }, idempotencyKey, projectId? }` 直接运行；graph 为 ComfyUI API 图，assets 为 `节点ID.输入名 → 平台素材UUID`。工作流暂不计费，不创建报价、不预留或扣除额度。
+- 任务查询、同步和归档重试沿用 `/api/runs/:id` 与对应动作接口。完整策略、异常语义和部署边界见 [工作流指南](comfyui.md)。

@@ -5,6 +5,7 @@ import { useDatabase } from '../database/client'
 import { generations } from '../database/schema'
 import { resolveProviderMediaUrls } from './assets'
 import { releaseGenerationCredits, settleGenerationCredits } from './billing'
+import { failWorkflowJob, runWorkflowJob } from './comfyui/worker'
 import { enqueueGeneration, withGenerationLock } from './generation-queue'
 import { archiveRemoteOutput, OutputArchiveError } from './output-archive'
 import { runImageJob } from './platform/image-worker'
@@ -16,6 +17,8 @@ import { configuredVideoProvider } from './providers/configured'
 const POLL_DELAY_MS = 12000
 export async function runGenerationJob(job: GenerationJob) {
   return await withGenerationLock(job.generationId, async () => {
+    if (job.kind === 'workflow')
+      return await runWorkflowJob(job.generationId)
     if (job.kind === 'image')
       return await runImageJob(job.generationId)
     if (job.kind === 'text')
@@ -28,6 +31,8 @@ export async function runGenerationJob(job: GenerationJob) {
 }
 export async function handleFailedGeneration(job: GenerationJob) {
   await withGenerationLock(job.generationId, async () => {
+    if (job.kind === 'workflow')
+      return await failWorkflowJob(job.generationId)
     if (job.kind === 'image' || job.kind === 'text')
       return await failRunJob(job.generationId)
     if (job.kind !== 'submit' && job.kind !== 'poll')

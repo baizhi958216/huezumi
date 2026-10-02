@@ -16,7 +16,7 @@ async function main() {
   try {
     await admin.query(`create database "${name}"`)
     created = true
-    for (const args of [['db:init'], ['exec', 'vitest', 'run', 'tests/database.integration.test.ts', 'tests/image-worker.integration.test.ts', 'tests/admin.integration.test.ts']]) {
+    for (const args of [['db:init'], ['exec', 'vitest', 'run', 'tests/database.integration.test.ts', 'tests/image-worker.integration.test.ts', 'tests/admin.integration.test.ts', 'tests/workflow-worker.integration.test.ts']]) {
       const result = spawnSync('pnpm', args, { env, stdio: 'inherit' })
       if (result.error)
         throw result.error

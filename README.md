@@ -9,6 +9,7 @@
 | `/studio`                | 故事、剧本、文案生成，手动编辑与不可变版本   | 登录后报价、后台生成、额度结算                                        |
 | `/studio/image`          | 百炼千问图片文生图、参考图编辑               | 当前支持 `qwen-image-2.0` / `qwen-image-2.0-pro` 及代码允许的日期版本 |
 | `/studio/video`          | 多供应商视频生成                             | 具体模式由适配器能力、连接模型和价格决定                              |
+| `/studio/workflow`       | ComfyUI 节点画布、模板及文本/图片/视频工作流 | 自动读取 ComfyUI 全部节点；登录后直接运行，暂不计费                   |
 | `/projects`              | 文本、图片、视频作品及项目归类               | 按账户隔离；生成结果后台归档                                          |
 | `/dashboard`、`/account` | 空间、额度、存储与账户资料                   | 登录后使用                                                            |
 | `/admin` 及管理子页面    | 用户、价格、连接、运营设置、任务核对和邀请码 | 仅管理员                                                              |
@@ -36,6 +37,8 @@ pnpm dev
 当前按全新开发项目管理数据库，`schema.ts` 是结构来源。`db:init` 使用 Drizzle Kit push 建表并初始化 PostgreSQL 队列，不需要 `drizzle/` 迁移历史；已有开发库改结构使用 `pnpm db:push`，不自动强制确认破坏性变更。
 
 默认页面地址为 `http://localhost:3000`。文案、图片与视频的服务平台和生成模型由管理员在控制面板分配，创作台不展示选择入口。模型连接、价格、注册方式和平台预算在管理后台维护。完整步骤见 [开发指南](docs/development.md)，检查结果见 [项目检查记录](docs/project-audit.md)。
+
+ComfyUI 本地安装、节点扩展、前端启停和部署边界见 [工作流指南](docs/comfyui.md)。
 
 ## 验证
 
